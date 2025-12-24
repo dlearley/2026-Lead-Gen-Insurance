@@ -9,7 +9,7 @@ from app.core.config import settings
 router = APIRouter()
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get("", response_model=HealthResponse)
 async def health_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
     try:
         await db.execute(text("SELECT 1"))

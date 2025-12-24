@@ -1,10 +1,16 @@
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 from sqlalchemy import String, Boolean, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.lead import Lead
+    from app.models.campaign import Campaign
+    from app.models.team import Team
 
 
 class Organization(Base, TimestampMixin):
@@ -31,6 +37,11 @@ class Organization(Base, TimestampMixin):
     )
     campaigns: Mapped[List["Campaign"]] = relationship(
         "Campaign",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    teams: Mapped[List["Team"]] = relationship(
+        "Team",
         back_populates="organization",
         cascade="all, delete-orphan"
     )
