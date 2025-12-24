@@ -1,0 +1,27 @@
+# Auto detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# TypeScript
+*.ts text diff=typescript
+*.tsx text diff=typescript
+
+# JavaScript
+*.js text diff=javascript
+*.jsx text diff=javascript
+
+# JSON
+*.json text diff=json
+
+# CSS
+*.css text diff=css
+
+# Markdown
+*.md text diff=markdown
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
