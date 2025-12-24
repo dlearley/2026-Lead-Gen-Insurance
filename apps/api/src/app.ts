@@ -1,0 +1,64 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import path from 'path';
+import { logger } from '@insurance-lead-gen/core';
+import leadsRouter from './routes/leads.js';
+import notesRouter from './routes/notes.js';
+import activityRouter from './routes/activity.js';
+import emailsRouter from './routes/emails.js';
+import tasksRouter from './routes/tasks.js';
+import notificationsRouter from './routes/notifications.js';
+import sendEmailRouter from './routes/send-email.js';
+import { UPLOADS_DIR } from './utils/files.js';
+
+export function createApp(): express.Express {
+  const app = express();
+
+  app.use(helmet());
+  app.use(cors());
+  app.use(compression());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
+
+  app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
+
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'insurance-lead-gen-api',
+      version: '1.0.0',
+    });
+  });
+
+  app.use('/api/v1/leads', leadsRouter);
+  app.use('/api/v1/leads/:leadId/notes', notesRouter);
+  app.use('/api/v1/leads/:leadId/activity', activityRouter);
+  app.use('/api/v1/leads/:leadId/emails', emailsRouter);
+  app.use('/api/v1/leads/:leadId/tasks', tasksRouter);
+  app.use('/api/v1/leads/:leadId/send-email', sendEmailRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
+
+  app.use('/api/leads', leadsRouter);
+  app.use('/api/leads/:leadId/notes', notesRouter);
+  app.use('/api/leads/:leadId/activity', activityRouter);
+  app.use('/api/leads/:leadId/emails', emailsRouter);
+  app.use('/api/leads/:leadId/tasks', tasksRouter);
+  app.use('/api/leads/:leadId/send-email', sendEmailRouter);
+  app.use('/api/notifications', notificationsRouter);
+
+  app.use((req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
+  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.error('Unhandled error', { error: err });
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  return app;
+}
+
+export const app = createApp();
