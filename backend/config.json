@@ -1,0 +1,14 @@
+{
+  "app_name": "2026 Lead Generation Insurance Platform",
+  "version": "1.0.0",
+  "description": "Lead Management System for Insurance Lead Generation",
+  "debug": true,
+  "secret_key": "your-secret-key-change-in-production",
+  "algorithm": "HS256",
+  "access_token_expire_minutes": 30,
+  "database_url": "sqlite+aiosqlite:///./leads.db",
+  "api_v1_prefix": "/api/v1",
+  "cors_origins": ["http://localhost:3000", "http://localhost:5173"],
+  "pagination_default_page_size": 20,
+  "pagination_max_page_size": 100
+}
