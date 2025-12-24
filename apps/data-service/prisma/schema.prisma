@@ -1,0 +1,270 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  BUSINESS
+  RENTERS
+  UMBRELLA
+  DISABILITY
+  LONG_TERM_CARE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  CONVERTED
+  REJECTED
+  EXPIRED
+  ARCHIVED
+}
+
+enum LeadSource {
+  WEB_FORM
+  API
+  FILE_UPLOAD
+  REFERRAL
+  PHONE
+  EMAIL
+  SOCIAL_MEDIA
+  ADVERTISEMENT
+  ORGANIC
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  ON_BREAK
+  BUSY
+  OFFLINE
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  COMPLETED
+  CONVERTED
+  CANCELLED
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Lead {
+  id                String          @id @default(uuid())
+  
+  // Personal Information
+  firstName         String
+  lastName          String
+  email             String
+  phone             String?
+  dateOfBirth       DateTime?
+  
+  // Insurance Details
+  insuranceType     InsuranceType
+  insuranceTypes    InsuranceType[] // For multiple insurance types
+  currentProvider   String?
+  policyExpiryDate  DateTime?
+  
+  // Lead Information
+  source            LeadSource      @default(WEB_FORM)
+  status            LeadStatus      @default(NEW)
+  qualityScore      Float?          // 0-100 score
+  urgency           Urgency         @default(MEDIUM)
+  intent            String?
+  
+  // Location
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  country           String          @default("US")
+  
+  // Additional Data
+  notes             String?
+  metadata          Json?           // Flexible JSON field for additional data
+  enrichedData      Json?           // Data from external APIs
+  
+  // AI Processing
+  aiProcessedAt     DateTime?
+  aiScoreReason     String?
+  similarityScore   Float?
+  
+  // Relationships
+  assignments       Assignment[]
+  events            LeadEvent[]
+  
+  // Timestamps
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@index([email])
+  @@index([status])
+  @@index([insuranceType])
+  @@index([qualityScore])
+  @@index([createdAt])
+  @@index([source])
+}
+
+model Agent {
+  id                String          @id @default(uuid())
+  
+  // Personal Information
+  firstName         String
+  lastName          String
+  email             String          @unique
+  phone             String?
+  
+  // Professional Information
+  licenseNumber     String?
+  licenseState      String?
+  yearsOfExperience Int?
+  
+  // Specializations
+  specializations   InsuranceType[]
+  
+  // Performance Metrics
+  conversionRate    Float           @default(0) // Percentage
+  averageResponseTime Float         @default(0) // Minutes
+  totalLeadsHandled Int             @default(0)
+  totalConversions  Int             @default(0)
+  performanceScore  Float           @default(0) // 0-100
+  
+  // Capacity & Availability
+  status            AgentStatus     @default(ACTIVE)
+  currentCapacity   Int             @default(0) // Current assigned leads
+  maxCapacity       Int             @default(10) // Max concurrent leads
+  availabilityHours Json?           // Schedule as JSON
+  
+  // Location
+  city              String?
+  state             String?
+  zipCode           String?
+  country           String          @default("US")
+  serviceArea       String[]        // ZIP codes or states they serve
+  
+  // Authentication & Authorization
+  passwordHash      String?
+  lastLoginAt       DateTime?
+  
+  // Relationships
+  assignments       Assignment[]
+  
+  // Additional Data
+  metadata          Json?
+  
+  // Timestamps
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@index([email])
+  @@index([status])
+  @@index([performanceScore])
+  @@index([specializations])
+}
+
+model Assignment {
+  id                String            @id @default(uuid())
+  
+  // Relationships
+  leadId            String
+  lead              Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agentId           String
+  agent             Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Assignment Details
+  status            AssignmentStatus  @default(PENDING)
+  priority          Int               @default(0) // Higher number = higher priority
+  
+  // Matching Details
+  matchScore        Float?            // How well the agent matches the lead
+  matchReason       String?           // Why this agent was selected
+  
+  // Timeline
+  assignedAt        DateTime          @default(now())
+  acceptedAt        DateTime?
+  rejectedAt        DateTime?
+  completedAt       DateTime?
+  expiresAt         DateTime?
+  
+  // Outcome
+  converted         Boolean           @default(false)
+  conversionValue   Float?            // Premium value or commission
+  rejectionReason   String?
+  
+  // Communication
+  notes             String?
+  agentNotes        String?
+  
+  // Additional Data
+  metadata          Json?
+  
+  // Timestamps
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  @@unique([leadId, agentId])
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([assignedAt])
+}
+
+model LeadEvent {
+  id                String          @id @default(uuid())
+  
+  // Relationships
+  leadId            String
+  lead              Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Event Details
+  eventType         String          // e.g., "status_change", "assigned", "contacted", "note_added"
+  eventData         Json            // Flexible event data
+  
+  // Actor
+  actorType         String?         // "system", "agent", "api"
+  actorId           String?         // ID of the actor (agent ID, API key ID, etc.)
+  
+  // Timestamp
+  timestamp         DateTime        @default(now())
+  
+  @@index([leadId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+model SystemConfig {
+  id                String          @id @default(uuid())
+  key               String          @unique
+  value             Json
+  description       String?
+  
+  // Timestamps
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@index([key])
+}
