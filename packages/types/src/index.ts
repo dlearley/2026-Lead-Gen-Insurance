@@ -68,3 +68,5 @@ export interface ProcessingResult {
   error?: Error;
   processingTime: number;
 }
+
+export * from './events.js';

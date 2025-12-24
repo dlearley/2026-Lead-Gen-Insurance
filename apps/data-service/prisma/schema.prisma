@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LeadStatus {
+  received
+  processing
+  qualified
+  routed
+  converted
+  rejected
+}
+
+model Lead {
+  id            String      @id
+  source        String
+  email         String?
+  phone         String?
+  firstName     String?
+  lastName      String?
+  address       Json?
+  insuranceType String?
+  qualityScore  Int?
+  status        LeadStatus  @default(received)
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  assignments   LeadAssignment[]
+
+  @@index([status])
+  @@index([source])
+}
+
+model Agent {
+  id                 String   @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String   @unique
+  phone               String
+  licenseNumber       String   @unique
+  specializations     String[]
+  location            Json
+  rating              Float    @default(0)
+  isActive            Boolean  @default(true)
+  maxLeadCapacity     Int      @default(0)
+  currentLeadCount    Int      @default(0)
+  averageResponseTime Int      @default(0)
+  conversionRate      Float    @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  assignments         LeadAssignment[]
+}
+
+enum AssignmentStatus {
+  pending
+  accepted
+  rejected
+  timeout
+}
+
+model LeadAssignment {
+  id         String           @id @default(uuid())
+  leadId     String
+  agentId    String
+  assignedAt DateTime         @default(now())
+  status     AssignmentStatus @default(pending)
+  acceptedAt DateTime?
+  notes      String?
+
+  lead       Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent      Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([agentId])
+}

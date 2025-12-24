@@ -1,67 +1,40 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import { config } from '@insurance-lead-gen/config';
 import { logger } from '@insurance-lead-gen/core';
-import type { Lead } from '@insurance-lead-gen/types';
+import { getConfig } from '@insurance-lead-gen/config';
 
-const app = express();
-const PORT = process.env.API_PORT || 3000;
+import { createApp } from './app.js';
+import { NatsEventBus } from './infra/nats-event-bus.js';
 
-app.use(helmet());
-app.use(cors());
-app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+const start = async (): Promise<void> => {
+  const config = getConfig();
+  const PORT = config.ports.api;
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+  const eventBus = await NatsEventBus.connect(config.nats.url);
 
-app.post('/api/v1/leads', async (req, res) => {
-  try {
-    const leadData: Partial<Lead> = req.body;
-    logger.info('Received lead', { lead: leadData });
-    
-    // TODO: Implement lead creation logic
-    res.status(201).json({
-      id: 'lead_' + Date.now(),
-      status: 'received',
-      message: 'Lead ingested successfully',
-    });
-  } catch (error) {
-    logger.error('Error creating lead', { error });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/v1/leads/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    logger.info('Fetching lead', { leadId: id });
-    
-    // TODO: Implement lead retrieval logic
-    res.json({
-      id,
-      status: 'processing',
-      message: 'Lead found',
-    });
-  } catch (error) {
-    logger.error('Error fetching lead', { error });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-const server = app.listen(PORT, () => {
-  logger.info(`API service running on port ${PORT}`);
-});
-
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    process.exit(0);
+  const app = createApp({
+    eventBus,
+    jwtSecret: config.jwt.secret,
+    rateLimit: config.apiRateLimit,
   });
-});
 
-export default app;
+  const server = app.listen(PORT, () => {
+    logger.info(`API service running on port ${PORT}`);
+  });
+
+  const shutdown = async (): Promise<void> => {
+    logger.info('SIGTERM received, shutting down gracefully');
+
+    server.close(() => {
+      void eventBus.close();
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', () => {
+    void shutdown();
+  });
+};
+
+start().catch((error) => {
+  logger.error('API service failed to start', { error });
+  process.exit(1);
+});

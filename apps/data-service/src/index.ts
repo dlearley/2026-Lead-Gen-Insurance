@@ -1,24 +1,102 @@
 import { logger } from '@insurance-lead-gen/core';
-import { createRequire } from 'module';
+import { getConfig } from '@insurance-lead-gen/config';
+import { EVENT_SUBJECTS, type LeadReceivedEvent } from '@insurance-lead-gen/types';
 
-const require = createRequire(import.meta.url);
+import { NatsEventBus } from './nats/nats-event-bus.js';
+import { prisma } from './prisma/client.js';
+import { createRedisConnection } from './redis/redis-client.js';
+import {
+  createLeadIngestionQueue,
+  startLeadIngestionWorker,
+} from './queues/lead-ingestion.queue.js';
+import { LeadRepository } from './repositories/lead.repository.js';
 
-const PORT = process.env.DATA_SERVICE_PORT || 3001;
+const config = getConfig();
+const PORT = config.ports.dataService;
 
-// TODO: Implement Prisma client
-// TODO: Implement Redis connection
-// TODO: Implement Neo4j driver
-// TODO: Implement Qdrant client
-// TODO: Implement NATS connection
+const start = async (): Promise<void> => {
+  logger.info('Data service starting', { port: PORT });
 
-logger.info('Data service starting', { port: PORT });
+  const eventBus = await NatsEventBus.connect(config.nats.url);
+  const redis = createRedisConnection();
 
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
+  const leadRepository = new LeadRepository(prisma);
+  const leadIngestionQueue = createLeadIngestionQueue(redis);
+  const leadIngestionWorker = startLeadIngestionWorker({
+    connection: redis,
+    leadRepository,
+    eventBus,
+  });
+
+  leadIngestionWorker.on('failed', (job, error) => {
+    logger.error('Lead ingestion job failed', { jobId: job?.id, error });
+  });
+
+  const leadReceivedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadReceived);
+  (async () => {
+    for await (const msg of leadReceivedSub) {
+      try {
+        const event = eventBus.decode<LeadReceivedEvent>(msg.data);
+
+        await leadIngestionQueue.add('ingest', {
+          leadId: event.data.leadId,
+          lead: event.data.lead,
+          rawEvent: event,
+        });
+      } catch (error) {
+        logger.error('Failed to enqueue lead ingestion job', { error });
+      }
+    }
+  })().catch((error) => {
+    logger.error('Lead received subscription terminated', { error });
+  });
+
+  const leadGetSub = eventBus.subscribe(EVENT_SUBJECTS.LeadGet);
+  (async () => {
+    for await (const msg of leadGetSub) {
+      try {
+        const { leadId } = eventBus.decode<{ leadId: string }>(msg.data);
+        const lead = await leadRepository.getLeadById(leadId);
+
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { lead });
+        }
+      } catch (error) {
+        logger.error('Failed to handle lead.get request', { error });
+
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { lead: null, error: 'internal_error' });
+        }
+      }
+    }
+  })().catch((error) => {
+    logger.error('Lead get subscription terminated', { error });
+  });
+
+  const shutdown = async (): Promise<void> => {
+    logger.info('Shutting down data service');
+
+    await leadIngestionWorker.close();
+    await leadIngestionQueue.close();
+
+    await eventBus.close();
+    await prisma.$disconnect();
+    await redis.quit();
+  };
+
+  process.on('SIGTERM', () => {
+    shutdown()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  });
+
+  logger.info('Data service running');
+};
+
+start().catch((error) => {
+  logger.error('Data service failed to start', { error });
+  process.exit(1);
 });
-
-logger.info(`Data service running on port ${PORT}`);
 
 // Keep the process alive
 setInterval(() => {
