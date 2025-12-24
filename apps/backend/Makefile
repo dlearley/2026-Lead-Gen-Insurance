@@ -26,14 +26,14 @@ dev:
     make migrate
 
 db-up:
-    docker compose up -d
+    docker compose -f ../../docker-compose.yml up -d postgres redis
 
 db-down:
-    docker compose down
+    docker compose -f ../../docker-compose.yml down
 
 db-reset:
-    docker compose down -v
-    docker compose up -d
+    docker compose -f ../../docker-compose.yml down -v
+    docker compose -f ../../docker-compose.yml up -d postgres redis
     @echo "Waiting for database to be ready..."
     @sleep 5
     make migrate

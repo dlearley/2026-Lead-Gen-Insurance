@@ -1,372 +1,377 @@
-# Lead Generation Insurance Platform - Backend API
+# 2026 Lead Generation Insurance Platform
 
-A modern, scalable backend API for managing insurance leads, built with FastAPI, PostgreSQL, and SQLAlchemy.
+A comprehensive AI-powered lead generation and management platform for insurance businesses.
 
-## 🚀 Features
+## 📋 Overview
 
-- **FastAPI Framework**: High-performance, modern Python web framework
-- **Async SQLAlchemy ORM**: Efficient database operations with connection pooling
-- **PostgreSQL Database**: Robust relational database with full ACID compliance
-- **Alembic Migrations**: Version-controlled database schema management
-- **Pydantic Validation**: Comprehensive input validation and serialization
-- **RESTful API**: Well-structured endpoints with proper HTTP methods
-- **Auto-generated Documentation**: Interactive API docs with Swagger UI
-- **Comprehensive Testing**: Unit and integration tests with pytest
-- **Docker Support**: Containerized PostgreSQL and Redis services
-- **Type Hints**: Full type safety throughout the codebase
+This is a monorepo containing multiple services and packages for the Lead Generation Insurance Platform. The platform combines modern backend APIs, data processing services, AI orchestration, and intelligent lead management capabilities.
 
-## 📋 Prerequisites
+## 🏗️ Architecture
 
-- Python 3.9+
-- Docker and Docker Compose
-- pip (Python package manager)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Frontend / Clients                       │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+┌───────────────────────┴─────────────────────────────────────┐
+│                      API Gateway                             │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
+┌───────▼──────┐ ┌─────▼──────┐ ┌─────▼──────────┐
+│   Backend    │ │Data Service│ │  Orchestrator  │
+│  (FastAPI)   │ │(TypeScript)│ │  (TypeScript)  │
+└──────┬───────┘ └─────┬──────┘ └─────┬──────────┘
+       │               │               │
+       └───────────────┼───────────────┘
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+┌───────▼─────────┐         ┌────────▼──────────┐
+│   PostgreSQL    │         │   Redis Cache     │
+│   (Primary DB)  │         │   (Sessions)      │
+└─────────────────┘         └───────────────────┘
+```
 
-## 🛠️ Installation & Setup
+## 📦 Monorepo Structure
 
-### 1. Clone the repository
+### Apps
+
+- **`apps/backend/`** - FastAPI Python backend for lead management (Phase 1.1 ✅)
+  - RESTful API for CRUD operations
+  - PostgreSQL database with SQLAlchemy ORM
+  - Alembic migrations
+  - Comprehensive testing with pytest
+  - See [apps/backend/README.md](./apps/backend/README.md)
+
+- **`apps/api/`** - Main API service (TypeScript/Node.js)
+  - API Gateway and routing
+  - Authentication & authorization
+  - Request/response handling
+
+- **`apps/data-service/`** - Data processing service
+  - Data transformation and validation
+  - Integration with external data sources
+  - Batch processing
+
+- **`apps/orchestrator/`** - AI orchestration service
+  - LLM integration
+  - Workflow coordination
+  - Event processing
+
+### Packages
+
+- **`packages/core/`** - Shared core utilities
+  - Error handling
+  - Logging
+  - Common helpers
+
+- **`packages/types/`** - Shared TypeScript types
+  - Type definitions
+  - Interfaces
+  - Schemas
+
+- **`packages/config/`** - Shared configuration
+  - Environment management
+  - Constants
+  - Feature flags
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 20+ (for TypeScript services)
+- **Python** 3.9+ (for FastAPI backend)
+- **Docker** and **Docker Compose**
+- **pnpm** (for Node.js package management)
+
+### Installation
 
 ```bash
+# Clone the repository
 git clone <repository-url>
-cd <project-directory>
-```
+cd 2026-Lead-Gen-Insurance
 
-### 2. Set up development environment
+# Install Node.js dependencies (if using TypeScript services)
+pnpm install
 
-```bash
-make dev
-```
-
-This command will:
-- Copy `.env.example` to `.env`
-- Install Python dependencies
-- Start Docker containers (PostgreSQL, Redis)
-- Run database migrations
-
-### Manual Setup (Alternative)
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+# Set up Python backend
+cd apps/backend
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Copy environment variables
 cp .env.example .env
+cd ../..
 
-# Start database services
-docker-compose up -d
+# Start infrastructure services
+docker compose up -d
 
-# Run migrations
+# Run database migrations (for backend)
+cd apps/backend
 alembic upgrade head
+PYTHONPATH=. python scripts/seed_data.py
 ```
 
-## 🗄️ Database Schema
+### Running Services
 
-### Core Tables
-
-- **organizations**: Companies using the platform
-- **users**: User accounts linked to organizations
-- **leads**: Primary lead records with contact information
-- **lead_sources**: Tracking where leads originate (web, social, referral, etc.)
-- **campaigns**: Marketing campaigns for lead generation
-- **insurance_products**: Available insurance products/policies
-
-### Key Relationships
-
-```
-Organization (1) ──< (N) Users
-Organization (1) ──< (N) Leads
-Organization (1) ──< (N) Campaigns
-Lead (N) ──> (1) LeadSource
-Lead (N) ──> (1) Campaign
-Lead (N) ──> (1) InsuranceProduct
-```
-
-## 🔌 API Endpoints
-
-### Health Check
-
-```
-GET /health
-```
-
-Returns API health status and database connectivity.
-
-### Leads Management
-
-```
-POST   /api/v1/leads          Create a new lead
-GET    /api/v1/leads          List all leads (with pagination)
-GET    /api/v1/leads/{id}     Get a specific lead
-PUT    /api/v1/leads/{id}     Update a lead
-DELETE /api/v1/leads/{id}     Delete a lead
-```
-
-### Query Parameters (List Leads)
-
-- `page`: Page number (default: 1)
-- `page_size`: Items per page (default: 50, max: 100)
-- `organization_id`: Filter by organization
-- `status`: Filter by lead status
-
-## 📝 API Documentation
-
-Once the server is running, access:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **OpenAPI Schema**: http://localhost:8000/openapi.json
-
-## 🚦 Running the Application
-
-### Development Server
+#### FastAPI Backend (Phase 1.1)
 
 ```bash
-make run
-```
-
-Or:
-
-```bash
+cd apps/backend
+source venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The API will be available at: http://localhost:8000
+Access at: **http://localhost:8000**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
-### Seed Sample Data
+#### TypeScript Services (Future)
 
 ```bash
-make seed
-```
+# Build all packages
+pnpm build
 
-This creates:
-- 2 organizations
-- 2 users
-- 4 lead sources
-- 4 insurance products
-- 2 campaigns
-- 5 sample leads
+# Run specific service
+pnpm --filter @insurance/api dev
+pnpm --filter @insurance/data-service dev
+pnpm --filter @insurance/orchestrator dev
+```
 
 ## 🧪 Testing
 
-### Run all tests
+### Backend (Python)
 
 ```bash
-make test
-```
-
-Or:
-
-```bash
+cd apps/backend
 pytest -v --cov=app --cov-report=term-missing
 ```
 
-### Test Coverage
-
-The test suite includes:
-- Model creation and validation tests
-- API endpoint integration tests
-- Database relationship tests
-- Error handling tests
-
-## 🔄 Database Migrations
-
-### Create a new migration
+### TypeScript Services
 
 ```bash
-make migrate-auto m="description of changes"
-```
+# Run all tests
+pnpm test
 
-Or:
-
-```bash
-alembic revision --autogenerate -m "description"
-```
-
-### Apply migrations
-
-```bash
-make migrate
-```
-
-Or:
-
-```bash
-alembic upgrade head
-```
-
-### Rollback migration
-
-```bash
-alembic downgrade -1
+# Run tests for specific package
+pnpm --filter @insurance/api test
 ```
 
 ## 🐳 Docker Services
 
-### Start services
+The platform uses Docker Compose for infrastructure services:
+
+```yaml
+services:
+  - postgres:5432    # Primary database
+  - redis:6379       # Cache and sessions
+```
+
+### Commands
 
 ```bash
-make db-up
+# Start all services
+docker compose up -d
+
+# Stop all services
+docker compose down
+
+# View logs
+docker compose logs -f
+
+# Reset database
+docker compose down -v
+docker compose up -d
 ```
 
-### Stop services
+## 📚 Documentation
 
+- **Backend API**: [apps/backend/README.md](./apps/backend/README.md)
+- **Database Schema**: [apps/backend/docs/DATABASE_SCHEMA.md](./apps/backend/docs/DATABASE_SCHEMA.md)
+- **Quick Start Guide**: [apps/backend/QUICKSTART.md](./apps/backend/QUICKSTART.md)
+- **Phase 1.1 Completion**: [apps/backend/PHASE_1.1_COMPLETION.md](./apps/backend/PHASE_1.1_COMPLETION.md)
+
+## 🎯 Development Phases
+
+### ✅ Phase 1.1 - Core Backend & Database Foundations (COMPLETE)
+- FastAPI backend with CRUD operations
+- PostgreSQL database with SQLAlchemy
+- Alembic migrations
+- Comprehensive testing
+- API documentation
+
+### 🚧 Phase 1.2 - Frontend Foundation (In Progress)
+- Next.js application setup
+- Component library
+- State management
+- API integration
+
+### 📋 Phase 1.3 - Authentication & Authorization (Planned)
+- JWT authentication
+- Role-based access control (RBAC)
+- User management
+- Session handling
+
+### 📋 Phase 2 - AI Integration (Planned)
+- LLM integration for lead scoring
+- Natural language processing
+- Automated lead qualification
+- Intelligent recommendations
+
+## 🛠️ Technology Stack
+
+### Backend (FastAPI)
+- **Framework**: FastAPI 0.109.0
+- **Database**: PostgreSQL 15
+- **ORM**: SQLAlchemy 2.0.25 (async)
+- **Migrations**: Alembic 1.13.1
+- **Validation**: Pydantic 2.5.3
+- **Testing**: pytest 7.4.4
+
+### TypeScript Services
+- **Runtime**: Node.js 20+
+- **Package Manager**: pnpm 8+
+- **Build Tool**: Turbo
+- **Language**: TypeScript 5+
+
+### Infrastructure
+- **Containerization**: Docker & Docker Compose
+- **Database**: PostgreSQL 15
+- **Cache**: Redis 7
+- **CI/CD**: GitHub Actions
+
+## 📊 API Status
+
+| Service | Status | Port | Documentation |
+|---------|--------|------|---------------|
+| Backend API (FastAPI) | ✅ Live | 8000 | [Docs](http://localhost:8000/docs) |
+| Main API (TypeScript) | 🚧 Planned | 3000 | - |
+| Data Service | 🚧 Planned | 3001 | - |
+| Orchestrator | 🚧 Planned | 3002 | - |
+
+## 🔐 Environment Configuration
+
+Each service has its own environment configuration:
+
+### Backend
 ```bash
-make db-down
-```
-
-### Reset database
-
-```bash
-make db-reset
-```
-
-This will:
-- Stop and remove containers
-- Delete all data volumes
-- Start fresh containers
-- Run migrations
-
-## 📁 Project Structure
-
-```
-.
-├── alembic/                 # Database migrations
-│   ├── versions/           # Migration files
-│   └── env.py             # Alembic configuration
-├── app/
-│   ├── api/               # API routes
-│   │   └── v1/           # API version 1
-│   ├── core/             # Core configuration
-│   │   ├── config.py     # Settings and environment variables
-│   │   └── logging.py    # Logging configuration
-│   ├── db/               # Database setup
-│   │   ├── base.py       # Base model
-│   │   └── session.py    # Database session management
-│   ├── models/           # SQLAlchemy models
-│   ├── schemas/          # Pydantic schemas
-│   ├── services/         # Business logic layer
-│   ├── tests/            # Test suite
-│   └── main.py           # FastAPI application entry point
-├── scripts/              # Utility scripts
-│   └── seed_data.py     # Database seeding
-├── .env.example         # Environment variables template
-├── docker-compose.yml   # Docker services configuration
-├── requirements.txt     # Python dependencies
-├── Makefile            # Development commands
-└── README.md           # This file
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-Key configuration options in `.env`:
-
-```bash
-# Database
+# apps/backend/.env
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/leadgen_db
-
-# Application
 APP_NAME="Lead Generation Insurance Platform"
 DEBUG=True
-LOG_LEVEL=INFO
-
-# Server
-HOST=0.0.0.0
 PORT=8000
-
-# CORS
-BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
 ```
 
-## 🔐 Security Notes
-
-⚠️ **Important for Production:**
-
-1. Change `SECRET_KEY` in `.env`
-2. Use strong database passwords
-3. Enable HTTPS/TLS
-4. Implement authentication middleware
-5. Set `DEBUG=False`
-6. Configure proper CORS origins
-7. Use environment-specific configurations
-
-## 📊 Lead Status Values
-
-- `new`: Initial lead status
-- `contacted`: Lead has been contacted
-- `qualified`: Lead meets qualification criteria
-- `converted`: Lead converted to customer
-- `lost`: Lead lost to competitor or not interested
-
-## 🎯 Priority Levels
-
-- `low`: Standard follow-up
-- `medium`: Normal priority
-- `high`: Urgent attention required
-
-## 🧹 Maintenance Commands
-
+### TypeScript Services
 ```bash
-# Clean up Python cache files
-make clean
+# .env (root)
+NODE_ENV=development
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/leadgen_db
+REDIS_URL=redis://localhost:6379
+```
 
-# View all available commands
-make help
+## 🤝 Contributing
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Add/update tests
+4. Ensure all tests pass
+5. Update documentation
+6. Submit a pull request
+
+### Code Style
+
+- **Python**: Follow PEP 8, use type hints
+- **TypeScript**: Use ESLint and Prettier (configured)
+- **Commits**: Follow Conventional Commits
+
+## 📝 Scripts & Commands
+
+### Backend (Python)
+```bash
+cd apps/backend
+make help          # Show available commands
+make dev           # Set up development environment
+make run           # Start development server
+make test          # Run tests
+make migrate       # Apply database migrations
+```
+
+### Monorepo (TypeScript)
+```bash
+pnpm install       # Install all dependencies
+pnpm build         # Build all packages
+pnpm test          # Run all tests
+pnpm lint          # Lint all packages
+pnpm clean         # Clean build artifacts
 ```
 
 ## 🐛 Troubleshooting
 
 ### Database Connection Issues
-
 ```bash
-# Check if PostgreSQL is running
-docker-compose ps
-
-# View database logs
-docker-compose logs postgres
+# Check if services are running
+docker compose ps
 
 # Restart database
-make db-reset
+docker compose restart postgres
+
+# View logs
+docker compose logs postgres
 ```
 
-### Migration Issues
-
+### Python Backend Issues
 ```bash
-# Check current migration version
-alembic current
+# Verify virtual environment is activated
+source apps/backend/venv/bin/activate
 
-# View migration history
-alembic history
+# Check Python version
+python --version  # Should be 3.9+
 
-# Downgrade if needed
-alembic downgrade -1
+# Reinstall dependencies
+pip install -r apps/backend/requirements.txt
 ```
 
-## 🤝 Contributing
+### TypeScript Services Issues
+```bash
+# Clear node_modules and reinstall
+pnpm clean
+pnpm install
 
-1. Create a feature branch
-2. Make your changes
-3. Add/update tests
-4. Run test suite
-5. Submit pull request
+# Rebuild packages
+pnpm build
+```
+
+## 📈 Project Status
+
+| Component | Status | Version | Last Updated |
+|-----------|--------|---------|--------------|
+| Backend API | ✅ Production Ready | 1.0.0 | Dec 2024 |
+| Database Schema | ✅ Complete | 1.0.0 | Dec 2024 |
+| TypeScript API | 🚧 In Development | 0.1.0 | - |
+| Frontend | 📋 Planned | - | - |
+| AI Services | 📋 Planned | - | - |
 
 ## 📄 License
 
 [Your License Here]
 
-## 🔮 Next Steps (Phase 1.3)
-
-- [ ] Implement JWT authentication
-- [ ] Add role-based access control (RBAC)
-- [ ] User registration and login endpoints
-- [ ] Password reset functionality
-- [ ] API rate limiting
-- [ ] Enhanced security middleware
-
 ## 📞 Support
 
-For issues and questions, please open an issue in the repository.
+For issues and questions:
+- Open an issue in the repository
+- Check the documentation in each service's directory
+- Review the troubleshooting guide above
+
+## 🎯 Next Milestones
+
+1. **Phase 1.2**: Frontend foundation with Next.js
+2. **Phase 1.3**: Authentication and authorization
+3. **Phase 2.1**: AI integration for lead scoring
+4. **Phase 2.2**: Advanced analytics and reporting
+5. **Phase 3**: Production deployment and monitoring
+
+---
+
+**Current Focus**: Phase 1.1 Complete ✅ | Working on Phase 1.2 🚧
