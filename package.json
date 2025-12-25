@@ -17,6 +17,7 @@
     "lint:fix": "turbo lint:fix",
     "test": "turbo test",
     "test:watch": "turbo test:watch",
+    "type-check": "turbo type-check",
     "clean": "turbo clean && rm -rf node_modules",
     "prepare": "husky install",
     "db:generate": "turbo db:generate",
