@@ -1,0 +1,172 @@
+// Prisma schema for Insurance Lead Generation Platform
+// This defines the database structure for leads, agents, and assignments
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Lead model - represents an insurance lead
+model Lead {
+  id              String           @id @default(cuid())
+  source          String           @db.VarChar(100)
+  email           String?          @db.VarChar(255)
+  phone           String?          @db.VarChar(50)
+  firstName       String?          @db.VarChar(100)
+  lastName        String?          @db.VarChar(100)
+  
+  // Address fields
+  street          String?          @db.VarChar(255)
+  city            String?          @db.VarChar(100)
+  state           String?          @db.VarChar(50)
+  zipCode         String?          @db.VarChar(20)
+  country         String?          @db.VarChar(2) @default("US")
+  
+  // Insurance and scoring
+  insuranceType   InsuranceType?
+  qualityScore    Float?           @db.Float
+  status          LeadStatus       @default(RECEIVED)
+  
+  // Additional data
+  metadata        Json?
+  
+  // Timestamps
+  createdAt       DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamp(6)
+  
+  // Relationships
+  assignments     LeadAssignment[]
+  activities      LeadActivity[]
+  
+  @@index([status])
+  @@index([insuranceType])
+  @@index([qualityScore])
+  @@index([createdAt])
+  @@index([source])
+}
+
+// Agent model - represents insurance agents
+model Agent {
+  id                String            @id @default(cuid())
+  firstName         String            @db.VarChar(100)
+  lastName          String            @db.VarChar(100)
+  email             String            @unique @db.VarChar(255)
+  phone             String            @db.VarChar(50)
+  licenseNumber     String            @db.VarChar(100)
+  
+  // Specializations
+  specializations   InsuranceType[]
+  
+  // Location
+  city              String            @db.VarChar(100)
+  state             String            @db.VarChar(50)
+  country           String            @db.VarChar(2) @default("US")
+  
+  // Performance metrics
+  rating            Float             @default(0) @db.Float
+  maxLeadCapacity   Int               @default(10)
+  currentLeadCount  Int               @default(0)
+  averageResponseTime Float           @default(0) @db.Float // in minutes
+  conversionRate    Float             @default(0) @db.Float
+  
+  // Status
+  isActive          Boolean           @default(true)
+  
+  // Timestamps
+  createdAt         DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime          @updatedAt @db.Timestamp(6)
+  
+  // Relationships
+  assignments       LeadAssignment[]
+  
+  @@index([isActive])
+  @@index([specializations])
+  @@index([city, state])
+}
+
+// LeadAssignment model - tracks lead-to-agent assignments
+model LeadAssignment {
+  id          String              @id @default(cuid())
+  leadId      String
+  agentId     String
+  
+  assignedAt  DateTime            @default(now()) @db.Timestamp(6)
+  status      AssignmentStatus    @default(PENDING)
+  acceptedAt  DateTime?           @db.Timestamp(6)
+  notes       String?             @db.Text
+  
+  // Timestamps
+  createdAt   DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime            @updatedAt @db.Timestamp(6)
+  
+  // Relationships
+  lead        Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent       Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@unique([leadId, agentId])
+  @@index([status])
+  @@index([assignedAt])
+}
+
+// LeadActivity model - tracks all activities for a lead
+model LeadActivity {
+  id          String          @id @default(cuid())
+  leadId      String
+  type        ActivityType
+  description String          @db.Text
+  metadata    Json?
+  
+  createdAt   DateTime        @default(now()) @db.Timestamp(6)
+  
+  // Relationship
+  lead        Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  @@index([leadId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// Enums
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  COMMERCIAL
+}
+
+enum LeadStatus {
+  RECEIVED
+  PROCESSING
+  QUALIFIED
+  ROUTED
+  CONVERTED
+  REJECTED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  TIMEOUT
+}
+
+enum ActivityType {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  QUALIFIED
+  SCORED
+  ROUTED
+  ASSIGNED
+  CONTACTED
+  CONVERTED
+  REJECTED
+  NOTE_ADDED
+  EMAIL_SENT
+  CALL_COMPLETED
+}
