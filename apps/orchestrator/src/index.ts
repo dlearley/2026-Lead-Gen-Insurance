@@ -1,6 +1,7 @@
+import { config } from '@insurance-lead-gen/config';
 import { logger } from '@insurance-lead-gen/core';
 
-const PORT = process.env.ORCHESTRATOR_PORT || 3002;
+const PORT = config.orchestrator.port;
 
 // TODO: Implement LangChain integration
 // TODO: Implement OpenAI client

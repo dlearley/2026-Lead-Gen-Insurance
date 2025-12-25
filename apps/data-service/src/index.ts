@@ -1,9 +1,7 @@
+import { config } from '@insurance-lead-gen/config';
 import { logger } from '@insurance-lead-gen/core';
-import { createRequire } from 'module';
 
-const require = createRequire(import.meta.url);
-
-const PORT = process.env.DATA_SERVICE_PORT || 3001;
+const PORT = config.dataService.port;
 
 // TODO: Implement Prisma client
 // TODO: Implement Redis connection
