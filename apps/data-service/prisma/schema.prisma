@@ -1,0 +1,134 @@
+// Prisma schema for Insurance Lead Generation AI Platform
+// This schema defines the database structure for PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Lead model - stores all lead information
+model Lead {
+  id             String     @id @default(cuid())
+  source         String
+  email          String?
+  phone          String?
+  firstName      String?
+  lastName       String?
+  street         String?
+  city           String?
+  state          String?
+  zipCode        String?
+  country        String?
+  insuranceType  InsuranceType?
+  qualityScore   Int?
+  status         LeadStatus
+  metadata       Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  // Relationships
+  assignments    LeadAssignment[]
+  events         Event[]
+  
+  @@index([status])
+  @@index([insuranceType])
+  @@index([qualityScore])
+}
+
+// Agent model - stores agent information
+model Agent {
+  id                  String     @id @default(cuid())
+  firstName           String
+  lastName            String
+  email               String     @unique
+  phone               String
+  licenseNumber       String     @unique
+  specializations     String[]
+  city                String
+  state               String
+  country             String
+  rating              Float      @default(0.0)
+  isActive            Boolean    @default(true)
+  maxLeadCapacity     Int        @default(10)
+  currentLeadCount    Int        @default(0)
+  averageResponseTime Float      @default(0.0)
+  conversionRate      Float      @default(0.0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  
+  // Relationships
+  assignments         LeadAssignment[]
+  
+  @@index([isActive])
+  @@index([rating])
+  @@index([conversionRate])
+}
+
+// LeadAssignment model - tracks lead-agent assignments
+model LeadAssignment {
+  id            String   @id @default(cuid())
+  leadId        String
+  agentId       String
+  assignedAt    DateTime @default(now())
+  status        AssignmentStatus
+  acceptedAt    DateTime?
+  notes         String?
+  
+  // Relationships
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent         Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+}
+
+// Event model - event sourcing for all system events
+model Event {
+  id          String   @id @default(cuid())
+  type        String
+  source      String
+  entityType  String
+  entityId    String
+  data        Json
+  timestamp   DateTime @default(now())
+  metadata    Json?
+  
+  // Relationships
+  lead        Lead?    @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  
+  @@index([type])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([timestamp])
+}
+
+// Enums
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  COMMERCIAL
+}
+
+enum LeadStatus {
+  RECEIVED
+  PROCESSING
+  QUALIFIED
+  ROUTED
+  CONVERTED
+  REJECTED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  TIMEOUT
+}
