@@ -1,0 +1,142 @@
+// Prisma schema for Insurance Lead Generation AI Platform
+// This schema defines the relational data model for PostgreSQL
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client"
+}
+
+// Lead model - stores all lead information
+model Lead {
+  id              String     @id @default(uuid())
+  source          String
+  email           String?
+  phone           String?
+  firstName       String?
+  lastName        String?
+  street          String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+  insuranceType   InsuranceType?
+  qualityScore    Int?
+  status          LeadStatus  @default(RECEIVED)
+  metadata        Json?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relationships
+  assignments     LeadAssignment[]
+  events          Event[]
+
+  // Indexes for performance
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Agent model - stores insurance agent information
+model Agent {
+  id                  String     @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String     @unique
+  phone               String
+  licenseNumber       String     @unique
+  specializations     String[]
+  city                String
+  state               String
+  country             String
+  rating              Float      @default(0.0)
+  isActive            Boolean    @default(true)
+  maxLeadCapacity     Int        @default(10)
+  currentLeadCount    Int        @default(0)
+  averageResponseTime Float      @default(0.0)
+  conversionRate      Float      @default(0.0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  assignments         LeadAssignment[]
+
+  // Indexes
+  @@index([email])
+  @@index([licenseNumber])
+  @@index([isActive])
+  @@index([city])
+  @@index([state])
+}
+
+// LeadAssignment model - tracks lead to agent assignments
+model LeadAssignment {
+  id            String      @id @default(uuid())
+  leadId        String
+  agentId       String
+  assignedAt    DateTime   @default(now())
+  status        AssignmentStatus @default(PENDING)
+  acceptedAt    DateTime?
+  notes         String?
+
+  // Relationships
+  lead          Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent         Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([assignedAt])
+}
+
+// Event model - event sourcing for all system events
+model Event {
+  id          String    @id @default(uuid())
+  type        String
+  source      String
+  entityType  String
+  entityId    String
+  data        Json
+  timestamp   DateTime @default(now())
+  metadata    Json?
+
+  // Relationships
+  lead        Lead?     @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([type])
+  @@index([source])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([timestamp])
+}
+
+// Enums for type safety
+enum LeadStatus {
+  RECEIVED
+  PROCESSING
+  QUALIFIED
+  ROUTED
+  CONVERTED
+  REJECTED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  TIMEOUT
+}
+
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  COMMERCIAL
+}
