@@ -23,7 +23,8 @@
     "db:push": "turbo db:push",
     "db:studio": "turbo db:studio",
     "format": "prettier --write \"**/*.{js,ts,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{js,ts,json,md,yml,yaml}\""
+    "format:check": "prettier --check \"**/*.{js,ts,json,md,yml,yaml}\"",
+    "type-check": "turbo type-check"
   },
   "workspaces": [
     "apps/*",
