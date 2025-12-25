@@ -1,0 +1,441 @@
+// Prisma Schema for Insurance Lead Generation Platform
+// Phase 2: Data Pipeline & Real-time Lead Processing
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Lead Management
+// ============================================================================
+
+model Lead {
+  id String @id @default(uuid())
+
+  // Contact Information
+  firstName String?
+  lastName  String?
+  email     String  @unique
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+
+  // Lead Details
+  source         LeadSource
+  status         LeadStatus       @default(NEW)
+  insuranceType  InsuranceType?
+  qualityScore   Int?             @default(0)
+  priority       PriorityLevel    @default(MEDIUM)
+  intent         IntentLevel?
+  urgency        UrgencyLevel?
+  estimatedValue Decimal?         @db.Decimal(10, 2)
+
+  // Metadata
+  metadata         Json?
+  rawData          Json?
+  enrichmentData   Json?
+  tags             String[]
+  notes            String?
+  externalId       String?          @unique
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  referrerUrl      String?
+  landingPageUrl   String?
+
+  // AI Processing
+  aiQualificationData Json?
+  aiClassificationData Json?
+  embeddingId         String?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastContactedAt DateTime?
+  convertedAt DateTime?
+
+  // Relations
+  assignments LeadAssignment[]
+  activities  LeadActivity[]
+  documents   LeadDocument[]
+  events      LeadEvent[]
+  communications Communication[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([source])
+  @@index([insuranceType])
+  @@index([qualityScore])
+  @@index([createdAt])
+  @@index([externalId])
+  @@map("leads")
+}
+
+model LeadEvent {
+  id String @id @default(uuid())
+
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  eventType   String
+  eventData   Json
+  timestamp   DateTime @default(now())
+  userId      String?
+  source      String?
+
+  @@index([leadId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@map("lead_events")
+}
+
+model LeadDocument {
+  id String @id @default(uuid())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  fileName    String
+  fileType    String
+  fileSize    Int
+  fileUrl     String
+  uploadedBy  String?
+  description String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@map("lead_documents")
+}
+
+model LeadActivity {
+  id String @id @default(uuid())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  activityType String
+  description  String
+  metadata     Json?
+  performedBy  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@map("lead_activities")
+}
+
+// ============================================================================
+// Agent Management
+// ============================================================================
+
+model Agent {
+  id String @id @default(uuid())
+
+  // Basic Information
+  email     String  @unique
+  firstName String
+  lastName  String
+  phone     String?
+  avatar    String?
+
+  // Professional Details
+  licenseNumber String?
+  specializations InsuranceType[]
+  languages       String[]
+  yearsExperience Int?
+  bio             String?
+
+  // Location
+  address     String?
+  city        String?
+  state       String?
+  zip         String?
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+
+  // Performance Metrics
+  performanceScore Decimal @default(0) @db.Decimal(5, 2)
+  conversionRate   Decimal @default(0) @db.Decimal(5, 4)
+  averageResponseTime Int @default(0)
+  totalLeadsHandled   Int @default(0)
+  totalConversions    Int @default(0)
+  customerSatisfaction Decimal @default(0) @db.Decimal(3, 2)
+
+  // Availability
+  status           AgentStatus    @default(ACTIVE)
+  availabilityZone String?
+  maxLeadsPerDay   Int            @default(10)
+  currentWorkload  Int            @default(0)
+
+  // Metadata
+  metadata Json?
+  preferences Json?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastActiveAt DateTime?
+
+  // Relations
+  assignments LeadAssignment[]
+  communications Communication[]
+  schedules   AgentSchedule[]
+
+  @@index([email])
+  @@index([status])
+  @@index([performanceScore])
+  @@index([specializations])
+  @@map("agents")
+}
+
+model AgentSchedule {
+  id String @id @default(uuid())
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isAvailable Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([dayOfWeek])
+  @@map("agent_schedules")
+}
+
+// ============================================================================
+// Lead Assignment & Routing
+// ============================================================================
+
+model LeadAssignment {
+  id String @id @default(uuid())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  status        AssignmentStatus @default(PENDING)
+  assignedBy    String?
+  assignmentReason String?
+  routingScore  Decimal?         @db.Decimal(5, 2)
+  metadata      Json?
+
+  // Timestamps
+  assignedAt  DateTime  @default(now())
+  acceptedAt  DateTime?
+  rejectedAt  DateTime?
+  completedAt DateTime?
+  expiredAt   DateTime?
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([assignedAt])
+  @@map("lead_assignments")
+}
+
+// ============================================================================
+// Communication & Notifications
+// ============================================================================
+
+model Communication {
+  id String @id @default(uuid())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id])
+
+  type        CommunicationType
+  direction   CommunicationDirection
+  channel     CommunicationChannel
+  subject     String?
+  body        String
+  metadata    Json?
+  status      CommunicationStatus    @default(PENDING)
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("communications")
+}
+
+// ============================================================================
+// System & Configuration
+// ============================================================================
+
+model SystemConfig {
+  id    String @id @default(uuid())
+  key   String @unique
+  value Json
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  entityType String
+  entityId   String
+  action     String
+  changes    Json?
+  performedBy String?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum LeadSource {
+  FACEBOOK_ADS
+  GOOGLE_ADS
+  WEBSITE_FORM
+  PHONE_CALL
+  EMAIL
+  REFERRAL
+  PARTNER
+  DIRECT
+  ORGANIC_SEARCH
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  IN_PROGRESS
+  CONVERTED
+  LOST
+  ARCHIVED
+}
+
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  BUSINESS
+  RENTERS
+  UMBRELLA
+  DISABILITY
+  PET
+  TRAVEL
+  OTHER
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum IntentLevel {
+  LOW
+  MEDIUM
+  HIGH
+  IMMEDIATE
+}
+
+enum UrgencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  BUSY
+  AWAY
+  OFFLINE
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum CommunicationType {
+  EMAIL
+  SMS
+  PHONE_CALL
+  IN_APP_MESSAGE
+  NOTIFICATION
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CommunicationChannel {
+  EMAIL
+  SMS
+  PHONE
+  WEB_CHAT
+  MOBILE_APP
+  WEBHOOK
+}
+
+enum CommunicationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  BOUNCED
+}
