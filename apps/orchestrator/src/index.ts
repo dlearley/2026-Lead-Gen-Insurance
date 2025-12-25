@@ -3,6 +3,7 @@ import { orchestratorConfig } from '@insurance-lead-gen/config';
 import { connectNats } from './nats.js';
 import { OpenAIClient } from './openai.js';
 import { LangChainEngine } from './langchain.js';
+import { EnrichmentService } from './enrichment.js';
 import { QueueManager } from './queues.js';
 
 const PORT = orchestratorConfig.port;
@@ -15,8 +16,12 @@ async function initializeOrchestrator() {
     const openaiClient = new OpenAIClient(orchestratorConfig.openaiApiKey);
     logger.info('OpenAI client initialized');
 
+    // Initialize Enrichment service
+    const enrichmentService = new EnrichmentService();
+    logger.info('Enrichment service initialized');
+
     // Initialize LangChain engine
-    const langchainEngine = new LangChainEngine(openaiClient);
+    const langchainEngine = new LangChainEngine(openaiClient, enrichmentService);
     logger.info('LangChain engine initialized');
 
     // Initialize queue manager

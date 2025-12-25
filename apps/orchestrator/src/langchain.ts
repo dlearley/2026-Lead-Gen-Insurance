@@ -1,14 +1,18 @@
 import { logger } from '@insurance-lead-gen/core';
+import { Lead } from '@insurance-lead-gen/types';
 import { OpenAIClient } from './openai.js';
+import { EnrichmentService } from './enrichment.js';
 
 export class LangChainEngine {
   private openaiClient: OpenAIClient;
+  private enrichmentService: EnrichmentService;
 
-  constructor(openaiClient: OpenAIClient) {
+  constructor(openaiClient: OpenAIClient, enrichmentService?: EnrichmentService) {
     this.openaiClient = openaiClient;
+    this.enrichmentService = enrichmentService || new EnrichmentService();
   }
 
-  async processLead(leadData: any): Promise<any> {
+  async processLead(leadData: Lead): Promise<any> {
     try {
       logger.info('Processing lead with LangChain', { leadId: leadData.id });
 
@@ -19,24 +23,33 @@ export class LangChainEngine {
         classification
       });
 
-      // Step 2: Generate embedding for semantic search
-      const embeddingText = this.createEmbeddingText(leadData);
+      // Step 2: Enrich lead data from external sources
+      const enrichment = await this.enrichmentService.enrichLead(leadData);
+      logger.debug('Lead enrichment completed', { 
+        leadId: leadData.id,
+        hasCompanyData: !!enrichment.company,
+        hasPersonData: !!enrichment.person
+      });
+
+      // Step 3: Generate embedding for semantic search
+      const embeddingText = this.createEmbeddingText({ ...leadData, enrichment });
       const embedding = await this.openaiClient.generateEmbedding(embeddingText);
       logger.debug('Lead embedding generated', { 
         leadId: leadData.id,
         embeddingSize: embedding.length
       });
 
-      // Step 3: Create enriched lead data
+      // Step 4: Create enriched lead data
       const enrichedLead = {
         ...leadData,
         ...classification,
+        enrichment,
         embedding,
         processingStatus: 'qualified',
         processedAt: new Date().toISOString(),
       };
 
-      logger.info('Lead processing completed', { leadId: leadData.id });
+      logger.info('Lead processing completed with enrichment', { leadId: leadData.id });
       return enrichedLead;
 
     } catch (error) {
@@ -48,18 +61,26 @@ export class LangChainEngine {
     }
   }
 
-  private createEmbeddingText(leadData: any): string {
-    // Create text representation for embedding
+  private createEmbeddingText(data: any): string {
+    // Create text representation for embedding, including enriched data
     const parts = [
-      `Lead ID: ${leadData.id}`,
-      `Source: ${leadData.source || 'unknown'}`,
-      `Name: ${leadData.firstName || ''} ${leadData.lastName || ''}`,
-      `Email: ${leadData.email || 'none'}`,
-      `Phone: ${leadData.phone || 'none'}`,
-      `Location: ${leadData.address?.city || ''}, ${leadData.address?.state || ''}`,
-      `Insurance Interest: ${leadData.insuranceType || 'unknown'}`,
-      `Notes: ${leadData.notes || 'none'}`,
+      `Lead ID: ${data.id}`,
+      `Source: ${data.source || 'unknown'}`,
+      `Name: ${data.firstName || ''} ${data.lastName || ''}`,
+      `Email: ${data.email || 'none'}`,
+      `Phone: ${data.phone || 'none'}`,
+      `Location: ${data.address?.city || ''}, ${data.address?.state || ''}`,
+      `Insurance Interest: ${data.insuranceType || 'unknown'}`,
+      `Notes: ${data.notes || 'none'}`,
     ];
+
+    if (data.enrichment?.company) {
+      parts.push(`Company: ${data.enrichment.company.name} (${data.enrichment.company.industry})`);
+    }
+
+    if (data.enrichment?.person) {
+      parts.push(`Job: ${data.enrichment.person.jobTitle} (${data.enrichment.person.seniority})`);
+    }
 
     return parts.filter(part => part && part !== 'none').join(' | ');
   }

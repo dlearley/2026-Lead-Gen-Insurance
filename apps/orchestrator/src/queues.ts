@@ -72,6 +72,7 @@ export class QueueManager {
             status: 'qualified',
             insuranceType: processedLead.insuranceType,
             qualityScore: processedLead.qualityScore,
+            enrichment: processedLead.enrichment,
             timestamp: new Date().toISOString(),
           });
 
