@@ -1,7 +1,4 @@
 import { logger } from '@insurance-lead-gen/core';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 const PORT = process.env.DATA_SERVICE_PORT || 3001;
 

@@ -42,7 +42,8 @@ coverage/
 .eslintcache
 .next.cache/
 .turbo*
-.
+*.tsbuildinfo
+
 # IDE
 .vscode/
 .idea/
