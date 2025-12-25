@@ -16,6 +16,10 @@
     "lint:fix": {
       "outputs": []
     },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
