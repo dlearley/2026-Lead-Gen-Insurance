@@ -15,6 +15,7 @@
     "dev:apps": "turbo dev",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
+    "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "turbo test",
     "test:watch": "turbo test:watch",
     "clean": "turbo clean && rm -rf node_modules",
@@ -39,9 +40,13 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.0",
     "husky": "^8.0.3",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.2.0",
     "turbo": "^1.11.0",
     "typescript": "^5.3.3"
+  },
+  "lint-staged": {
+    "**/*.{js,ts,json,md,yml,yaml}": "prettier --write"
   },
   "keywords": [
     "insurance",
