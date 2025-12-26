@@ -5,15 +5,14 @@ import compression from 'compression';
 import path from 'path';
 import { logger } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
-import agentsRouter from './routes/agents.js';
-import routingRouter from './routes/routing.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
 import emailsRouter from './routes/emails.js';
 import tasksRouter from './routes/tasks.js';
 import notificationsRouter from './routes/notifications.js';
 import sendEmailRouter from './routes/send-email.js';
-import analyticsRouter from './routes/analytics.js';
+import reportsRouter from './routes/reports.js';
+import alertsRouter from './routes/alerts.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -42,10 +41,9 @@ export function createApp(): express.Express {
   app.use('/api/v1/leads/:leadId/emails', emailsRouter);
   app.use('/api/v1/leads/:leadId/tasks', tasksRouter);
   app.use('/api/v1/leads/:leadId/send-email', sendEmailRouter);
-  app.use('/api/v1/agents', agentsRouter);
-  app.use('/api/v1/routing', routingRouter);
   app.use('/api/v1/notifications', notificationsRouter);
-  app.use('/api/v1/analytics', analyticsRouter);
+  app.use('/api/v1/reports', reportsRouter);
+  app.use('/api/v1/alerts', alertsRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -53,9 +51,9 @@ export function createApp(): express.Express {
   app.use('/api/leads/:leadId/emails', emailsRouter);
   app.use('/api/leads/:leadId/tasks', tasksRouter);
   app.use('/api/leads/:leadId/send-email', sendEmailRouter);
-  app.use('/api/agents', agentsRouter);
-  app.use('/api/routing', routingRouter);
   app.use('/api/notifications', notificationsRouter);
+  app.use('/api/reports', reportsRouter);
+  app.use('/api/alerts', alertsRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
