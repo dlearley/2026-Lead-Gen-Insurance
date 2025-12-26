@@ -1,6 +1,9 @@
 import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
 
 import { NatsEventBus } from './nats/nats-event-bus.js';
 
@@ -11,6 +14,32 @@ const start = async (): Promise<void> => {
   logger.info('Orchestrator service starting', { port: PORT });
 
   const eventBus = await NatsEventBus.connect(config.nats.url);
+
+  const app = express();
+  app.use(helmet());
+  app.use(cors());
+  app.use(express.json());
+
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'insurance-lead-gen-orchestrator',
+      version: '1.0.0',
+    });
+  });
+
+  app.get('/api/v1/routing/status', (req, res) => {
+    res.json({
+      status: 'operational',
+      connected: true,
+      subscribers: 1,
+    });
+  });
+
+  const httpServer = app.listen(PORT, () => {
+    logger.info(`Orchestrator HTTP server running on port ${PORT}`);
+  });
 
   const sub = eventBus.subscribe(EVENT_SUBJECTS.LeadProcessed);
   (async () => {

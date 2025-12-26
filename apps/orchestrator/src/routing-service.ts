@@ -3,6 +3,28 @@ import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import type { Lead, Agent, LeadAssignment } from '@insurance-lead-gen/types';
 
+const DATA_SERVICE_URL = process.env.DATA_SERVICE_URL || 'http://localhost:3002';
+
+async function trackAnalyticsEvent(
+  eventType: string,
+  data: Record<string, unknown>,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await fetch(`${DATA_SERVICE_URL}/api/v1/analytics/track/${eventType}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        data,
+        metadata,
+      }),
+    });
+  } catch (error) {
+    logger.warn('Failed to track analytics event', { eventType, error });
+  }
+}
+
 export interface RoutingDecision {
   leadId: string;
   agentId: string;
@@ -80,6 +102,14 @@ export class RoutingService {
 
       // Send notification to the agent
       await this.notifyAgent(bestMatch);
+
+      await trackAnalyticsEvent('lead.routed', {
+        leadId,
+        agentId: bestMatch.agentId,
+        score: bestMatch.score,
+        confidence: bestMatch.confidence,
+        factors: bestMatch.routingFactors,
+      });
 
       logger.info('Lead routed successfully', { 
         leadId, 
@@ -181,6 +211,16 @@ export class RoutingService {
       leadId: routingDecision.leadId,
       score: routingDecision.score,
       factors: routingDecision.routingFactors
+    });
+
+    await trackAnalyticsEvent('agent.assigned', {
+      leadId: routingDecision.leadId,
+      agentId: routingDecision.agentId,
+      score: routingDecision.score,
+      responseTime: null,
+    }, {
+      agentId: routingDecision.agentId,
+      leadId: routingDecision.leadId,
     });
 
     // Store assignment for tracking

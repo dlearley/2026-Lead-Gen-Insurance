@@ -1,6 +1,9 @@
 import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadReceivedEvent } from '@insurance-lead-gen/types';
+import express, { type Application } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
 
 import { NatsEventBus } from './nats/nats-event-bus.js';
 import { prisma } from './prisma/client.js';
@@ -10,6 +13,7 @@ import {
   startLeadIngestionWorker,
 } from './queues/lead-ingestion.queue.js';
 import { LeadRepository } from './repositories/lead.repository.js';
+import analyticsRouter from './routes/analytics.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -26,6 +30,26 @@ const start = async (): Promise<void> => {
     connection: redis,
     leadRepository,
     eventBus,
+  });
+
+  const app = express();
+  app.use(helmet());
+  app.use(cors());
+  app.use(express.json());
+
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'insurance-lead-gen-data-service',
+      version: '1.0.0',
+    });
+  });
+
+  app.use('/api/v1/analytics', analyticsRouter);
+
+  const httpServer = app.listen(PORT, () => {
+    logger.info(`Data service HTTP server running on port ${PORT}`);
   });
 
   leadIngestionWorker.on('failed', (job, error) => {
