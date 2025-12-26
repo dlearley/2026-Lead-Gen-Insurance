@@ -3,6 +3,8 @@
 ## Overview
 Successfully implemented the intelligent routing system that matches qualified insurance leads to the best agents using AI-powered algorithms and graph database queries.
 
+**Run 4.5 Updates**: Added API routes for agent management and lead routing in the API service.
+
 ## 🏗️ Architecture Components Built
 
 ### 1. Neo4j Graph Database Integration ✅
@@ -96,14 +98,21 @@ interface RoutingDecision {
 
 ### 4. API Service Integration ✅
 
-**Enhanced**: `/apps/api/src/index.ts`
+**Files Created**:
+- `/apps/api/src/routes/agents.ts` - Agent management endpoints
+- `/apps/api/src/routes/routing.ts` - Routing configuration and batch operations
+
+**Enhanced**: `/apps/api/src/app.ts`
 
 **Proxy Endpoints**:
-- Agent management (create, read, specializations, metrics)
+- Agent management (`POST /api/v1/agents`, `GET /api/v1/agents/:id`, etc.)
 - Lead routing (`POST /api/v1/leads/:id/route`)
 - Agent matching (`GET /api/v1/leads/:id/matching-agents`)
 - Lead assignment (`POST /api/v1/leads/:leadId/assign/:agentId`)
-- Routing configuration management
+- Routing configuration management (`GET/PUT /api/v1/routing/config`)
+- Batch processing (`POST /api/v1/routing/batch`)
+- Stale lead reassignment (`POST /api/v1/routing/reassign-stale`)
+- Webhook integration (`POST /api/v1/routing/webhook`)
 
 **Features**: 
 - Service-to-service communication via fetch API
@@ -213,13 +222,27 @@ curl "http://localhost:3000/api/v1/leads/lead_123/matching-agents?limit=3"
 
 ### Update Routing Configuration:
 ```bash
-curl -X PUT http://localhost:3000/api/v1/orchestrator/routing/config \
+curl -X PUT http://localhost:3000/api/v1/routing/config \
   -H "Content-Type: application/json" \
   -d '{
     "minConfidenceThreshold": 0.75,
     "maxAgentsPerLead": 5,
     "escalationTimeoutMs": 600000
   }'
+```
+
+### Batch Route Multiple Leads:
+```bash
+curl -X POST http://localhost:3000/api/v1/routing/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leadIds": ["lead_1", "lead_2", "lead_3"]
+  }'
+```
+
+### Get Agent Performance Metrics:
+```bash
+curl http://localhost:3000/api/v1/agents/agent_123/metrics
 ```
 
 ## 🏗️ Scalability Considerations
