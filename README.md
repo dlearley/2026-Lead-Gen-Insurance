@@ -51,6 +51,7 @@ insurance-lead-gen-ai/
 ### Setup
 
 1. **Clone and install:**
+
    ```bash
    git clone <repository-url>
    cd insurance-lead-gen-ai
@@ -58,12 +59,14 @@ insurance-lead-gen-ai/
    ```
 
 2. **Environment setup:**
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 3. **Start infrastructure:**
+
    ```bash
    pnpm dev:services
    ```
@@ -74,6 +77,7 @@ insurance-lead-gen-ai/
    ```
 
 Or run everything at once:
+
 ```bash
 pnpm dev
 ```
@@ -125,6 +129,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` Build/tooling changes
 
 Examples:
+
 ```bash
 git commit -m "feat: add lead scoring endpoint"
 git commit -m "fix: resolve redis connection issue"
@@ -167,6 +172,7 @@ MIT License - see LICENSE file for details.
 ## 📞 Support
 
 For issues and questions:
+
 - Create GitHub issue for bugs
 - Check [Development Guide](./docs/DEVELOPMENT.md) for setup help
 - See [Architecture Overview](./docs/ARCHITECTURE.md) for system understanding
