@@ -74,6 +74,8 @@ htmlcov/
 .next.cache/
 .turbo
 .turbo/
+.turbo*
+*.tsbuildinfo
 .pytest_cache/
 .mypy_cache/
 .dmypy.json
