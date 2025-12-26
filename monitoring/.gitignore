@@ -1,0 +1,14 @@
+# Ignore sensitive alert configuration
+alertmanager/secrets.yml
+
+# Ignore runtime data
+*.tmp
+*.log
+
+# Ignore backup files
+*.bak
+*~
+
+# Keep configuration files
+!*.yml
+!*.json

@@ -155,17 +155,37 @@ pytest -v          # Run tests with verbose output
 
 ## 🚢 Services & Ports
 
+### Application Services
+
 | Service | Status | Port | Documentation |
 |---------|--------|------|---------------|
 | Backend API (FastAPI) | ✅ Live | 8000 | [Swagger](http://localhost:8000/docs) |
 | Main API (TypeScript) | 🚧 Planned | 3000 | - |
 | Data Service | 🚧 Planned | 3001 | - |
 | Orchestrator | 🚧 Planned | 3002 | - |
+
+### Infrastructure Services
+
+| Service | Status | Port | Documentation |
+|---------|--------|------|---------------|
 | PostgreSQL | ✅ Running | 5432 | - |
 | Redis | ✅ Running | 6379 | - |
 | Neo4j Browser | ✅ Running | 7474 | http://localhost:7474 |
 | Qdrant | ✅ Running | 6333 | http://localhost:6333 |
 | NATS | ✅ Running | 4222 | Monitor: 8222 |
+
+### Monitoring Services (Phase 6.3)
+
+| Service | Status | Port | Documentation |
+|---------|--------|------|---------------|
+| Prometheus | ✅ Live | 9090 | http://localhost:9090 |
+| Grafana | ✅ Live | 3003 | http://localhost:3003 (admin/admin) |
+| Loki | ✅ Live | 3100 | http://localhost:3100 |
+| Jaeger UI | ✅ Live | 16686 | http://localhost:16686 |
+| AlertManager | ✅ Live | 9093 | http://localhost:9093 |
+| Node Exporter | ✅ Live | 9100 | http://localhost:9100/metrics |
+| PostgreSQL Exporter | ✅ Live | 9187 | http://localhost:9187/metrics |
+| Redis Exporter | ✅ Live | 9121 | http://localhost:9121/metrics |
 
 ## 🎯 Development Phases
 
@@ -177,71 +197,71 @@ pytest -v          # Run tests with verbose output
 - API documentation (Swagger/ReDoc)
 - See [apps/backend/PHASE_1.1_COMPLETION.md](./apps/backend/PHASE_1.1_COMPLETION.md)
 
-### ✅ Phase 2: Data Pipeline & Real-time Processing (Complete)
-- Real-time lead processing with NATS
-- Event-driven architecture
-- Data validation & enrichment
-- BullMQ job queues
-- Complete integration tests
+### 🚧 Phase 1.2: Authentication & Authorization (In Progress)
+- JWT-based authentication
+- Role-based access control (RBAC)
+- User management
+- Session handling
 
-### ✅ Phase 3: AI Lead Qualification & Scoring (Complete)
+### 🚧 Phase 1.3: Frontend Foundation (Planned)
+- Next.js 14 application setup
+- Tailwind CSS & component library
+- State management
+- API integration
+
+### 📋 Phase 1.4: Lead Management (Planned)
+- Full-stack lead management features
+- Campaign management
+- Lead routing & assignment
+
+### 📋 Phase 1.5: Communication System (Planned)
+- Notes & activity tracking
+- Email integration
+- Tasks & notifications
+
+### 📋 Phase 2: Data Pipeline & Real-time Processing (Planned)
+- Real-time lead processing
+- Event-driven architecture with NATS
+- Data validation & enrichment
+
+### 📋 Phase 3: AI Lead Qualification & Scoring (Planned)
 - LLM integration for lead scoring
 - Natural language processing
 - Automated lead qualification
 - Intelligent recommendations
-- LangChain integration
 
-### ✅ Phase 3.5: AI Lead Pipeline & Enrichment (Complete)
+### 📋 Phase 3.5: AI Lead Pipeline & Enrichment (Planned)
+- LangChain integration
 - Lead enrichment module
 - Agent matching service
 - Neo4j & Qdrant integration
-- Vector search for similar leads
-- RAG (Retrieval Augmented Generation)
 
-### ✅ Phase 4: Multi-Agent Routing & Distribution (Complete)
+### 📋 Phase 4: Multi-Agent Routing & Distribution (Planned)
 - Intelligent agent matching
-- Load balancing with round-robin
+- Load balancing
 - Priority routing
-- Graph-based recommendations
-- Conflict resolution for stale leads
-- See [docs/PHASE4_IMPLEMENTATION.md](./docs/PHASE4_IMPLEMENTATION.md)
 
-### ✅ Phase 5: Analytics Dashboard & System Optimization (Complete)
-- **Phase 5.1**: Analytics Service
-  - Lead funnel analytics
-  - Agent performance metrics
-  - AI model monitoring
-  - System health tracking
+### 📋 Phase 5: Analytics Dashboard & Optimization (Planned)
+- Real-time analytics
+- Performance metrics
+- System optimization
 
-- **Phase 5.2**: Analytics Dashboard
-  - Real-time metrics dashboard
-  - Performance benchmarking
-  - Lead funnel visualization
+### ✅ Phase 6.3: Advanced Monitoring & Observability (Complete)
+- ✅ Prometheus + Grafana stack for metrics and visualization
+- ✅ Loki + Promtail for log aggregation
+- ✅ Jaeger for distributed tracing with OpenTelemetry
+- ✅ AlertManager for alert routing and management
+- ✅ System exporters (Node, PostgreSQL, Redis)
+- ✅ Custom business metrics for leads and AI models
+- ✅ Pre-configured dashboards and alerts
+- See [docs/MONITORING.md](./docs/MONITORING.md)
 
-- **Phase 5.3**: Reporting System
-  - Scheduled reports
-  - Alert management
-  - Data export functionality
-
-- **Phase 5.4**: Analytics UI
-  - Frontend dashboard components
-  - Interactive charts
-  - Real-time data visualization
-
-- **Phase 5.5**: Testing Infrastructure ✅ (Latest)
-  - Comprehensive integration tests (13 files, 63+ scenarios)
-  - Performance benchmarks
-  - Test coverage (74.5% overall)
-  - Complete test documentation
-  - See [docs/PHASE_5_SUMMARY.md](./docs/PHASE_5_SUMMARY.md)
-  - See [docs/PHASE_5.5_COMPLETION.md](./docs/PHASE_5.5_COMPLETION.md)
-
-### 📋 Phase 6: Production Deployment & Monitoring (Planned)
-- Production infrastructure
-- Monitoring & alerting
-- Performance optimization
-- Kubernetes deployment
-- Security hardening
+### 📋 Phase 6: Production Deployment (Remaining)
+- Kubernetes deployment manifests
+- Infrastructure as Code (Terraform/Pulumi)
+- Security hardening (WAF, secrets management, encryption)
+- Performance optimization and auto-scaling
+- Production operational readiness
 
 See [Implementation Phases](./docs/PHASES.md) for detailed roadmap.
 
@@ -255,35 +275,9 @@ pytest -v --cov=app --cov-report=term-missing
 
 ### TypeScript Services
 ```bash
-# Run all tests
-pnpm test
-
-# Run with coverage
-pnpm test:coverage
-
-# Service-specific tests
-cd apps/api && npm test
-cd apps/data-service && npm test
-cd apps/orchestrator && npm test
-cd apps/frontend && npm test
-
-# Integration tests only
-pnpm test:integration
-
-# Performance tests only
-pnpm test:performance
+pnpm test                    # Run all tests
+pnpm --filter @insurance/api test  # Run specific package tests
 ```
-
-### Test Coverage
-
-| Service | Target | Status |
-|---------|--------|--------|
-| API | 75% | ✅ 75% |
-| Data Service | 78% | ✅ 78% |
-| Orchestrator | 75% | ✅ 75% |
-| Frontend | 70% | ✅ 70% |
-
-See [Testing Documentation](./docs/TESTING_COVERAGE.md) for detailed guide.
 
 ## 📚 Documentation
 
@@ -297,16 +291,8 @@ See [Testing Documentation](./docs/TESTING_COVERAGE.md) for detailed guide.
 - [Architecture Overview](./docs/ARCHITECTURE.md)
 - [Technology Stack](./docs/TECH_STACK.md)
 - [Development Guide](./docs/DEVELOPMENT.md)
-- [Testing Guide](./docs/TESTING_GUIDE.md)
-- [Testing Coverage](./docs/TESTING_COVERAGE.md)
-
-### Implementation Phases
-- [All Phases Roadmap](./docs/PHASES.md)
-- [Phase 4 Implementation](./docs/PHASE4_IMPLEMENTATION.md)
-- [Phase 5 Summary](./docs/PHASE_5_SUMMARY.md)
-- [Phase 5.5 Completion](./docs/PHASE_5.5_COMPLETION.md)
-- [Phase 5.5 Quick Start](./docs/PHASE_5.5_QUICKSTART.md)
-- [Test Checklist](./docs/TEST_CHECKLIST.md)
+- [Monitoring & Observability](./docs/MONITORING.md) ✨ **NEW**
+- [Implementation Phases](./docs/PHASES.md)
 
 ## 📝 Commit Convention
 
@@ -332,30 +318,83 @@ git commit -m "docs: update API documentation"
 The platform uses Docker Compose for infrastructure services:
 
 ```yaml
+# Core Infrastructure
 services:
   - postgres:5432    # Primary database
   - redis:6379       # Cache and sessions
   - neo4j:7474/7687  # Graph database
   - qdrant:6333      # Vector database
   - nats:4222        # Message broker
+
+# Monitoring Stack (Phase 6.3)
+monitoring:
+  - prometheus:9090  # Metrics collection
+  - grafana:3003     # Visualization
+  - loki:3100        # Log aggregation
+  - jaeger:16686     # Distributed tracing
+  - alertmanager:9093 # Alert management
 ```
 
 ### Commands
 
 ```bash
-# Start all services
+# Start core infrastructure only
 docker compose up -d
+
+# Start infrastructure + monitoring
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+# Start monitoring services only
+docker compose -f docker-compose.monitoring.yml up -d
 
 # Stop all services
 docker compose down
+docker compose -f docker-compose.monitoring.yml down
 
 # View logs
 docker compose logs -f
+docker compose -f docker-compose.monitoring.yml logs -f grafana
 
 # Reset database (WARNING: destroys data)
 docker compose down -v
 docker compose up -d
 ```
+
+## 📊 Monitoring & Observability
+
+Phase 6.3 implements comprehensive monitoring with:
+
+- **Prometheus** - Metrics collection from all services
+- **Grafana** - Dashboards and visualization (http://localhost:3003)
+- **Loki** - Centralized log aggregation
+- **Jaeger** - Distributed tracing (http://localhost:16686)
+- **AlertManager** - Intelligent alert routing
+
+### Quick Start
+
+```bash
+# Start monitoring stack
+docker compose -f docker-compose.monitoring.yml up -d
+
+# Access Grafana
+open http://localhost:3003  # Login: admin / admin
+
+# View Prometheus targets
+open http://localhost:9090/targets
+
+# View traces in Jaeger
+open http://localhost:16686
+```
+
+### Available Metrics
+
+All services expose metrics at `/metrics`:
+- API Service: http://localhost:3000/metrics
+- Data Service: http://localhost:3001/metrics
+- Orchestrator: http://localhost:3002/metrics
+- Backend: http://localhost:8000/metrics
+
+See [Monitoring Guide](./docs/MONITORING.md) for detailed documentation.
 
 ## 🐛 Troubleshooting
 
@@ -428,10 +467,9 @@ For issues and questions:
 - Open an issue in the repository
 - Check the documentation in each service's directory
 - Review the troubleshooting guide above
-- See [Testing Coverage](./docs/TESTING_COVERAGE.md) for testing help
-- See [Development Guide](./docs/DEVELOPMENT.md) for setup help
-- See [Architecture Overview](./docs/ARCHITECTURE.md) for system understanding
+- See [Development Guide](./docs/DEVELOPMENT.md) for setup help _(coming soon)_
+- See [Architecture Overview](./docs/ARCHITECTURE.md) for system understanding _(coming soon)_
 
 ---
 
-**Project Status**: Phase 5 Complete ✅ | Phase 6: Production Deployment & Monitoring 🚧
+**Project Status**: Phase 1.1 Complete ✅ | Merging Phase 1.2-3.5 🚧
