@@ -5,6 +5,8 @@ import compression from 'compression';
 import path from 'path';
 import { logger } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
+import agentsRouter from './routes/agents.js';
+import routingRouter from './routes/routing.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
 import emailsRouter from './routes/emails.js';
@@ -39,6 +41,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/leads/:leadId/emails', emailsRouter);
   app.use('/api/v1/leads/:leadId/tasks', tasksRouter);
   app.use('/api/v1/leads/:leadId/send-email', sendEmailRouter);
+  app.use('/api/v1/agents', agentsRouter);
+  app.use('/api/v1/routing', routingRouter);
   app.use('/api/v1/notifications', notificationsRouter);
 
   app.use('/api/leads', leadsRouter);
@@ -47,6 +51,8 @@ export function createApp(): express.Express {
   app.use('/api/leads/:leadId/emails', emailsRouter);
   app.use('/api/leads/:leadId/tasks', tasksRouter);
   app.use('/api/leads/:leadId/send-email', sendEmailRouter);
+  app.use('/api/agents', agentsRouter);
+  app.use('/api/routing', routingRouter);
   app.use('/api/notifications', notificationsRouter);
 
   app.use((req, res) => {

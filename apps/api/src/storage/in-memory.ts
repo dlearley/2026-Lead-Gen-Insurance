@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { ActivityLog, Email, Lead, Note, Notification, Task, User } from '@insurance-lead-gen/types';
+import type { ActivityLog, Agent, Email, Lead, LeadAssignment, Note, Notification, Task, User } from '@insurance-lead-gen/types';
 
 export interface EmailTemplateRecord {
   id: string;
@@ -16,6 +16,8 @@ export interface EmailTemplateRecord {
 export interface InMemoryStore {
   users: Map<string, User>;
   leads: Map<string, Lead>;
+  agents: Map<string, Agent>;
+  assignments: Map<string, LeadAssignment>;
   notes: Map<string, Note>;
   tasks: Map<string, Task>;
   emails: Map<string, Email>;
@@ -43,6 +45,8 @@ export const store: InMemoryStore = {
     ],
   ]),
   leads: new Map(),
+  agents: new Map(),
+  assignments: new Map(),
   notes: new Map(),
   tasks: new Map(),
   emails: new Map(),
