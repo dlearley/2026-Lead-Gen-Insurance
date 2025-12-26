@@ -225,8 +225,8 @@ Build the intelligent routing system that matches qualified leads to the best in
 #### Orchestrator Service
 
 - [ ] Agent matching algorithm using Neo4j graph
-- [ ] Multi-criteria ranking (specialization, location, performance, availability)
-- [ ] Round-robin & load balancing strategies
+- [x] Multi-criteria ranking (specialization, location, performance, availability)
+- [x] Round-robin & load balancing strategies
 - [ ] Agent performance tracking
 - [ ] Lead distribution rules engine
 - [ ] SMS/Email notification system

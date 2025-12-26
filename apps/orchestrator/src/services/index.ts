@@ -1,1 +1,2 @@
 export * from './ranking.service';
+export * from './routing.service';
