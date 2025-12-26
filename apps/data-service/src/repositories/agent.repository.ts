@@ -1,26 +1,19 @@
-import { Prisma, Agent, AgentStatus, InsuranceType } from '@prisma/client';
-import prisma from '../db/prisma.js';
+import type { PrismaClient, Agent, Prisma } from '@prisma/client';
 import { logger } from '@insurance-lead-gen/core';
 
 export interface CreateAgentInput {
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string;
-  licenseNumber?: string;
-  licenseState?: string;
-  yearsOfExperience?: number;
-  specializations?: InsuranceType[];
-  status?: AgentStatus;
-  maxCapacity?: number;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  country?: string;
-  serviceArea?: string[];
-  passwordHash?: string;
-  metadata?: Prisma.InputJsonValue;
-  availabilityHours?: Prisma.InputJsonValue;
+  phone: string;
+  licenseNumber: string;
+  specializations?: string[];
+  city: string;
+  state: string;
+  country: string;
+  rating?: number;
+  isActive?: boolean;
+  maxLeadCapacity?: number;
 }
 
 export interface UpdateAgentInput {
@@ -29,48 +22,48 @@ export interface UpdateAgentInput {
   email?: string;
   phone?: string;
   licenseNumber?: string;
-  licenseState?: string;
-  yearsOfExperience?: number;
-  specializations?: InsuranceType[];
-  conversionRate?: number;
-  averageResponseTime?: number;
-  totalLeadsHandled?: number;
-  totalConversions?: number;
-  performanceScore?: number;
-  status?: AgentStatus;
-  currentCapacity?: number;
-  maxCapacity?: number;
+  specializations?: string[];
   city?: string;
   state?: string;
-  zipCode?: string;
   country?: string;
-  serviceArea?: string[];
-  passwordHash?: string;
-  lastLoginAt?: Date;
-  metadata?: Prisma.InputJsonValue;
-  availabilityHours?: Prisma.InputJsonValue;
+  rating?: number;
+  isActive?: boolean;
+  maxLeadCapacity?: number;
+  currentLeadCount?: number;
+  averageResponseTime?: number;
+  conversionRate?: number;
 }
 
 export interface AgentFilters {
-  status?: AgentStatus | AgentStatus[];
-  specializations?: InsuranceType | InsuranceType[];
-  minPerformanceScore?: number;
-  maxPerformanceScore?: number;
-  hasCapacity?: boolean;
+  isActive?: boolean;
   state?: string;
-  serviceArea?: string[];
+  specialization?: string;
+  specializationsAny?: string[];
 }
 
 export class AgentRepository {
+  constructor(private prisma: PrismaClient) {}
+
   async create(input: CreateAgentInput): Promise<Agent> {
     try {
-      logger.info('Creating new agent', { email: input.email });
-
-      const agent = await prisma.agent.create({
-        data: input,
+      const agent = await this.prisma.agent.create({
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          phone: input.phone,
+          licenseNumber: input.licenseNumber,
+          specializations: input.specializations ?? [],
+          city: input.city,
+          state: input.state,
+          country: input.country,
+          rating: input.rating ?? 0,
+          isActive: input.isActive ?? true,
+          maxLeadCapacity: input.maxLeadCapacity ?? 10,
+        },
       });
 
-      logger.info('Agent created successfully', { agentId: agent.id });
+      logger.info('Agent created', { agentId: agent.id });
       return agent;
     } catch (error) {
       logger.error('Failed to create agent', { error, input });
@@ -79,138 +72,51 @@ export class AgentRepository {
   }
 
   async findById(id: string): Promise<Agent | null> {
-    try {
-      return await prisma.agent.findUnique({
-        where: { id },
-        include: {
-          assignments: {
-            include: {
-              lead: true,
-            },
-          },
-        },
-      });
-    } catch (error) {
-      logger.error('Failed to find agent by ID', { error, id });
-      throw error;
-    }
+    return this.prisma.agent.findUnique({ where: { id } });
   }
 
-  async findByEmail(email: string): Promise<Agent | null> {
-    try {
-      return await prisma.agent.findUnique({
-        where: { email },
-        include: {
-          assignments: true,
-        },
-      });
-    } catch (error) {
-      logger.error('Failed to find agent by email', { error, email });
-      throw error;
+  async findMany(
+    filters?: AgentFilters,
+    skip: number = 0,
+    take: number = 20
+  ): Promise<Agent[]> {
+    const where: Prisma.AgentWhereInput = {};
+
+    if (filters?.isActive !== undefined) {
+      where.isActive = filters.isActive;
     }
-  }
 
-  async findMany(filters?: AgentFilters, skip = 0, take = 20): Promise<Agent[]> {
-    try {
-      const where: Prisma.AgentWhereInput = {};
-
-      if (filters) {
-        if (filters.status) {
-          where.status = Array.isArray(filters.status) ? { in: filters.status } : filters.status;
-        }
-
-        if (filters.specializations) {
-          if (Array.isArray(filters.specializations)) {
-            where.specializations = {
-              hasSome: filters.specializations,
-            };
-          } else {
-            where.specializations = {
-              has: filters.specializations,
-            };
-          }
-        }
-
-        if (
-          filters.minPerformanceScore !== undefined ||
-          filters.maxPerformanceScore !== undefined
-        ) {
-          where.performanceScore = {};
-          if (filters.minPerformanceScore !== undefined) {
-            where.performanceScore.gte = filters.minPerformanceScore;
-          }
-          if (filters.maxPerformanceScore !== undefined) {
-            where.performanceScore.lte = filters.maxPerformanceScore;
-          }
-        }
-
-        if (filters.hasCapacity) {
-          where.currentCapacity = {
-            lt: prisma.agent.fields.maxCapacity,
-          };
-          where.status = AgentStatus.ACTIVE;
-        }
-
-        if (filters.state) {
-          where.state = filters.state;
-        }
-
-        if (filters.serviceArea && filters.serviceArea.length > 0) {
-          where.serviceArea = {
-            hasSome: filters.serviceArea,
-          };
-        }
-      }
-
-      return await prisma.agent.findMany({
-        where,
-        skip,
-        take,
-        orderBy: {
-          performanceScore: 'desc',
-        },
-        include: {
-          assignments: {
-            take: 5,
-            orderBy: {
-              assignedAt: 'desc',
-            },
-          },
-        },
-      });
-    } catch (error) {
-      logger.error('Failed to find agents', { error, filters });
-      throw error;
+    if (filters?.state) {
+      where.state = filters.state;
     }
-  }
 
-  async count(filters?: AgentFilters): Promise<number> {
-    try {
-      const where: Prisma.AgentWhereInput = {};
-
-      if (filters) {
-        if (filters.status) {
-          where.status = Array.isArray(filters.status) ? { in: filters.status } : filters.status;
-        }
-      }
-
-      return await prisma.agent.count({ where });
-    } catch (error) {
-      logger.error('Failed to count agents', { error, filters });
-      throw error;
+    if (filters?.specialization) {
+      where.specializations = { has: filters.specialization };
     }
+
+    if (filters?.specializationsAny && filters.specializationsAny.length > 0) {
+      where.specializations = { hasSome: filters.specializationsAny };
+    }
+
+    return this.prisma.agent.findMany({
+      where,
+      skip,
+      take,
+      orderBy: [{ rating: 'desc' }, { conversionRate: 'desc' }],
+    });
   }
 
   async update(id: string, input: UpdateAgentInput): Promise<Agent> {
     try {
-      logger.info('Updating agent', { agentId: id });
-
-      const agent = await prisma.agent.update({
+      const agent = await this.prisma.agent.update({
         where: { id },
-        data: input,
+        data: {
+          ...input,
+          specializations: input.specializations,
+        },
       });
 
-      logger.info('Agent updated successfully', { agentId: agent.id });
+      logger.info('Agent updated', { agentId: agent.id });
       return agent;
     } catch (error) {
       logger.error('Failed to update agent', { error, id, input });
@@ -219,147 +125,24 @@ export class AgentRepository {
   }
 
   async delete(id: string): Promise<Agent> {
-    try {
-      logger.info('Deleting agent', { agentId: id });
-
-      const agent = await prisma.agent.delete({
-        where: { id },
-      });
-
-      logger.info('Agent deleted successfully', { agentId: agent.id });
-      return agent;
-    } catch (error) {
-      logger.error('Failed to delete agent', { error, id });
-      throw error;
-    }
+    return this.prisma.agent.delete({ where: { id } });
   }
 
-  async updateStatus(id: string, status: AgentStatus): Promise<Agent> {
-    return this.update(id, { status });
+  async incrementCurrentLeadCount(id: string): Promise<Agent> {
+    return this.prisma.agent.update({
+      where: { id },
+      data: {
+        currentLeadCount: { increment: 1 },
+      },
+    });
   }
 
-  async incrementCapacity(id: string): Promise<Agent> {
-    try {
-      const agent = await prisma.agent.update({
-        where: { id },
-        data: {
-          currentCapacity: {
-            increment: 1,
-          },
-        },
-      });
-
-      logger.info('Agent capacity incremented', {
-        agentId: id,
-        newCapacity: agent.currentCapacity,
-      });
-      return agent;
-    } catch (error) {
-      logger.error('Failed to increment agent capacity', { error, id });
-      throw error;
-    }
-  }
-
-  async decrementCapacity(id: string): Promise<Agent> {
-    try {
-      const agent = await prisma.agent.update({
-        where: { id },
-        data: {
-          currentCapacity: {
-            decrement: 1,
-          },
-        },
-      });
-
-      logger.info('Agent capacity decremented', {
-        agentId: id,
-        newCapacity: agent.currentCapacity,
-      });
-      return agent;
-    } catch (error) {
-      logger.error('Failed to decrement agent capacity', { error, id });
-      throw error;
-    }
-  }
-
-  async updatePerformanceMetrics(
-    id: string,
-    metrics: {
-      totalLeadsHandled?: number;
-      totalConversions?: number;
-      conversionRate?: number;
-      averageResponseTime?: number;
-      performanceScore?: number;
-    }
-  ): Promise<Agent> {
-    return this.update(id, metrics);
-  }
-
-  async getAvailableAgentsByInsuranceType(
-    insuranceType: InsuranceType,
-    limit = 20
-  ): Promise<Agent[]> {
-    try {
-      return await prisma.agent.findMany({
-        where: {
-          status: AgentStatus.ACTIVE,
-          specializations: {
-            has: insuranceType,
-          },
-          currentCapacity: {
-            lt: prisma.agent.fields.maxCapacity,
-          },
-        },
-        take: limit,
-        orderBy: [{ performanceScore: 'desc' }, { currentCapacity: 'asc' }],
-      });
-    } catch (error) {
-      logger.error('Failed to get available agents', { error, insuranceType });
-      throw error;
-    }
-  }
-
-  async getTopPerformingAgents(limit = 10): Promise<Agent[]> {
-    try {
-      return await prisma.agent.findMany({
-        where: {
-          status: AgentStatus.ACTIVE,
-        },
-        take: limit,
-        orderBy: [{ performanceScore: 'desc' }, { conversionRate: 'desc' }],
-      });
-    } catch (error) {
-      logger.error('Failed to get top performing agents', { error });
-      throw error;
-    }
-  }
-
-  async getAgentsByLocation(state: string, zipCode?: string): Promise<Agent[]> {
-    try {
-      const where: Prisma.AgentWhereInput = {
-        status: AgentStatus.ACTIVE,
-        state,
-      };
-
-      if (zipCode) {
-        where.OR = [{ zipCode }, { serviceArea: { has: zipCode } }];
-      }
-
-      return await prisma.agent.findMany({
-        where,
-        orderBy: {
-          performanceScore: 'desc',
-        },
-      });
-    } catch (error) {
-      logger.error('Failed to get agents by location', { error, state, zipCode });
-      throw error;
-    }
-  }
-
-  async updateLoginTime(id: string): Promise<Agent> {
-    return this.update(id, { lastLoginAt: new Date() });
+  async decrementCurrentLeadCount(id: string): Promise<Agent> {
+    return this.prisma.agent.update({
+      where: { id },
+      data: {
+        currentLeadCount: { decrement: 1 },
+      },
+    });
   }
 }
-
-export const agentRepository = new AgentRepository();

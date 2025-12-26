@@ -34,13 +34,11 @@ describe('Lead Repository', () => {
         lastName: 'Doe',
         insuranceType: 'AUTO',
         metadata: { utm_source: 'google' },
-        address: {
-          street: '123 Main St',
-          city: 'New York',
-          state: 'NY',
-          zipCode: '10001',
-          country: 'US',
-        },
+        street: '123 Main St',
+        city: 'New York',
+        state: 'NY',
+        zipCode: '10001',
+        country: 'US',
       };
 
       const lead = await repository.create(leadData);

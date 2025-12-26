@@ -1,11 +1,19 @@
-import { PrismaClient, Event } from '@prisma/client';
+import type { PrismaClient, Event } from '@prisma/client';
 import { logger } from '@insurance-lead-gen/core';
-import type { Event as EventType } from '@insurance-lead-gen/types';
+
+export interface CreateEventInput {
+  type: string;
+  source: string;
+  entityType: string;
+  entityId: string;
+  data: unknown;
+  metadata?: Record<string, unknown>;
+}
 
 export class EventRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async createEvent(eventData: Omit<EventType, 'id' | 'timestamp'>): Promise<Event> {
+  async createEvent(eventData: CreateEventInput): Promise<Event> {
     try {
       const event = await this.prisma.event.create({
         data: {
@@ -14,7 +22,7 @@ export class EventRepository {
           entityType: eventData.entityType,
           entityId: eventData.entityId,
           data: eventData.data as any,
-          metadata: eventData.metadata as any,
+          metadata: (eventData.metadata ?? null) as any,
         },
       });
 

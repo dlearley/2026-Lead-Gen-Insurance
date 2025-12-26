@@ -1,4 +1,5 @@
-import { Prisma, Lead, LeadStatus, InsuranceType } from '@prisma/client';
+import { LeadStatus as LeadStatusEnum } from '@prisma/client';
+import type { InsuranceType, Lead, LeadStatus, Prisma } from '@prisma/client';
 
 // Lead repository interface
 export interface LeadRepository {
@@ -28,7 +29,7 @@ export class InMemoryLeadRepository implements LeadRepository {
   async create(data: Prisma.LeadCreateInput): Promise<Lead> {
     const now = new Date();
     const id = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const lead: Lead = {
       id,
       source: data.source as string,
@@ -36,15 +37,15 @@ export class InMemoryLeadRepository implements LeadRepository {
       phone: data.phone as string | null,
       firstName: data.firstName as string | null,
       lastName: data.lastName as string | null,
-      street: (data.address as any)?.street || null,
-      city: (data.address as any)?.city || null,
-      state: (data.address as any)?.state || null,
-      zipCode: (data.address as any)?.zipCode || null,
-      country: (data.address as any)?.country || 'US',
-      insuranceType: data.insuranceType as InsuranceType | null,
-      qualityScore: null,
-      status: 'RECEIVED' as LeadStatus,
-      metadata: data.metadata as Record<string, unknown> | null,
+      street: (data.street as string | null) ?? null,
+      city: (data.city as string | null) ?? null,
+      state: (data.state as string | null) ?? null,
+      zipCode: (data.zipCode as string | null) ?? null,
+      country: (data.country as string | null) ?? 'US',
+      insuranceType: (data.insuranceType as InsuranceType | null) ?? null,
+      qualityScore: (data.qualityScore as number | null) ?? null,
+      status: (data.status as LeadStatus) ?? LeadStatusEnum.RECEIVED,
+      metadata: (data.metadata as Record<string, unknown> | null) ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -74,30 +75,30 @@ export class InMemoryLeadRepository implements LeadRepository {
     // Apply filters
     if (params.where) {
       const { status, source, insuranceType, qualityScore, createdAt } = params.where;
-      
+
       if (status) {
-        leads = leads.filter(l => l.status === status);
+        leads = leads.filter((l) => l.status === status);
       }
       if (source) {
-        leads = leads.filter(l => l.source === source);
+        leads = leads.filter((l) => l.source === source);
       }
       if (insuranceType) {
-        leads = leads.filter(l => l.insuranceType === insuranceType);
+        leads = leads.filter((l) => l.insuranceType === insuranceType);
       }
       if (qualityScore) {
         if (qualityScore.gte !== undefined) {
-          leads = leads.filter(l => (l.qualityScore || 0) >= qualityScore.gte!);
+          leads = leads.filter((l) => (l.qualityScore || 0) >= qualityScore.gte!);
         }
         if (qualityScore.lte !== undefined) {
-          leads = leads.filter(l => (l.qualityScore || 0) <= qualityScore.lte!);
+          leads = leads.filter((l) => (l.qualityScore || 0) <= qualityScore.lte!);
         }
       }
       if (createdAt) {
         if (createdAt.gte) {
-          leads = leads.filter(l => l.createdAt >= createdAt.gte!);
+          leads = leads.filter((l) => l.createdAt >= createdAt.gte!);
         }
         if (createdAt.lte) {
-          leads = leads.filter(l => l.createdAt <= createdAt.lte!);
+          leads = leads.filter((l) => l.createdAt <= createdAt.lte!);
         }
       }
     }
@@ -147,19 +148,19 @@ export class InMemoryLeadRepository implements LeadRepository {
 
   async count(where?: Prisma.LeadWhereInput): Promise<number> {
     let leads = Array.from(this.leads.values());
-    
+
     if (where) {
       if (where.status) {
-        leads = leads.filter(l => l.status === where.status);
+        leads = leads.filter((l) => l.status === where.status);
       }
       if (where.source) {
-        leads = leads.filter(l => l.source === where.source);
+        leads = leads.filter((l) => l.source === where.source);
       }
       if (where.insuranceType) {
-        leads = leads.filter(l => l.insuranceType === where.insuranceType);
+        leads = leads.filter((l) => l.insuranceType === where.insuranceType);
       }
     }
-    
+
     return leads.length;
   }
 }
