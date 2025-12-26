@@ -381,3 +381,6 @@ export interface ProcessingResult {
 }
 
 export * from './events.js';
+
+// Validation Schemas
+export * from './validation.js';
