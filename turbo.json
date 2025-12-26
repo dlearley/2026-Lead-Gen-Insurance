@@ -30,9 +30,15 @@
     "db:push": {
       "cache": false
     },
+    "db:migrate": {
+      "cache": false
+    },
     "db:studio": {
       "cache": false,
       "persistent": true
+    },
+    "db:seed": {
+      "cache": false
     },
     "clean": {
       "cache": false
