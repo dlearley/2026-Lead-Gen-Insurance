@@ -15,7 +15,11 @@ from app.models import (
     lead,
     lead_source,
     campaign,
-    insurance_product
+    insurance_product,
+    role,
+    permission,
+    team,
+    audit_log
 )
 
 config = context.config
