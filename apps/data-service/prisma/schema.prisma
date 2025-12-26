@@ -46,8 +46,8 @@ enum UserRole {
 // ========================================
 
 model Lead {
-  id             String       @id @default(uuid())
-  source         String
+  id             String         @id @default(uuid())
+  source         LeadSource     @default(MANUAL)
   email          String?
   phone          String?
   firstName      String?
@@ -57,24 +57,54 @@ model Lead {
   state          String?
   zipCode        String?
   country        String?
-  insuranceType  InsuranceType?
-  qualityScore   Float?
-  status         LeadStatus   @default(RECEIVED)
-  metadata       Json?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
 
-  // Relations
+  // Insurance details - merged from both versions
+  insuranceType  InsuranceType?
+  insuranceTypes InsuranceType[] @default([])
+  currentProvider String?
+  policyExpiryDate DateTime?
+
+  // Lead information - enhanced from Phase 2.2
+  dateOfBirth    DateTime?
+  urgency        Urgency       @default(MEDIUM)
+  intent         String?
+  qualityScore   Float?
+
+  // AI processing - from Phase 2.2
+  aiProcessedAt   DateTime?
+  aiScoreReason   String?
+  similarityScore Float?
+  enrichedData    Json?
+
+  // Status and metadata
+  status         LeadStatus    @default(RECEIVED)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations - merged from both versions
   notes         Note[]
   activities    ActivityLog[]
   emails        Email[]
   tasks         Task[]
   assignments   LeadAssignment[]
+  events        LeadEvent[]
 
   @@index([status])
   @@index([email])
   @@index([createdAt])
+  @@index([source])
+  @@index([urgency])
   @@map("leads")
+}
+
+enum LeadSource {
+  WEB_FORM
+  PHONE
+  EMAIL
+  REFERRAL
+  PARTNER_API
+  MANUAL
 }
 
 enum InsuranceType {
@@ -83,6 +113,11 @@ enum InsuranceType {
   LIFE
   HEALTH
   COMMERCIAL
+  RENTERS
+  UMBRELLA
+  DISABILITY
+  LONG_TERM_CARE
+  PET
 }
 
 enum LeadStatus {
@@ -90,8 +125,39 @@ enum LeadStatus {
   PROCESSING
   QUALIFIED
   ROUTED
+  CONTACTED
   CONVERTED
   REJECTED
+  DUPLICATE
+  INVALID
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ========================================
+// LEAD EVENTS (from Phase 2.2)
+// ========================================
+
+model LeadEvent {
+  id          String   @id @default(uuid())
+  leadId      String
+  eventType   String
+  eventData   Json?
+  source      String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("lead_events")
 }
 
 // ========================================
@@ -355,31 +421,53 @@ enum NotificationType {
 // ========================================
 
 model Agent {
-  id                  String   @id @default(uuid())
+  id                  String      @id @default(uuid())
   firstName           String
   lastName            String
-  email               String   @unique
+  email               String      @unique
   phone               String
   licenseNumber       String
-  specializations     String[]
+  specializations     InsuranceType[]
   city                String
   state               String
   country             String
-  rating              Float    @default(0)
-  isActive            Boolean  @default(true)
-  maxLeadCapacity     Int      @default(10)
-  currentLeadCount    Int      @default(0)
-  averageResponseTime Int      @default(0)
-  conversionRate      Float    @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  zipCode             String?
+
+  // Performance metrics - enhanced from Phase 2.2
+  rating              Float       @default(0)
+  averageResponseTime Int         @default(0)
+  conversionRate      Float       @default(0)
+  totalLeadsAssigned  Int         @default(0)
+  totalLeadsConverted Int         @default(0)
+
+  // Capacity management - enhanced from Phase 2.2
+  maxLeadCapacity     Int         @default(10)
+  currentLeadCount    Int         @default(0)
+
+  // Status and authentication - enhanced from Phase 2.2
+  status              AgentStatus @default(ACTIVE)
+  isActive            Boolean     @default(true)
+  passwordHash        String?
+  lastLoginAt         DateTime?
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   // Relations
   assignments LeadAssignment[]
 
   @@index([email])
   @@index([isActive])
+  @@index([status])
+  @@index([state])
   @@map("agents")
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
 }
 
 model LeadAssignment {
@@ -387,8 +475,22 @@ model LeadAssignment {
   leadId     String
   agentId    String
   status     LeadAssignmentStatus @default(PENDING)
+
+  // Enhanced matching fields from Phase 2.2
+  matchScore  Float?
+  matchReason String?
+  priority    Int                  @default(0)
+
+  // Timestamps
   assignedAt DateTime             @default(now())
   acceptedAt DateTime?
+  rejectedAt DateTime?
+  viewedAt   DateTime?
+
+  // Conversion tracking from Phase 2.2
+  convertedAt DateTime?
+  conversionValue Float?
+
   notes      String?
 
   // Relations
@@ -398,6 +500,7 @@ model LeadAssignment {
   @@index([leadId])
   @@index([agentId])
   @@index([status])
+  @@index([assignedAt])
   @@map("lead_assignments")
 }
 
@@ -406,4 +509,23 @@ enum LeadAssignmentStatus {
   ACCEPTED
   REJECTED
   TIMEOUT
+  EXPIRED
+}
+
+// ========================================
+// SYSTEM CONFIGURATION (from Phase 2.2)
+// ========================================
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  category  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([category])
+  @@map("system_config")
 }
