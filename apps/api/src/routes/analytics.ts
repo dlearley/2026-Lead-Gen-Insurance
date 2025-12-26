@@ -1,71 +1,80 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, Request, Response } from 'express';
+import axios from 'axios';
 import { logger } from '@insurance-lead-gen/core';
 
 const router = Router();
 
-const DATA_SERVICE_URL = process.env.DATA_SERVICE_URL || 'http://localhost:3002';
+const DATA_SERVICE_URL = process.env.DATA_SERVICE_URL || 'http://localhost:3001';
 
-async function proxyToDataService(endpoint: string, req: Request, res: Response): Promise<void> {
+async function proxyToDataService(req: Request, res: Response, endpoint: string): Promise<void> {
   try {
-    const url = `${DATA_SERVICE_URL}${endpoint}`;
-    const response = await fetch(url, {
+    const response = await axios({
       method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
+      url: `${DATA_SERVICE_URL}${endpoint}`,
+      data: req.body,
+      params: req.query,
     });
-
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    logger.error('Failed to proxy to data service', { error, endpoint });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      logger.error('Proxy to data service failed', { endpoint, error: error.message });
+      res.status(error.response?.status || 500).json({
+        error: 'Failed to fetch analytics data',
+        message: error.message,
+      });
+    } else {
+      logger.error('Unknown error during proxy', { endpoint, error });
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 }
 
-router.get('/dashboard', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/dashboard', req, res);
+router.get('/dashboard', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/dashboard');
 });
 
-router.get('/leads/funnel', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/leads/funnel', req, res);
+router.get('/leads/funnel', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/leads/funnel');
 });
 
-router.get('/leads/volume', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/leads/volume', req, res);
+router.get('/leads/volume', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/leads/volume');
 });
 
-router.get('/agents/leaderboard', (req: Request, res: Response): void => {
-  const queryString = new URLSearchParams(req.query as Record<string, string>).toString();
-  const endpoint = `/api/v1/analytics/agents/leaderboard${queryString ? `?${queryString}` : ''}`;
-  void proxyToDataService(endpoint, req, res);
+router.get('/agents/leaderboard', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/agents/leaderboard');
 });
 
-router.get('/agents/:agentId/performance', (req: Request, res: Response): void => {
-  const { agentId } = req.params;
-  void proxyToDataService(`/api/v1/analytics/agents/${agentId}/performance`, req, res);
+router.get('/agents/:agentId/performance', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, `/api/v1/analytics/agents/${req.params.agentId}/performance`);
 });
 
-router.get('/ai/metrics', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/ai/metrics', req, res);
+router.get('/ai/metrics', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/ai/metrics');
 });
 
-router.get('/ai/processing', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/ai/processing', req, res);
+router.get('/ai/processing', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/ai/processing');
 });
 
-router.get('/system/health', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/system/health', req, res);
+router.get('/system/health', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/system/health');
 });
 
-router.post('/track/:eventType', (req: Request, res: Response): void => {
-  const { eventType } = req.params;
-  void proxyToDataService(`/api/v1/analytics/track/${eventType}`, req, res);
+router.post('/track/event', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/track/event');
 });
 
-router.post('/reset', (req: Request, res: Response): void => {
-  void proxyToDataService('/api/v1/analytics/reset', req, res);
+router.post('/track/lead', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/track/lead');
+});
+
+router.post('/track/agent', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/track/agent');
+});
+
+router.post('/track/ai', async (req: Request, res: Response): Promise<void> => {
+  await proxyToDataService(req, res, '/api/v1/analytics/track/ai');
 });
 
 export default router;

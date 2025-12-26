@@ -381,6 +381,7 @@ export interface ProcessingResult {
 }
 
 export * from './events.js';
+export * from './analytics.js';
 
 // Report Types
 export * from './reports.js';

@@ -11,8 +11,7 @@ import emailsRouter from './routes/emails.js';
 import tasksRouter from './routes/tasks.js';
 import notificationsRouter from './routes/notifications.js';
 import sendEmailRouter from './routes/send-email.js';
-import reportsRouter from './routes/reports.js';
-import alertsRouter from './routes/alerts.js';
+import analyticsRouter from './routes/analytics.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -42,8 +41,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/leads/:leadId/tasks', tasksRouter);
   app.use('/api/v1/leads/:leadId/send-email', sendEmailRouter);
   app.use('/api/v1/notifications', notificationsRouter);
-  app.use('/api/v1/reports', reportsRouter);
-  app.use('/api/v1/alerts', alertsRouter);
+  app.use('/api/v1/analytics', analyticsRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -52,8 +50,7 @@ export function createApp(): express.Express {
   app.use('/api/leads/:leadId/tasks', tasksRouter);
   app.use('/api/leads/:leadId/send-email', sendEmailRouter);
   app.use('/api/notifications', notificationsRouter);
-  app.use('/api/reports', reportsRouter);
-  app.use('/api/alerts', alertsRouter);
+  app.use('/api/analytics', analyticsRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

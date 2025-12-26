@@ -1,15 +1,12 @@
-import { logger } from '@insurance-lead-gen/core';
-import { getConfig } from '@insurance-lead-gen/config';
-import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
+import { logger } from '@insurance-lead-gen/core';
+import { getConfig } from '@insurance-lead-gen/config';
+import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
 
 import { NatsEventBus } from './nats/nats-event-bus.js';
-import { RoutingService } from './routing-service.js';
-import { QueueManager } from './queues.ts';
-import { LangChainEngine } from './langchain.ts';
-import { OpenAIClient } from './openai.ts';
 
 const config = getConfig();
 const PORT = config.ports.orchestrator;
@@ -17,112 +14,66 @@ const PORT = config.ports.orchestrator;
 const start = async (): Promise<void> => {
   logger.info('Orchestrator service starting', { port: PORT });
 
-  // 1. Initialize NATS Event Bus
-  const eventBus = await NatsEventBus.connect(config.nats.url);
-
-  // 2. Initialize Components
-  const routingService = new RoutingService(eventBus);
-  const openaiClient = new OpenAIClient();
-  const langchainEngine = new LangChainEngine(openaiClient);
-  const queueManager = new QueueManager();
-  await queueManager.connect();
-
-  // 3. Initialize HTTP Server
+  // Initialize Express app for health checks
   const app = express();
   app.use(helmet());
   app.use(cors());
-  app.use(express.json());
+  app.use(compression());
+  app.use(express.json({ limit: '10mb' }));
 
+  // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'insurance-lead-gen-orchestrator',
+      service: 'orchestrator',
       version: '1.0.0',
+      uptime: process.uptime(),
     });
   });
 
-  app.get('/api/v1/routing/status', (req, res) => {
+  // Readiness check endpoint
+  app.get('/ready', (req, res) => {
     res.json({
-      status: 'operational',
-      connected: true,
-      subscribers: 1,
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      service: 'orchestrator',
     });
   });
 
-  const httpServer = app.listen(PORT, () => {
-    logger.info(`Orchestrator HTTP server running on port ${PORT}`);
+  // Start Express server
+  const server = app.listen(PORT, () => {
+    logger.info(`Orchestrator service API listening on port ${PORT}`);
   });
 
-  // 4. Start Workers
-  await queueManager.startProcessingQueue(langchainEngine, eventBus.connection);
+  // Initialize NATS event bus
+  const eventBus = await NatsEventBus.connect(config.nats.url);
 
-  // 5. Subscribe to Events
-  
-  // Listen for new leads to process
-  const leadReceivedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadReceived);
+  // Subscribe to events
+  const sub = eventBus.subscribe(EVENT_SUBJECTS.LeadProcessed);
   (async () => {
-    for await (const msg of leadReceivedSub) {
-      try {
-        const event = eventBus.decode<any>(msg.data);
-        const leadData = event.data?.lead || event.lead || event;
-        
-        logger.info('Received lead.received event, adding to processing queue', { 
-          leadId: leadData.id 
-        });
-        
-        await queueManager.addLeadProcessingJob(leadData);
-      } catch (error) {
-        logger.error('Failed to handle lead.received event', { error });
-      }
-    }
-  })().catch((error) => {
-    logger.error('lead.received subscription terminated', { error });
-  });
-
-  // Listen for qualified leads to route
-  const leadQualifiedSub = eventBus.subscribe('lead.qualified');
-  const leadProcessedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadProcessed);
-  
-  const handleQualifiedLead = async (leadId: string) => {
-    try {
-      logger.info('Lead qualified, starting routing', { leadId });
-      await routingService.routeLead(leadId);
-    } catch (error) {
-      logger.error('Failed to route qualified lead', { leadId, error });
-    }
-  };
-
-  (async () => {
-    for await (const msg of leadQualifiedSub) {
-      const event = eventBus.decode<any>(msg.data);
-      const leadId = event.id || event.leadId;
-      if (leadId) await handleQualifiedLead(leadId);
-    }
-  })().catch((error) => {
-    logger.error('lead.qualified subscription terminated', { error });
-  });
-
-  (async () => {
-    for await (const msg of leadProcessedSub) {
-      const event = eventBus.decode<any>(msg.data);
-      const leadId = event.data?.leadId || event.leadId;
-      if (leadId) await handleQualifiedLead(leadId);
+    for await (const msg of sub) {
+      const event = eventBus.decode<LeadProcessedEvent>(msg.data);
+      logger.info('Received lead.processed', { leadId: event.data.leadId });
     }
   })().catch((error) => {
     logger.error('lead.processed subscription terminated', { error });
   });
 
-  // 6. Graceful Shutdown
+  const shutdown = async (): Promise<void> => {
+    logger.info('Shutting down orchestrator service');
+
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await eventBus.close();
+  };
+
   process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down gracefully');
-    void Promise.all([
-      eventBus.close(),
-      queueManager.close()
-    ]).finally(() => process.exit(0));
+    shutdown()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
   });
 
-  logger.info(`Orchestrator service running and listening for events`);
+  logger.info(`Orchestrator service running`);
 };
 
 start().catch((error) => {
