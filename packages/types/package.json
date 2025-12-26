@@ -15,7 +15,8 @@
     "dev": "tsc --watch",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "test": "jest --passWithNoTests",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
     "clean": "rm -rf dist"
   }
 }
