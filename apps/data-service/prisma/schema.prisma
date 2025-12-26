@@ -1,0 +1,409 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// USERS & AUTHENTICATION
+// ========================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  firstName String?
+  lastName  String?
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  notes         Note[]
+  activities    ActivityLog[]
+  emailsSent    Email[]       @relation("EmailSender")
+  tasksCreated  Task[]        @relation("TaskCreator")
+  tasksAssigned Task[]        @relation("TaskAssignee")
+  notifications Notification[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ========================================
+// LEADS
+// ========================================
+
+model Lead {
+  id             String       @id @default(uuid())
+  source         String
+  email          String?
+  phone          String?
+  firstName      String?
+  lastName       String?
+  street         String?
+  city           String?
+  state          String?
+  zipCode        String?
+  country        String?
+  insuranceType  InsuranceType?
+  qualityScore   Float?
+  status         LeadStatus   @default(RECEIVED)
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  notes         Note[]
+  activities    ActivityLog[]
+  emails        Email[]
+  tasks         Task[]
+  assignments   LeadAssignment[]
+
+  @@index([status])
+  @@index([email])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  COMMERCIAL
+}
+
+enum LeadStatus {
+  RECEIVED
+  PROCESSING
+  QUALIFIED
+  ROUTED
+  CONVERTED
+  REJECTED
+}
+
+// ========================================
+// NOTES & COMMENTS
+// ========================================
+
+model Note {
+  id         String           @id @default(uuid())
+  leadId     String
+  authorId   String
+  content    String           @db.Text
+  visibility NoteVisibility   @default(TEAM)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  // Relations
+  lead        Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author      User            @relation(fields: [authorId], references: [id])
+  attachments NoteAttachment[]
+
+  @@index([leadId])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("notes")
+}
+
+enum NoteVisibility {
+  PRIVATE
+  TEAM
+  PUBLIC
+}
+
+model NoteAttachment {
+  id        String   @id @default(uuid())
+  noteId    String
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
+  @@map("note_attachments")
+}
+
+// ========================================
+// ACTIVITY LOG & TIMELINE
+// ========================================
+
+model ActivityLog {
+  id          String       @id @default(uuid())
+  leadId      String
+  userId      String?
+  activityType ActivityType
+  action      String
+  description String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+
+  // Relations
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  LEAD_UPDATED
+  STATUS_CHANGED
+  ASSIGNMENT_CREATED
+  ASSIGNMENT_UPDATED
+  NOTE_CREATED
+  NOTE_UPDATED
+  NOTE_DELETED
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_COMPLETED
+  SYSTEM_ACTION
+  WORKFLOW_TRIGGERED
+}
+
+// ========================================
+// EMAIL COMMUNICATION
+// ========================================
+
+model Email {
+  id          String      @id @default(uuid())
+  leadId      String
+  senderId    String
+  to          String[]
+  cc          String[]    @default([])
+  bcc         String[]    @default([])
+  subject     String
+  body        String      @db.Text
+  bodyHtml    String?     @db.Text
+  templateId  String?
+  threadId    String?
+  status      EmailStatus @default(PENDING)
+  sentAt      DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  scheduledFor DateTime?
+  error       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  lead        Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sender      User             @relation("EmailSender", fields: [senderId], references: [id])
+  template    EmailTemplate?   @relation(fields: [templateId], references: [id])
+  attachments EmailAttachment[]
+
+  @@index([leadId])
+  @@index([senderId])
+  @@index([threadId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("emails")
+}
+
+enum EmailStatus {
+  PENDING
+  SCHEDULED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  FAILED
+  BOUNCED
+}
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  subject     String
+  body        String   @db.Text
+  bodyHtml    String?  @db.Text
+  variables   String[] @default([])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  emails Email[]
+
+  @@map("email_templates")
+}
+
+model EmailAttachment {
+  id        String   @id @default(uuid())
+  emailId   String
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+  @@map("email_attachments")
+}
+
+// ========================================
+// TASKS & FOLLOW-UPS
+// ========================================
+
+model Task {
+  id          String       @id @default(uuid())
+  leadId      String
+  creatorId   String
+  assigneeId  String?
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(OPEN)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  recurrence  String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  lead     Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  creator  User  @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee User? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  @@index([leadId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([priority])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ========================================
+// NOTIFICATIONS
+// ========================================
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  entityType String?
+  entityId  String?
+  isRead    Boolean            @default(false)
+  readAt    DateTime?
+  metadata  Json?
+  createdAt DateTime           @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_DUE_SOON
+  TASK_OVERDUE
+  NOTE_MENTION
+  EMAIL_RECEIVED
+  LEAD_ASSIGNED
+  LEAD_UPDATED
+  SYSTEM_ALERT
+}
+
+// ========================================
+// AGENTS
+// ========================================
+
+model Agent {
+  id                  String   @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String   @unique
+  phone               String
+  licenseNumber       String
+  specializations     String[]
+  city                String
+  state               String
+  country             String
+  rating              Float    @default(0)
+  isActive            Boolean  @default(true)
+  maxLeadCapacity     Int      @default(10)
+  currentLeadCount    Int      @default(0)
+  averageResponseTime Int      @default(0)
+  conversionRate      Float    @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  assignments LeadAssignment[]
+
+  @@index([email])
+  @@index([isActive])
+  @@map("agents")
+}
+
+model LeadAssignment {
+  id         String               @id @default(uuid())
+  leadId     String
+  agentId    String
+  status     LeadAssignmentStatus @default(PENDING)
+  assignedAt DateTime             @default(now())
+  acceptedAt DateTime?
+  notes      String?
+
+  // Relations
+  lead  Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id])
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@map("lead_assignments")
+}
+
+enum LeadAssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  TIMEOUT
+}
