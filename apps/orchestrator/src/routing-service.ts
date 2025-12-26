@@ -39,12 +39,19 @@ const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
 
 export class RoutingService {
   private dataService: AxiosInstance;
+  private analyticsClient: AxiosInstance;
   private config: RoutingConfig;
   private routingHistory: Map<string, Date[]> = new Map();
 
   constructor() {
     const dataServiceUrl = `http://localhost:${process.env.DATA_SERVICE_PORT || 3001}`;
     this.dataService = axios.create({
+      baseURL: dataServiceUrl,
+      timeout: 5000,
+    });
+
+    // Analytics client for tracking routing events
+    this.analyticsClient = axios.create({
       baseURL: dataServiceUrl,
       timeout: 5000,
     });
@@ -81,6 +88,9 @@ export class RoutingService {
       // Send notification to the agent
       await this.notifyAgent(bestMatch);
 
+      // Track routing decision for analytics
+      await this.trackRoutingDecision(bestMatch);
+
       logger.info('Lead routed successfully', { 
         leadId, 
         agentId: bestMatch.agentId, 
@@ -92,6 +102,38 @@ export class RoutingService {
     } catch (error) {
       logger.error('Lead routing failed', { error, leadId });
       throw error;
+    }
+  }
+
+  private async trackRoutingDecision(decision: RoutingDecision): Promise<void> {
+    try {
+      await this.analyticsClient.post('/api/v1/analytics/track/event', {
+        eventType: 'lead_routed',
+        timestamp: new Date().toISOString(),
+        source: 'routing-service',
+        data: {
+          leadId: decision.leadId,
+          agentId: decision.agentId,
+          score: decision.score,
+          confidence: decision.confidence,
+          factors: decision.routingFactors,
+        },
+      });
+    } catch (error) {
+      logger.warn('Failed to track routing decision', { error });
+    }
+  }
+
+  private async trackAgentAssignment(agentId: string, leadId: string, eventType: string): Promise<void> {
+    try {
+      await this.analyticsClient.post('/api/v1/analytics/track/agent', {
+        agentId,
+        eventType,
+        leadId,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.warn('Failed to track agent event', { error });
     }
   }
 
@@ -167,6 +209,7 @@ export class RoutingService {
   private async assignLead(leadId: string, agentId: string): Promise<void> {
     try {
       await this.dataService.post(`/api/v1/leads/${leadId}/assign/${agentId}`);
+      await this.trackAgentAssignment(agentId, leadId, 'assignment');
       logger.info('Lead assigned to agent', { leadId, agentId });
     } catch (error) {
       logger.error('Failed to assign lead', { error, leadId, agentId });

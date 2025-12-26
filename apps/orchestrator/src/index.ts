@@ -1,3 +1,7 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
 import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
@@ -10,8 +14,42 @@ const PORT = config.ports.orchestrator;
 const start = async (): Promise<void> => {
   logger.info('Orchestrator service starting', { port: PORT });
 
+  // Initialize Express app for health checks
+  const app = express();
+  app.use(helmet());
+  app.use(cors());
+  app.use(compression());
+  app.use(express.json({ limit: '10mb' }));
+
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'orchestrator',
+      version: '1.0.0',
+      uptime: process.uptime(),
+    });
+  });
+
+  // Readiness check endpoint
+  app.get('/ready', (req, res) => {
+    res.json({
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      service: 'orchestrator',
+    });
+  });
+
+  // Start Express server
+  const server = app.listen(PORT, () => {
+    logger.info(`Orchestrator service API listening on port ${PORT}`);
+  });
+
+  // Initialize NATS event bus
   const eventBus = await NatsEventBus.connect(config.nats.url);
 
+  // Subscribe to events
   const sub = eventBus.subscribe(EVENT_SUBJECTS.LeadProcessed);
   (async () => {
     for await (const msg of sub) {
@@ -22,12 +60,20 @@ const start = async (): Promise<void> => {
     logger.error('lead.processed subscription terminated', { error });
   });
 
+  const shutdown = async (): Promise<void> => {
+    logger.info('Shutting down orchestrator service');
+
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await eventBus.close();
+  };
+
   process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down gracefully');
-    void eventBus.close().finally(() => process.exit(0));
+    shutdown()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
   });
 
-  logger.info(`Orchestrator service running on port ${PORT}`);
+  logger.info(`Orchestrator service running`);
 };
 
 start().catch((error) => {

@@ -1,3 +1,7 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
 import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadReceivedEvent } from '@insurance-lead-gen/types';
@@ -10,6 +14,8 @@ import {
   startLeadIngestionWorker,
 } from './queues/lead-ingestion.queue.js';
 import { LeadRepository } from './repositories/lead.repository.js';
+import { AnalyticsService } from './analytics.js';
+import { createAnalyticsRoutes } from './routes/analytics.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -17,10 +23,39 @@ const PORT = config.ports.dataService;
 const start = async (): Promise<void> => {
   logger.info('Data service starting', { port: PORT });
 
+  // Initialize Express app for analytics API
+  const app = express();
+  app.use(helmet());
+  app.use(cors());
+  app.use(compression());
+  app.use(express.json({ limit: '10mb' }));
+
+  // Initialize services
   const eventBus = await NatsEventBus.connect(config.nats.url);
   const redis = createRedisConnection();
 
   const leadRepository = new LeadRepository(prisma);
+  const analyticsService = new AnalyticsService(prisma);
+
+  // Setup analytics routes
+  app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'data-service',
+      version: '1.0.0',
+    });
+  });
+
+  // Start Express server
+  const server = app.listen(PORT, () => {
+    logger.info(`Data service API listening on port ${PORT}`);
+  });
+
+  // Queue setup
   const leadIngestionQueue = createLeadIngestionQueue(redis);
   const leadIngestionWorker = startLeadIngestionWorker({
     connection: redis,
@@ -32,6 +67,7 @@ const start = async (): Promise<void> => {
     logger.error('Lead ingestion job failed', { jobId: job?.id, error });
   });
 
+  // Event subscriptions
   const leadReceivedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadReceived);
   (async () => {
     for await (const msg of leadReceivedSub) {
@@ -76,6 +112,7 @@ const start = async (): Promise<void> => {
   const shutdown = async (): Promise<void> => {
     logger.info('Shutting down data service');
 
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     await leadIngestionWorker.close();
     await leadIngestionQueue.close();
 
