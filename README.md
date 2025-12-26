@@ -155,17 +155,37 @@ pytest -v          # Run tests with verbose output
 
 ## 🚢 Services & Ports
 
+### Application Services
+
 | Service | Status | Port | Documentation |
 |---------|--------|------|---------------|
 | Backend API (FastAPI) | ✅ Live | 8000 | [Swagger](http://localhost:8000/docs) |
 | Main API (TypeScript) | 🚧 Planned | 3000 | - |
 | Data Service | 🚧 Planned | 3001 | - |
 | Orchestrator | 🚧 Planned | 3002 | - |
+
+### Infrastructure Services
+
+| Service | Status | Port | Documentation |
+|---------|--------|------|---------------|
 | PostgreSQL | ✅ Running | 5432 | - |
 | Redis | ✅ Running | 6379 | - |
 | Neo4j Browser | ✅ Running | 7474 | http://localhost:7474 |
 | Qdrant | ✅ Running | 6333 | http://localhost:6333 |
 | NATS | ✅ Running | 4222 | Monitor: 8222 |
+
+### Monitoring Services (Phase 6.3)
+
+| Service | Status | Port | Documentation |
+|---------|--------|------|---------------|
+| Prometheus | ✅ Live | 9090 | http://localhost:9090 |
+| Grafana | ✅ Live | 3003 | http://localhost:3003 (admin/admin) |
+| Loki | ✅ Live | 3100 | http://localhost:3100 |
+| Jaeger UI | ✅ Live | 16686 | http://localhost:16686 |
+| AlertManager | ✅ Live | 9093 | http://localhost:9093 |
+| Node Exporter | ✅ Live | 9100 | http://localhost:9100/metrics |
+| PostgreSQL Exporter | ✅ Live | 9187 | http://localhost:9187/metrics |
+| Redis Exporter | ✅ Live | 9121 | http://localhost:9121/metrics |
 
 ## 🎯 Development Phases
 
@@ -226,10 +246,22 @@ pytest -v          # Run tests with verbose output
 - Performance metrics
 - System optimization
 
-### 📋 Phase 6: Production Deployment & Monitoring (Planned)
-- Production infrastructure
-- Monitoring & alerting
-- Performance optimization
+### ✅ Phase 6.3: Advanced Monitoring & Observability (Complete)
+- ✅ Prometheus + Grafana stack for metrics and visualization
+- ✅ Loki + Promtail for log aggregation
+- ✅ Jaeger for distributed tracing with OpenTelemetry
+- ✅ AlertManager for alert routing and management
+- ✅ System exporters (Node, PostgreSQL, Redis)
+- ✅ Custom business metrics for leads and AI models
+- ✅ Pre-configured dashboards and alerts
+- See [docs/MONITORING.md](./docs/MONITORING.md)
+
+### 📋 Phase 6: Production Deployment (Remaining)
+- Kubernetes deployment manifests
+- Infrastructure as Code (Terraform/Pulumi)
+- Security hardening (WAF, secrets management, encryption)
+- Performance optimization and auto-scaling
+- Production operational readiness
 
 See [Implementation Phases](./docs/PHASES.md) for detailed roadmap.
 
@@ -256,9 +288,11 @@ pnpm --filter @insurance/api test  # Run specific package tests
 - [Phase 1.1 Completion](./apps/backend/PHASE_1.1_COMPLETION.md)
 
 ### Monorepo
-- [Architecture Overview](./docs/ARCHITECTURE.md) _(coming soon)_
-- [Technology Stack](./docs/TECH_STACK.md) _(coming soon)_
-- [Development Guide](./docs/DEVELOPMENT.md) _(coming soon)_
+- [Architecture Overview](./docs/ARCHITECTURE.md)
+- [Technology Stack](./docs/TECH_STACK.md)
+- [Development Guide](./docs/DEVELOPMENT.md)
+- [Monitoring & Observability](./docs/MONITORING.md) ✨ **NEW**
+- [Implementation Phases](./docs/PHASES.md)
 
 ## 📝 Commit Convention
 
@@ -284,30 +318,83 @@ git commit -m "docs: update API documentation"
 The platform uses Docker Compose for infrastructure services:
 
 ```yaml
+# Core Infrastructure
 services:
   - postgres:5432    # Primary database
   - redis:6379       # Cache and sessions
   - neo4j:7474/7687  # Graph database
   - qdrant:6333      # Vector database
   - nats:4222        # Message broker
+
+# Monitoring Stack (Phase 6.3)
+monitoring:
+  - prometheus:9090  # Metrics collection
+  - grafana:3003     # Visualization
+  - loki:3100        # Log aggregation
+  - jaeger:16686     # Distributed tracing
+  - alertmanager:9093 # Alert management
 ```
 
 ### Commands
 
 ```bash
-# Start all services
+# Start core infrastructure only
 docker compose up -d
+
+# Start infrastructure + monitoring
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+# Start monitoring services only
+docker compose -f docker-compose.monitoring.yml up -d
 
 # Stop all services
 docker compose down
+docker compose -f docker-compose.monitoring.yml down
 
 # View logs
 docker compose logs -f
+docker compose -f docker-compose.monitoring.yml logs -f grafana
 
 # Reset database (WARNING: destroys data)
 docker compose down -v
 docker compose up -d
 ```
+
+## 📊 Monitoring & Observability
+
+Phase 6.3 implements comprehensive monitoring with:
+
+- **Prometheus** - Metrics collection from all services
+- **Grafana** - Dashboards and visualization (http://localhost:3003)
+- **Loki** - Centralized log aggregation
+- **Jaeger** - Distributed tracing (http://localhost:16686)
+- **AlertManager** - Intelligent alert routing
+
+### Quick Start
+
+```bash
+# Start monitoring stack
+docker compose -f docker-compose.monitoring.yml up -d
+
+# Access Grafana
+open http://localhost:3003  # Login: admin / admin
+
+# View Prometheus targets
+open http://localhost:9090/targets
+
+# View traces in Jaeger
+open http://localhost:16686
+```
+
+### Available Metrics
+
+All services expose metrics at `/metrics`:
+- API Service: http://localhost:3000/metrics
+- Data Service: http://localhost:3001/metrics
+- Orchestrator: http://localhost:3002/metrics
+- Backend: http://localhost:8000/metrics
+
+See [Monitoring Guide](./docs/MONITORING.md) for detailed documentation.
 
 ## 🐛 Troubleshooting
 
