@@ -14,17 +14,20 @@ Before you begin, ensure you have the following installed:
 ### Initial Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd insurance-lead-gen-ai
    ```
 
 2. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp .env.example .env
    ```
@@ -36,6 +39,7 @@ Before you begin, ensure you have the following installed:
    - Security secrets
 
 4. **Start development environment**
+
    ```bash
    pnpm dev
    ```
@@ -285,7 +289,7 @@ describe('LeadService', () => {
     const lead = await service.createLead({
       email: 'test@example.com',
       phone: '+1234567890',
-      source: 'facebook_app'
+      source: 'facebook_app',
     });
 
     expect(lead).toBeDefined();
@@ -304,7 +308,7 @@ describe('Lead API', () => {
       .send({
         email: 'test@example.com',
         phone: '+1234567890',
-        source: 'google_ads'
+        source: 'google_ads',
       })
       .expect(201);
 
@@ -319,6 +323,7 @@ describe('Lead API', () => {
 ### Common Issues
 
 #### 1. Port Already in Use
+
 ```bash
 # Find process using port
 lsof -i :3000
@@ -328,6 +333,7 @@ kill -9 <PID>
 ```
 
 #### 2. Database Connection Issues
+
 ```bash
 # Check if PostgreSQL is running
 docker-compose ps postgres
@@ -344,6 +350,7 @@ pnpm --filter @insurance-lead-gen/data-service db:push
 ```
 
 #### 3. TypeScript Compilation Errors
+
 ```bash
 # Run type check
 pnpm type-check
@@ -354,6 +361,7 @@ pnpm build
 ```
 
 #### 4. Dependency Issues
+
 ```bash
 # Clear pnpm store
 pnpm store prune
@@ -409,11 +417,13 @@ Create `.vscode/launch.json`:
 ### New Shared Package
 
 1. **Create package directory:**
+
    ```bash
    mkdir -p packages/new-package/src
    ```
 
 2. **Create package.json:**
+
    ```json
    {
      "name": "@insurance-lead-gen/new-package",
@@ -430,6 +440,7 @@ Create `.vscode/launch.json`:
    ```
 
 3. **Add TypeScript config:**
+
    ```json
    {
      "extends": "../../tsconfig.json",
@@ -494,12 +505,12 @@ try {
     logger.warn('Invalid lead data', { error });
     throw new BadRequestException(error.message);
   }
-  
+
   if (error instanceof LeadProcessingError) {
     logger.error('Failed to process lead', { error });
     throw new InternalServerErrorException();
   }
-  
+
   logger.error('Unexpected error', { error });
   throw new InternalServerErrorException();
 }

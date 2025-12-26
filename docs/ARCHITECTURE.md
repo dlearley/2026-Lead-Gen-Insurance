@@ -90,6 +90,7 @@ Agent Assignment & Notification
 ## 🏛️ Service Responsibilities
 
 ### API Service (Port 3000)
+
 - **Technology**: NestJS, Express
 - **Responsibilities**:
   - RESTful API endpoints
@@ -104,6 +105,7 @@ Agent Assignment & Notification
   - GET `/api/v1/agents/:id/leads` - Agent leads
 
 ### Data Service (Port 3001)
+
 - **Technology**: Prisma ORM, PostgreSQL, Neo4j, Redis
 - **Responsibilities**:
   - Lead CRUD operations
@@ -118,6 +120,7 @@ Agent Assignment & Notification
   - Cache frequently accessed data
 
 ### Orchestrator Service (Port 3002)
+
 - **Technology**: LangChain, OpenAI, NATS
 - **Responsibilities**:
   - AI workflow coordination
@@ -133,6 +136,7 @@ Agent Assignment & Notification
 ## 🗄️ Data Storage Strategy
 
 ### PostgreSQL (Relational)
+
 ```sql
 Tables:
 - leads (id, source, data, status, created_at)
@@ -142,6 +146,7 @@ Tables:
 ```
 
 ### Neo4j (Graph)
+
 ```cypher
 Nodes:
 (:Lead {id, quality_score, location, type})
@@ -156,6 +161,7 @@ Relationships:
 ```
 
 ### Redis
+
 - **Key Structure**:
   - `lead:{id}:processing_lock` - Processing locks
   - `agent:{id}:queue` - Agent work queues
@@ -163,6 +169,7 @@ Relationships:
   - `session:{token}` - User sessions
 
 ### Qdrant (Vector)
+
 ```json
 Collections:
 {
@@ -175,6 +182,7 @@ Collections:
 ## 🎙️ Event-Driven Communication
 
 ### NATS Topics
+
 ```
 lead.received     → New lead ingested
 lead.processed    → Preprocessing complete
@@ -190,6 +198,7 @@ agent.completed   → Agent closed lead
 ## 🔒 Security Architecture
 
 ### Authentication & Authorization
+
 - JWT tokens with RS256
 - Role-based access control (RBAC)
 - API key authentication for webhooks
@@ -197,12 +206,14 @@ agent.completed   → Agent closed lead
 - Request signing for critical endpoints
 
 ### Data Protection
+
 - Encryption at rest (PostgreSQL TDE, encrypted volumes)
 - Encryption in transit (TLS 1.3)
 - PII data masking in logs
 - GDPR/CCPA compliance mechanisms
 
 ### API Security
+
 - OWASP Top 10 protection
 - SQL injection prevention (Prisma ORM)
 - XSS protection (Helmet.js)
@@ -212,6 +223,7 @@ agent.completed   → Agent closed lead
 ## 📊 Observability
 
 ### Logging (Winston + OpenTelemetry)
+
 ```
 Structured JSON logs →
   ├─ Loki (for Grafana)
@@ -220,6 +232,7 @@ Structured JSON logs →
 ```
 
 ### Metrics (Prometheus)
+
 - API response times
 - AI processing latency
 - Error rates per service
@@ -227,12 +240,14 @@ Structured JSON logs →
 - Lead conversion rates
 
 ### Tracing (Jaeger/OpenTelemetry)
+
 - End-to-end request tracing
 - DB query performance
 - External API call timing
 - AI model inference time
 
 ### Dashboards (Grafana)
+
 - Real-time lead flow
 - Agent performance metrics
 - System health overview
@@ -241,12 +256,14 @@ Structured JSON logs →
 ## 🔄 Scaling Strategy
 
 ### Horizontal Scaling
+
 - Each service scales independently
 - Stateless API services
 - Redis for session management
 - Database read replicas
 
 ### Queue-Based Processing
+
 ```
 Load Spike → NATS Queue → Multiple Workers
    ↓
@@ -257,6 +274,7 @@ Auto-scaling based on:
 ```
 
 ### Caching Strategy
+
 - Redis for session/state
 - CDN for static assets
 - Query result caching
@@ -264,23 +282,25 @@ Auto-scaling based on:
 
 ## 🎯 Performance Targets
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| API Response Time | <200ms | p95 latency |
-| Lead Processing | 95% <5s | End-to-end |
-| AI Scoring | <2s | Model inference |
-| Database Queries | <100ms | Query execution |
-| System Uptime | 99.9% | Monthly average |
+| Metric            | Target  | Measurement     |
+| ----------------- | ------- | --------------- |
+| API Response Time | <200ms  | p95 latency     |
+| Lead Processing   | 95% <5s | End-to-end      |
+| AI Scoring        | <2s     | Model inference |
+| Database Queries  | <100ms  | Query execution |
+| System Uptime     | 99.9%   | Monthly average |
 
 ## 🔧 Development Considerations
 
 ### Local Development
+
 - Docker Compose for all services
 - Hot reloading enabled
 - API mocking layers
 - Test data generators
 
 ### Testing Strategy
+
 - Unit tests: Jest (+85% coverage)
 - Integration tests: Supertest
 - E2E tests: Playwright/Cypress
@@ -288,6 +308,7 @@ Auto-scaling based on:
 - AI model evaluation: custom test suite
 
 ### Deployment
+
 - Container-based (Docker)
 - Kubernetes orchestration
 - Blue-green deployments

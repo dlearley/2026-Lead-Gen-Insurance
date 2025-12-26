@@ -28,7 +28,7 @@
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
     "compression": "^1.7.4",
-    "rate-limiter-flexible": "^3.0.8",
+    "rate-limiter-flexible": "^3.0.6",
     "class-validator": "^0.14.0",
     "class-transformer": "^0.5.1",
     "zod": "^3.22.0"

@@ -35,7 +35,7 @@ importers:
         specifier: ^8.0.3
         version: 8.0.3
       lint-staged:
-        specifier: ^15.5.2
+        specifier: ^15.2.0
         version: 15.5.2
       prettier:
         specifier: ^3.2.0
@@ -89,8 +89,8 @@ importers:
         specifier: ^7.1.0
         version: 7.2.0
       rate-limiter-flexible:
-        specifier: ^5.0.3
-        version: 5.0.5
+        specifier: ^3.0.6
+        version: 3.0.6
       zod:
         specifier: ^3.22.0
         version: 3.25.76
@@ -151,7 +151,7 @@ importers:
         version: 1.16.2(typescript@5.9.3)
       bullmq:
         specifier: ^5.0.0
-        version: 5.66.2
+        version: 5.66.3
       ioredis:
         specifier: ^5.3.0
         version: 5.8.2
@@ -206,7 +206,7 @@ importers:
         version: link:../../packages/types
       bullmq:
         specifier: ^5.0.0
-        version: 5.66.2
+        version: 5.66.3
       ioredis:
         specifier: ^5.3.0
         version: 5.8.2
@@ -3533,10 +3533,10 @@ packages:
       ieee754: 1.2.1
     dev: false
 
-  /bullmq@5.66.2:
+  /bullmq@5.66.3:
     resolution:
       {
-        integrity: sha512-0PrkpIakIntkBcPLltPIRWdLC1FTLUa/VhJkmEfobb5YUQjoUwJdmmf7HX+o/vMonS5048JpP+abf9lVRUFEjA==,
+        integrity: sha512-ZZfFIjGv3XRcvJDi6J02SZE8/86xQHLdjiKLrtxOGH9FrBT03sE2QZks2UuvGmDSxFeSY4lSqI1ulCPgIWicqg==,
       }
     dependencies:
       cron-parser: 4.9.0
@@ -8013,10 +8013,10 @@ packages:
       }
     engines: { node: '>= 0.6' }
 
-  /rate-limiter-flexible@5.0.5:
+  /rate-limiter-flexible@3.0.6:
     resolution:
       {
-        integrity: sha512-+/dSQfo+3FYwYygUs/V2BBdwGa9nFtakDwKt4l0bnvNB53TNT++QSFewwHX9qXrZJuMe9j+TUaU21lm5ARgqdQ==,
+        integrity: sha512-tlvbee6lyse/XTWmsuBDS4MT8N65FyM151bPmQlFyfhv9+RIHs7d3rSTXoz0j35H910dM01mH0yTIeWYo8+aAw==,
       }
     dev: false
 

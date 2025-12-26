@@ -1,19 +1,13 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
-  preset: 'ts-jest/presets/default-esm',
+  preset: 'ts-jest',
   testEnvironment: 'node',
-  extensionsToTreatAsEsm: ['.ts'],
-  transform: {
-    '^.+\\.ts$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: './tsconfig.test.json'
-      }
-    ]
-  },
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1'
+    '^@insurance-lead-gen/core$': '<rootDir>/../../packages/core/src',
+    '^@insurance-lead-gen/types$': '<rootDir>/../../packages/types/src',
+    '^@insurance-lead-gen/config$': '<rootDir>/../../packages/config/src',
   },
-  testMatch: ['**/*.test.ts']
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', { useESM: true }],
+  },
+  extensionsToTreatAsEsm: ['.ts'],
 };
