@@ -15,7 +15,7 @@
     "dev:apps": "turbo dev",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
-    "type-check": "tsc -p tsconfig.json --noEmit",
+    "type-check": "turbo type-check",
     "test": "turbo test",
     "test:watch": "turbo test:watch",
     "clean": "turbo clean && rm -rf node_modules",
