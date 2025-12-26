@@ -4,40 +4,19 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Target, Users, TrendingUp, FileText } from "lucide-react";
+import { MetricCard } from "@/components/analytics/MetricCard";
+import { Target, Users, TrendingUp, FileText, Brain, BarChart3 } from "lucide-react";
 import Link from "next/link";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 function DashboardContent() {
-  const stats = [
-    {
-      title: "Total Leads",
-      value: "1,234",
-      change: "+12.5%",
-      icon: <Target className="h-6 w-6" />,
-      color: "bg-primary-500",
-    },
-    {
-      title: "Active Users",
-      value: "89",
-      change: "+3.2%",
-      icon: <Users className="h-6 w-6" />,
-      color: "bg-success-500",
-    },
-    {
-      title: "Conversion Rate",
-      value: "24.5%",
-      change: "+5.1%",
-      icon: <TrendingUp className="h-6 w-6" />,
-      color: "bg-warning-500",
-    },
-    {
-      title: "Documents",
-      value: "456",
-      change: "+8.3%",
-      icon: <FileText className="h-6 w-6" />,
-      color: "bg-secondary-500",
-    },
-  ];
+  const { data: dashboard, loading } = useAnalytics("7d");
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
 
   const recentActivity = [
     { id: 1, action: "New lead created", time: "2 minutes ago", user: "John Doe" },
@@ -60,22 +39,36 @@ function DashboardContent() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-secondary-600">
-                {stat.title}
-              </CardTitle>
-              <div className={`p-2 rounded-lg ${stat.color}`}>
-                <div className="text-white">{stat.icon}</div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-secondary-900">{stat.value}</div>
-              <p className="text-xs text-success-600 mt-1">{stat.change} from last month</p>
-            </CardContent>
-          </Card>
-        ))}
+        <MetricCard
+          title="Total Leads"
+          value={formatNumber(dashboard?.leads.total || 0)}
+          change={dashboard?.leads.trend}
+          icon={<Target className="h-6 w-6" />}
+          color="bg-primary-500"
+          loading={loading}
+        />
+        <MetricCard
+          title="Active Agents"
+          value={dashboard?.agents.active || 0}
+          icon={<Users className="h-6 w-6" />}
+          color="bg-success-500"
+          loading={loading}
+        />
+        <MetricCard
+          title="Conversion Rate"
+          value={`${(dashboard?.leads.conversionRate || 0).toFixed(1)}%`}
+          change={dashboard?.leads.trend}
+          icon={<TrendingUp className="h-6 w-6" />}
+          color="bg-warning-500"
+          loading={loading}
+        />
+        <MetricCard
+          title="AI Accuracy"
+          value={`${(dashboard?.ai.accuracy || 0).toFixed(1)}%`}
+          icon={<Brain className="h-6 w-6" />}
+          color="bg-purple-500"
+          loading={loading}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -118,6 +111,12 @@ function DashboardContent() {
                 <Button variant="outline" className="w-full justify-start">
                   <Users className="h-4 w-4 mr-2" />
                   Add Team Member
+                </Button>
+              </Link>
+              <Link href="/analytics">
+                <Button variant="outline" className="w-full justify-start">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Analytics
                 </Button>
               </Link>
               <Link href="/reports">

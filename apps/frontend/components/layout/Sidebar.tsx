@@ -11,6 +11,7 @@ import {
   FileText,
   Target,
   BarChart3,
+  FolderOpen,
 } from "lucide-react";
 
 interface NavItem {
@@ -33,6 +34,16 @@ const navItems: NavItem[] = [
     badge: "New",
   },
   {
+    label: "Analytics",
+    href: "/analytics",
+    icon: <BarChart3 className="h-5 w-5" />,
+  },
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: <FolderOpen className="h-5 w-5" />,
+  },
+  {
     label: "Users",
     href: "/users",
     icon: <Users className="h-5 w-5" />,
@@ -41,11 +52,6 @@ const navItems: NavItem[] = [
     label: "Organizations",
     href: "/organizations",
     icon: <Building2 className="h-5 w-5" />,
-  },
-  {
-    label: "Reports",
-    href: "/reports",
-    icon: <BarChart3 className="h-5 w-5" />,
   },
   {
     label: "Documents",
