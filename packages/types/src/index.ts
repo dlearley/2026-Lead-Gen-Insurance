@@ -382,5 +382,8 @@ export interface ProcessingResult {
 
 export * from './events.js';
 
+// Report Types
+export * from './reports.js';
+
 // Validation Schemas
 export * from './validation.js';

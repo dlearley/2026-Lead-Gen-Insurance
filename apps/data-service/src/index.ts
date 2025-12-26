@@ -10,12 +10,15 @@ import {
   startLeadIngestionWorker,
 } from './queues/lead-ingestion.queue.js';
 import { LeadRepository } from './repositories/lead.repository.js';
+import { startServer, stopServer } from './server.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
 
 const start = async (): Promise<void> => {
   logger.info('Data service starting', { port: PORT });
+
+  await startServer();
 
   const eventBus = await NatsEventBus.connect(config.nats.url);
   const redis = createRedisConnection();
@@ -75,6 +78,8 @@ const start = async (): Promise<void> => {
 
   const shutdown = async (): Promise<void> => {
     logger.info('Shutting down data service');
+
+    stopServer();
 
     await leadIngestionWorker.close();
     await leadIngestionQueue.close();
