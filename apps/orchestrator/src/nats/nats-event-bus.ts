@@ -7,10 +7,27 @@ export class NatsEventBus {
 
   constructor(private readonly nc: NatsConnection) {}
 
+  get connection(): NatsConnection {
+    return this.nc;
+  }
+
   static async connect(url: string): Promise<NatsEventBus> {
     const nc = await connect({ servers: url });
     logger.info('Connected to NATS', { url });
     return new NatsEventBus(nc);
+  }
+
+  publish(subject: string, payload: unknown): void {
+    this.nc.publish(subject, this.codec.encode(payload));
+  }
+
+  async request<TResponse>(
+    subject: string,
+    payload: unknown,
+    timeoutMs = 5000
+  ): Promise<TResponse> {
+    const msg = await this.nc.request(subject, this.codec.encode(payload), { timeout: timeoutMs });
+    return this.codec.decode(msg.data) as TResponse;
   }
 
   subscribe(subject: string) {

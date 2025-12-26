@@ -80,3 +80,10 @@ export class NATSConnection {
     }
   }
 }
+
+export async function publishEvent(connection: NatsConnection, topic: string, data: any): Promise<void> {
+  const stringCodec = StringCodec();
+  const payload = JSON.stringify(data);
+  await connection.publish(topic, stringCodec.encode(payload));
+  logger.debug(`Published to NATS topic: ${topic}`, { data });
+}

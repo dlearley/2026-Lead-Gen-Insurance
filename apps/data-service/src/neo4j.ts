@@ -152,7 +152,7 @@ export class Neo4jDriver {
     }
   }
 
-  async findBestAgentsForLead(leadId: string, insuranceType: string, location: string): Promise<string[]> {
+  async findBestAgentsForLead(leadId: string, insuranceType: string, location: any): Promise<string[]> {
     if (!this.driver) {
       throw new Error('Neo4j driver not initialized');
     }
@@ -160,18 +160,28 @@ export class Neo4jDriver {
     const session = this.driver.session();
     
     try {
+      // Extract state for broader matching
+      const state = typeof location === 'string' ? null : location?.state;
+      const city = typeof location === 'string' ? location : location?.city;
+
       const result = await session.run(`
-        MATCH (l:Lead {id: $leadId})
         MATCH (a:Agent)
-        WHERE $insuranceType IN a.specialization
-        AND a.location = $location
+        WHERE (
+          $insuranceType IN a.specialization OR 
+          any(spec IN a.specialization WHERE toLower(spec) = toLower($insuranceType))
+        )
+        AND (
+          a.location.state = $state OR 
+          a.location.city = $city OR
+          a.location = $city
+        )
         RETURN a.id AS agentId
-        ORDER BY a.rating DESC, a.conversionRate DESC
-        LIMIT 5
-      `, { leadId, insuranceType, location });
+        ORDER BY a.rating DESC
+        LIMIT 20
+      `, { leadId, insuranceType, state, city });
       
       const agentIds = result.records.map(record => record.get('agentId'));
-      logger.info('Found best agents for lead', { leadId, agentIds });
+      logger.info('Found candidate agents for lead', { leadId, agentIdsCount: agentIds.length });
       return agentIds;
     } catch (error) {
       logger.error('Failed to find best agents', { error, leadId });

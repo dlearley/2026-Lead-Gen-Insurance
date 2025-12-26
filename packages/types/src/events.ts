@@ -2,6 +2,10 @@ export const EVENT_SUBJECTS = {
   LeadReceived: 'lead.received',
   LeadProcessed: 'lead.processed',
   LeadGet: 'lead.get',
+  LeadAssign: 'lead.assign',
+  AgentGet: 'agent.get',
+  AgentsMatch: 'agents.match',
+  RoutingConfigUpdate: 'routing.config.update',
 } as const;
 
 export type EventSubject = (typeof EVENT_SUBJECTS)[keyof typeof EVENT_SUBJECTS];
