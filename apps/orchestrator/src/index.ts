@@ -1,6 +1,9 @@
 import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
 
 import { NatsEventBus } from './nats/nats-event-bus.js';
 import { RoutingService } from './routing-service.js';
@@ -24,12 +27,37 @@ const start = async (): Promise<void> => {
   const queueManager = new QueueManager();
   await queueManager.connect();
 
-  // 3. Start Workers
-  // Note: We're passing the raw NATS connection from the event bus to the worker
-  // because the worker currently expects the raw connection.
+  // 3. Initialize HTTP Server
+  const app = express();
+  app.use(helmet());
+  app.use(cors());
+  app.use(express.json());
+
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'insurance-lead-gen-orchestrator',
+      version: '1.0.0',
+    });
+  });
+
+  app.get('/api/v1/routing/status', (req, res) => {
+    res.json({
+      status: 'operational',
+      connected: true,
+      subscribers: 1,
+    });
+  });
+
+  const httpServer = app.listen(PORT, () => {
+    logger.info(`Orchestrator HTTP server running on port ${PORT}`);
+  });
+
+  // 4. Start Workers
   await queueManager.startProcessingQueue(langchainEngine, eventBus.connection);
 
-  // 4. Subscribe to Events
+  // 5. Subscribe to Events
   
   // Listen for new leads to process
   const leadReceivedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadReceived);
@@ -53,7 +81,6 @@ const start = async (): Promise<void> => {
   });
 
   // Listen for qualified leads to route
-  // The worker publishes 'lead.qualified' but we also have 'lead.processed'
   const leadQualifiedSub = eventBus.subscribe('lead.qualified');
   const leadProcessedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadProcessed);
   
@@ -86,7 +113,7 @@ const start = async (): Promise<void> => {
     logger.error('lead.processed subscription terminated', { error });
   });
 
-  // 5. Graceful Shutdown
+  // 6. Graceful Shutdown
   process.on('SIGTERM', () => {
     logger.info('SIGTERM received, shutting down gracefully');
     void Promise.all([

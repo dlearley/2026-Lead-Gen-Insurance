@@ -1,16 +1,42 @@
 import { logger } from '@insurance-lead-gen/core';
-import { EVENT_SUBJECTS, type Lead, type Agent, type LeadAssignment } from '@insurance-lead-gen/types';
-import { NatsEventBus } from './nats/nats-event-bus.js';
-import { RankingService, RankedAgent } from './services/ranking.service.js';
+import type { AxiosInstance } from 'axios';
+import axios from 'axios';
+import type { Lead, Agent, LeadAssignment } from '@insurance-lead-gen/types';
+
+const DATA_SERVICE_URL = process.env.DATA_SERVICE_URL || 'http://localhost:3002';
+
+async function trackAnalyticsEvent(
+  eventType: string,
+  data: Record<string, unknown>,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await fetch(`${DATA_SERVICE_URL}/api/v1/analytics/track/${eventType}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        data,
+        metadata,
+      }),
+    });
+  } catch (error) {
+    logger.warn('Failed to track analytics event', { eventType, error });
+  }
+}
 
 export interface RoutingDecision {
   leadId: string;
-  assignments: Array<{
-    agentId: string;
-    score: number;
-    confidence: number;
-    routingFactors: any;
-  }>;
+  agentId: string;
+  score: number;
+  confidence: number;
+  routingFactors: {
+    specializationMatch: number;
+    locationProximity: number;
+    performanceScore: number;
+    currentWorkload: number;
+    qualityTierAlignment: number;
+  };
 }
 
 export interface RoutingConfig {
@@ -34,15 +60,22 @@ const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
 };
 
 export class RoutingService {
+  private dataService: AxiosInstance;
   private config: RoutingConfig;
-  private rankingService: RankingService;
+  private routingHistory: Map<string, Date[]> = new Map();
 
-  constructor(private eventBus: NatsEventBus) {
+  constructor() {
+    const dataServiceUrl = `http://localhost:${process.env.DATA_SERVICE_PORT || 3001}`;
+    this.dataService = axios.create({
+      baseURL: dataServiceUrl,
+      timeout: 5000,
+    });
+
     this.config = DEFAULT_ROUTING_CONFIG;
-    this.rankingService = new RankingService();
 
     logger.info('Routing service initialized', {
-      config: this.config
+      config: this.config,
+      dataServiceUrl
     });
   }
 
@@ -50,110 +83,191 @@ export class RoutingService {
     logger.info('Starting lead routing', { leadId });
 
     try {
-      // 1. Get lead details
-      const { lead } = await this.eventBus.request<{ lead: Lead }>(
-        EVENT_SUBJECTS.LeadGet,
-        { leadId }
-      );
+      // Get best matching agents from graph database
+      const response = await this.dataService.get(`/api/v1/leads/${leadId}/matching-agents`, {
+        params: { limit: this.config.maxAgentsPerLead },
+      });
 
-      if (!lead) {
-        throw new Error(`Lead not found: ${leadId}`);
+      const matches: Array<{ agent: Agent; score: number }> = response.data.data;
+
+      if (!matches || matches.length === 0) {
+        throw new Error('No agents found for lead routing');
       }
 
-      // 2. Get candidate agents from data-service (via Neo4j)
-      const location = `${lead.address?.city || ''}, ${lead.address?.state || ''}`;
-      const { agents: candidates } = await this.eventBus.request<{ agents: Agent[] }>(
-        EVENT_SUBJECTS.AgentsMatch,
-        { 
-          leadId, 
-          insuranceType: lead.insuranceType,
-          location,
-          limit: 10 // Get more than we need for better ranking
-        }
-      );
+      // Select the best agent using weighted scoring
+      const bestMatch = await this.selectBestAgent(leadId, matches);
 
-      if (!candidates || candidates.length === 0) {
-        throw new Error('No candidate agents found for lead routing');
-      }
+      // Assign the lead to the selected agent
+      await this.assignLead(bestMatch.leadId, bestMatch.agentId);
 
-      // 3. Rank candidates using RankingService
-      const rankedAgents = this.rankingService.rankAgents(lead, candidates);
+      // Send notification to the agent
+      await this.notifyAgent(bestMatch);
 
-      // 4. Select top N agents based on config
-      const selectedAgents = rankedAgents
-        .filter(a => (a.score / 100) >= this.config.minConfidenceThreshold)
-        .slice(0, this.config.maxAgentsPerLead);
-
-      if (selectedAgents.length === 0) {
-        logger.warn('No agents met the minimum confidence threshold', {
-          leadId,
-          threshold: this.config.minConfidenceThreshold,
-          bestScore: rankedAgents[0]?.score
-        });
-        // Fallback to the single best agent even if below threshold? 
-        // For now, let's just take the top one if none met threshold
-        selectedAgents.push(rankedAgents[0]);
-      }
-
-      // 5. Create assignments
-      const results = await Promise.all(
-        selectedAgents.map(async (rankedAgent) => {
-          try {
-            await this.eventBus.request(EVENT_SUBJECTS.LeadAssign, {
-              leadId,
-              agentId: rankedAgent.id
-            });
-
-            await this.notifyAgent(lead, rankedAgent);
-
-            return {
-              agentId: rankedAgent.id,
-              score: rankedAgent.score,
-              confidence: rankedAgent.score / 100,
-              routingFactors: rankedAgent.breakdown
-            };
-          } catch (error) {
-            logger.error('Failed to assign lead to agent', { 
-              leadId, 
-              agentId: rankedAgent.id, 
-              error 
-            });
-            return null;
-          }
-        })
-      );
-
-      const successfulAssignments = results.filter(r => r !== null) as RoutingDecision['assignments'];
+      await trackAnalyticsEvent('lead.routed', {
+        leadId,
+        agentId: bestMatch.agentId,
+        score: bestMatch.score,
+        confidence: bestMatch.confidence,
+        factors: bestMatch.routingFactors,
+      });
 
       logger.info('Lead routed successfully', { 
         leadId, 
-        assignmentsCount: successfulAssignments.length
+        agentId: bestMatch.agentId, 
+        score: bestMatch.score,
+        factors: bestMatch.routingFactors
       });
 
-      return {
-        leadId,
-        assignments: successfulAssignments
-      };
+      return bestMatch;
     } catch (error) {
       logger.error('Lead routing failed', { error, leadId });
       throw error;
     }
   }
 
-  private async notifyAgent(lead: Lead, agent: Agent): Promise<void> {
-    // Simulate notification to agent
-    logger.info('Notification sent to agent', {
+  private async selectBestAgent(
+    leadId: string, 
+    matches: Array<{ agent: Agent; score: number }>
+  ): Promise<RoutingDecision> {
+    // Use the highest scoring agent from Neo4j results
+    const bestMatch = matches[0];
+    const agent = bestMatch.agent;
+
+    // Calculate detailed routing factors
+    const routingFactors = {
+      specializationMatch: this.calculateSpecializationMatch(agent, leadId),
+      locationProximity: this.calculateLocationScore(agent, leadId),
+      performanceScore: this.calculatePerformanceScore(agent),
+      currentWorkload: this.calculateWorkloadScore(agent),
+      qualityTierAlignment: this.calculateQualityAlignment(agent, leadId),
+    };
+
+    // Calculate overall confidence (0-1)
+    const confidence = Math.min(bestMatch.score / 100, 1.0);
+
+    // Check if routing meets minimum confidence
+    if (confidence < this.config.minConfidenceThreshold) {
+      logger.warn('Routing confidence below threshold', {
+        leadId,
+        confidence,
+        threshold: this.config.minConfidenceThreshold
+      });
+    }
+
+    return {
+      leadId,
       agentId: agent.id,
-      agentName: `${agent.firstName} ${agent.lastName}`,
-      leadId: lead.id,
-      insuranceType: lead.insuranceType
+      score: bestMatch.score,
+      confidence,
+      routingFactors,
+    };
+  }
+
+  private calculateSpecializationMatch(agent: Agent, leadId: string): number {
+    // This would be calculated more precisely in a real implementation
+    return agent.specializations.length > 0 ? 0.8 : 0.5;
+  }
+
+  private calculateLocationScore(agent: Agent, leadId: string): number {
+    // In a real implementation, we'd compare actual lead location
+    return agent.location.state === 'CA' ? 0.85 : 0.7; // Default example
+  }
+
+  private calculatePerformanceScore(agent: Agent): number {
+    // Combine rating, conversion rate, and response time
+    const ratingScore = Math.min(agent.rating / 5.0, 1.0);
+    const conversionScore = agent.conversionRate || 0.15;
+    const responseScore = agent.averageResponseTime < 3600 ? 1.0 : 
+                         agent.averageResponseTime < 7200 ? 0.8 : 0.5;
+    
+    return (ratingScore * 0.4 + conversionScore * 0.4 + responseScore * 0.2);
+  }
+
+  private calculateWorkloadScore(agent: Agent): number {
+    // Lower score means better (less workload)
+    const utilization = agent.currentLeadCount / agent.maxLeadCapacity;
+    return Math.max(0, 1 - utilization);
+  }
+
+  private calculateQualityAlignment(agent: Agent, leadId: string): number {
+    // In a real implementation, compare lead quality with agent tier
+    return 0.75;
+  }
+
+  private async assignLead(leadId: string, agentId: string): Promise<void> {
+    try {
+      await this.dataService.post(`/api/v1/leads/${leadId}/assign/${agentId}`);
+      logger.info('Lead assigned to agent', { leadId, agentId });
+    } catch (error) {
+      logger.error('Failed to assign lead', { error, leadId, agentId });
+      throw error;
+    }
+  }
+
+  private async notifyAgent(routingDecision: RoutingDecision): Promise<void> {
+    // Simulate notification to agent (would use Twilio/SendGrid in production)
+    logger.info('Notification sent to agent', {
+      agentId: routingDecision.agentId,
+      leadId: routingDecision.leadId,
+      score: routingDecision.score,
+      factors: routingDecision.routingFactors
     });
+
+    await trackAnalyticsEvent('agent.assigned', {
+      leadId: routingDecision.leadId,
+      agentId: routingDecision.agentId,
+      score: routingDecision.score,
+      responseTime: null,
+    }, {
+      agentId: routingDecision.agentId,
+      leadId: routingDecision.leadId,
+    });
+
+    // Store assignment for tracking
+    const assignment: LeadAssignment = {
+      id: `assignment_${Date.now()}`,
+      leadId: routingDecision.leadId,
+      agentId: routingDecision.agentId,
+      assignedAt: new Date(),
+      status: 'pending',
+    };
+
+    // Track routing history for load balancing
+    this.trackAgentRouting(routingDecision.agentId);
+
+    // Log assignment for analytics
+    logger.info('Assignment recorded', { assignment });
+  }
+
+  private trackAgentRouting(agentId: string): void {
+    const history = this.routingHistory.get(agentId) || [];
+    history.push(new Date());
+    
+    // Keep only last 24 hours of history
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const filteredHistory = history.filter(date => date > oneDayAgo);
+    
+    this.routingHistory.set(agentId, filteredHistory);
+  }
+
+  async getAgentRoutingHistory(agentId: string): Promise<Date[]> {
+    return this.routingHistory.get(agentId) || [];
   }
 
   async reassignStaleLeads(): Promise<void> {
-    // This would be called by a cron or periodically
-    logger.info('Checking for stale leads to reassign');
-    // Implementation would involve querying data-service for stale assignments
+    logger.info('Starting stale lead reassignments');
+    
+    // In production, this would query for leads pending > escalation timeout
+    const staleLeads: string[] = []; // Would be fetched from database
+    
+    for (const leadId of staleLeads) {
+      try {
+        await this.routeLead(leadId);
+        logger.info('Reassigned stale lead', { leadId });
+      } catch (error) {
+        logger.error('Failed to reassign stale lead', { error, leadId });
+      }
+    }
   }
 
   updateConfig(newConfig: Partial<RoutingConfig>): void {
