@@ -177,7 +177,7 @@ make clean         # Clean up generated files
 Key environment variables (see `.env.example`):
 
 ```env
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/leadgen_db
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/insurance_lead_gen
 APP_NAME="Lead Generation Insurance Platform"
 DEBUG=True
 LOG_LEVEL=INFO

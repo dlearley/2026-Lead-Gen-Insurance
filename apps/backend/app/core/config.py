@@ -20,10 +20,10 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/leadgen_db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/insurance_lead_gen"
     DATABASE_HOST: str = "localhost"
     DATABASE_PORT: int = 5432
-    DATABASE_NAME: str = "leadgen_db"
+    DATABASE_NAME: str = "insurance_lead_gen"
     DATABASE_USER: str = "postgres"
     DATABASE_PASSWORD: str = "postgres"
 

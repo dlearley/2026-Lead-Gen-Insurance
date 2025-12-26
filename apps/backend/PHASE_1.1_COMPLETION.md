@@ -257,7 +257,7 @@ The system uses environment variables for configuration:
 
 ```env
 # Database
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/leadgen_db
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/insurance_lead_gen
 
 # Application
 APP_NAME="Lead Generation Insurance Platform"
