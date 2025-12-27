@@ -373,6 +373,188 @@ export interface Event {
   metadata?: Record<string, unknown>;
 }
 
+// ========================================
+// REFERRAL PROGRAM TYPES
+// ========================================
+
+export type PartnerStatus = 'active' | 'inactive' | 'suspended' | 'terminated';
+
+export type ReferralSource = 
+  | 'website'
+  | 'mobile_app'
+  | 'email'
+  | 'phone'
+  | 'in_person'
+  | 'social_media'
+  | 'other';
+
+export type ReferralStatus = 
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'converted'
+  | 'paid'
+  | 'expired';
+
+export type RewardStatus = 
+  | 'pending'
+  | 'calculated'
+  | 'approved'
+  | 'paid'
+  | 'cancelled';
+
+export interface Partner {
+  id: string;
+  userId?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  referralCode: string;
+  status: PartnerStatus;
+  commissionRate: number;
+  totalReferrals: number;
+  successfulReferrals: number;
+  totalEarnings: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Referral {
+  id: string;
+  partnerId: string;
+  leadId?: string;
+  referralCode: string;
+  source: ReferralSource;
+  status: ReferralStatus;
+  referredAt: Date;
+  acceptedAt?: Date;
+  rejectedAt?: Date;
+  convertedAt?: Date;
+  conversionValue?: number;
+  notes?: string;
+  partner?: Partner;
+  lead?: Lead;
+  reward?: Reward;
+}
+
+export interface Reward {
+  id: string;
+  partnerId: string;
+  referralId: string;
+  amount: number;
+  currency: string;
+  status: RewardStatus;
+  calculatedAt: Date;
+  paidAt?: Date;
+  paymentMethod?: string;
+  transactionId?: string;
+  notes?: string;
+  partner?: Partner;
+  referral?: Referral;
+}
+
+export interface CreatePartnerDto {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  commissionRate?: number;
+  userId?: string;
+}
+
+export interface UpdatePartnerDto {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  companyName?: string;
+  commissionRate?: number;
+  status?: PartnerStatus;
+}
+
+export interface CreateReferralDto {
+  partnerId: string;
+  referralCode: string;
+  source: ReferralSource;
+  leadId?: string;
+  notes?: string;
+}
+
+export interface UpdateReferralDto {
+  status?: ReferralStatus;
+  leadId?: string;
+  notes?: string;
+  conversionValue?: number;
+}
+
+export interface CreateRewardDto {
+  partnerId: string;
+  referralId: string;
+  amount: number;
+  currency?: string;
+  notes?: string;
+}
+
+export interface UpdateRewardDto {
+  status?: RewardStatus;
+  amount?: number;
+  paymentMethod?: string;
+  transactionId?: string;
+  notes?: string;
+}
+
+export interface PartnerFilterParams {
+  status?: PartnerStatus;
+  search?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page?: number;
+  limit?: number;
+}
+
+export interface ReferralFilterParams {
+  partnerId?: string;
+  leadId?: string;
+  status?: ReferralStatus;
+  source?: ReferralSource;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface RewardFilterParams {
+  partnerId?: string;
+  referralId?: string;
+  status?: RewardStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ReferralAnalytics {
+  totalReferrals: number;
+  successfulReferrals: number;
+  conversionRate: number;
+  totalRevenue: number;
+  averageConversionValue: number;
+  topPartners: Array<{
+    partnerId: string;
+    partnerName: string;
+    referralCount: number;
+    conversionCount: number;
+    earnings: number;
+  }>;
+  sourceDistribution: Record<ReferralSource, number>;
+  statusDistribution: Record<ReferralStatus, number>;
+}
+
 export interface ProcessingResult {
   success: boolean;
   data?: unknown;
