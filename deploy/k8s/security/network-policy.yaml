@@ -1,0 +1,474 @@
+# Kubernetes Network Policies for Insurance Lead Gen Platform
+# These policies implement zero-trust networking within the cluster
+
+---
+# Default deny all ingress traffic for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  labels:
+    app.kubernetes.io/name: platform
+    app.kubernetes.io/component: security
+  annotations:
+    description: "Default deny all ingress traffic"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress: []
+
+---
+# Default deny all egress traffic for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  labels:
+    app.kubernetes.io/name: platform
+    app.kubernetes.io/component: security
+  annotations:
+    description: "Default deny all egress traffic"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress: []
+
+---
+# Allow DNS resolution for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  labels:
+    app.kubernetes.io/name: platform
+    app.kubernetes.io/component: security
+  annotations:
+    description: "Allow DNS resolution for all pods"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# API Service - Ingress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow ingress traffic to API service"
+spec:
+  podSelector:
+    matchLabels:
+      app: api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow health checks from monitoring
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# API Service - Egress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-egress
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow egress traffic from API service"
+spec:
+  podSelector:
+    matchLabels:
+      app: api
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to data-service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: data-service
+      ports:
+        - protocol: TCP
+          port: 3001
+    # Allow to orchestrator
+    - to:
+        - podSelector:
+            matchLabels:
+              app: orchestrator
+      ports:
+        - protocol: TCP
+          port: 3002
+    # Allow to redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow to nats
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+
+---
+# Backend Service - Ingress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-ingress
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow ingress traffic to Backend service"
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from API service
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow health checks
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8000
+
+---
+# Backend Service - Egress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-egress
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow egress traffic from Backend service"
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow to redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+
+---
+# Data Service - Ingress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-service-ingress
+  labels:
+    app.kubernetes.io/name: data-service
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow ingress traffic to Data service"
+spec:
+  podSelector:
+    matchLabels:
+      app: data-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from API service
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api
+      ports:
+        - protocol: TCP
+          port: 3001
+    # Allow from orchestrator
+    - from:
+        - podSelector:
+            matchLabels:
+              app: orchestrator
+      ports:
+        - protocol: TCP
+          port: 3001
+    # Allow health checks
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 3001
+
+---
+# Data Service - Egress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-service-egress
+  labels:
+    app.kubernetes.io/name: data-service
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow egress traffic from Data service"
+spec:
+  podSelector:
+    matchLabels:
+      app: data-service
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow to redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow to Neo4j
+    - to:
+        - podSelector:
+            matchLabels:
+              app: neo4j
+      ports:
+        - protocol: TCP
+          port: 7687
+    # Allow to Qdrant
+    - to:
+        - podSelector:
+            matchLabels:
+              app: qdrant
+      ports:
+        - protocol: TCP
+          port: 6333
+    # Allow to NATS
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+
+---
+# Orchestrator Service - Ingress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orchestrator-ingress
+  labels:
+    app.kubernetes.io/name: orchestrator
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow ingress traffic to Orchestrator service"
+spec:
+  podSelector:
+    matchLabels:
+      app: orchestrator
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from API service
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api
+      ports:
+        - protocol: TCP
+          port: 3002
+    # Allow from data-service
+    - from:
+        - podSelector:
+            matchLabels:
+              app: data-service
+      ports:
+        - protocol: TCP
+          port: 3002
+    # Allow health checks
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 3002
+
+---
+# Orchestrator Service - Egress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orchestrator-egress
+  labels:
+    app.kubernetes.io/name: orchestrator
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow egress traffic from Orchestrator service"
+spec:
+  podSelector:
+    matchLabels:
+      app: orchestrator
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to data-service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: data-service
+      ports:
+        - protocol: TCP
+          port: 3001
+    # Allow to NATS
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+    # Allow to external OpenAI API (if needed)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Frontend Service - Ingress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-ingress
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow ingress traffic to Frontend service"
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow health checks
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# Frontend Service - Egress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-egress
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: service
+  annotations:
+    description: "Allow egress traffic from Frontend service"
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to API service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: api
+      ports:
+        - protocol: TCP
+          port: 3000

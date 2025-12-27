@@ -1,0 +1,333 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'Dockerfile*'
+      - '.github/workflows/build-push.yml'
+  pull_request:
+    branches: [main, develop]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: insurance-lead-gen
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Run type check
+        run: pnpm type-check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false
+
+  build-api:
+    name: Build API Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event_name == 'push' }}
+    
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        working-directory: ./apps/api
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/api:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY/api:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY/api:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/api:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/api:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY/api:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ steps.build-image.outputs.image }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event_name == 'push' }}
+
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        working-directory: ./apps/backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/backend:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY/backend:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY/backend:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/backend:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/backend:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY/backend:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ steps.build-image.outputs.image }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+  build-data-service:
+    name: Build Data Service Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event_name == 'push' }}
+
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        working-directory: ./apps/data-service
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/data-service:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY/data-service:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY/data-service:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/data-service:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/data-service:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY/data-service:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ steps.build-image.outputs.image }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+  build-orchestrator:
+    name: Build Orchestrator Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event_name == 'push' }}
+
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        working-directory: ./apps/orchestrator
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/orchestrator:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY/orchestrator:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY/orchestrator:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/orchestrator:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/orchestrator:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY/orchestrator:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ steps.build-image.outputs.image }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+  build-frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ github.event_name == 'push' }}
+
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        working-directory: ./apps/frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY/frontend:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY/frontend:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY/frontend:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/frontend:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY/frontend:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY/frontend:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ steps.build-image.outputs.image }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+  publish-helm-charts:
+    name: Publish Helm Charts
+    runs-on: ubuntu-latest
+    needs: [build-api, build-backend, build-data-service, build-orchestrator, build-frontend]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update Helm chart image tags
+        run: |
+          # Update API chart values with new image tag
+          sed -i "s/tag:.*/tag: \"${{ github.sha }}\"/g" deploy/helm/api/values.yaml
+          
+          # Commit changes
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add deploy/helm/*/values.yaml
+          git commit -m "Update Helm chart image tags to ${{ github.sha }}"
+          git push
