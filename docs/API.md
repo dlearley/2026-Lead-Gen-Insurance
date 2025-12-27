@@ -626,6 +626,55 @@ Paginated responses include:
 
 ---
 
+## Policies
+
+Policies represent the post-sale lifecycle of an insurance product created from a converted lead.
+
+All policy endpoints are scoped under a lead:
+
+- Base: `GET|POST /leads/:leadId/policies`
+
+### Create Policy
+
+**Endpoint:** `POST /leads/:leadId/policies`
+
+**Request Body:**
+```json
+{
+  "insuranceType": "AUTO",
+  "carrier": "Acme Insurance",
+  "productName": "Acme Auto",
+  "effectiveDate": "2025-01-01T00:00:00.000Z",
+  "expirationDate": "2026-01-01T00:00:00.000Z",
+  "premium": { "amount": 1200, "currency": "USD" },
+  "billingFrequency": "MONTHLY",
+  "coverage": { "liability": 100000 }
+}
+```
+
+### Activate Policy
+
+**Endpoint:** `POST /leads/:leadId/policies/:policyId/activate`
+
+Activating a policy sets the policy status to `active` and updates the lead status to `converted` (if not already).
+
+### Endorsements
+
+- `GET /leads/:leadId/policies/:policyId/endorsements`
+- `POST /leads/:leadId/policies/:policyId/endorsements`
+
+### Invoices / Payments
+
+- `GET /leads/:leadId/policies/:policyId/invoices`
+- `POST /leads/:leadId/policies/:policyId/invoices`
+- `POST /leads/:leadId/policies/:policyId/invoices/:invoiceId/pay`
+
+### Renewal
+
+**Endpoint:** `POST /leads/:leadId/policies/:policyId/renew`
+
+---
+
 ## Rate Limiting
 
 API requests are rate-limited to prevent abuse. Rate limiting headers:

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { ActivityLog, Agent, Email, Lead, LeadAssignment, Note, Notification, Task, User } from '@insurance-lead-gen/types';
+import type { ActivityLog, Agent, Email, Lead, LeadAssignment, Note, Notification, Policy, Task, User } from '@insurance-lead-gen/types';
 
 export interface EmailTemplateRecord {
   id: string;
@@ -24,6 +24,7 @@ export interface InMemoryStore {
   activities: Map<string, ActivityLog>;
   notifications: Map<string, Notification>;
   emailTemplates: Map<string, EmailTemplateRecord>;
+  policies: Map<string, Policy>;
 }
 
 const now = () => new Date();
@@ -52,6 +53,7 @@ export const store: InMemoryStore = {
   emails: new Map(),
   activities: new Map(),
   notifications: new Map(),
+  policies: new Map(),
   emailTemplates: new Map([
     [
       '00000000-0000-0000-0000-00000000a001',
@@ -81,4 +83,16 @@ export function extractMentions(text: string): string[] {
   const matches = text.match(/@[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g);
   if (!matches) return [];
   return [...new Set(matches.map((m) => m.substring(1)))];
+}
+
+export function resetStore(): void {
+  store.leads.clear();
+  store.agents.clear();
+  store.assignments.clear();
+  store.notes.clear();
+  store.tasks.clear();
+  store.emails.clear();
+  store.activities.clear();
+  store.notifications.clear();
+  store.policies.clear();
 }

@@ -1,26 +1,13 @@
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { app } from '../app.js';
-import { prisma } from '@insurance-lead-gen/data-service';
+import { describe, it, expect, beforeEach } from '@jest/globals';
+import { app } from '../../app.js';
+import { resetStore } from '../../storage/in-memory.js';
+
+const AUTH_HEADER = { Authorization: 'Bearer dev-token' };
 
 describe('Leads API Integration Tests', () => {
-  let testLeadId: string;
-
-  beforeAll(async () => {
-    // Setup database connection
-    await prisma.$connect();
-  });
-
-  afterAll(async () => {
-    // Cleanup
-    await prisma.$disconnect();
-  });
-
-  beforeEach(async () => {
-    // Cleanup test data before each test
-    await prisma.lead.deleteMany({
-      where: { email: { contains: 'test-integration' } }
-    });
+  beforeEach(() => {
+    resetStore();
   });
 
   describe('POST /api/v1/leads', () => {
@@ -39,22 +26,24 @@ describe('Leads API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/leads')
+        .set(AUTH_HEADER)
         .send(newLead)
         .expect(201)
         .expect('Content-Type', /json/);
 
       expect(response.body).toMatchObject({
-        success: true,
-        data: {
-          id: expect.any(String),
-          firstName: 'Test',
-          lastName: 'Integration',
-          email: 'test-integration@example.com',
-          insuranceType: 'AUTO',
+        id: expect.any(String),
+        firstName: 'Test',
+        lastName: 'Integration',
+        email: 'test-integration@example.com',
+        insuranceType: 'auto',
+        status: 'received',
+        address: {
+          city: 'Los Angeles',
+          state: 'CA',
+          zipCode: '90001',
         },
       });
-
-      testLeadId = response.body.data.id;
     });
 
     it('should validate required fields', async () => {
@@ -64,6 +53,7 @@ describe('Leads API Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/v1/leads')
+        .set(AUTH_HEADER)
         .send(invalidLead)
         .expect(400);
 
@@ -73,9 +63,9 @@ describe('Leads API Integration Tests', () => {
 
   describe('GET /api/v1/leads/:id', () => {
     it('should get lead by id', async () => {
-      // First create a lead
       const createResponse = await request(app)
         .post('/api/v1/leads')
+        .set(AUTH_HEADER)
         .send({
           firstName: 'Get',
           lastName: 'Test',
@@ -88,27 +78,25 @@ describe('Leads API Integration Tests', () => {
           zipCode: '10001',
         });
 
-      const leadId = createResponse.body.data.id;
+      const leadId = createResponse.body.id;
 
-      // Then get it
       const response = await request(app)
         .get(`/api/v1/leads/${leadId}`)
+        .set(AUTH_HEADER)
         .expect(200)
         .expect('Content-Type', /json/);
 
       expect(response.body).toMatchObject({
-        success: true,
-        data: {
-          id: leadId,
-          firstName: 'Get',
-          lastName: 'Test',
-        },
+        id: leadId,
+        firstName: 'Get',
+        lastName: 'Test',
       });
     });
 
     it('should return 404 for non-existent lead', async () => {
       const response = await request(app)
         .get('/api/v1/leads/non-existent-id')
+        .set(AUTH_HEADER)
         .expect(404);
 
       expect(response.body).toHaveProperty('error');
@@ -117,13 +105,24 @@ describe('Leads API Integration Tests', () => {
 
   describe('GET /api/v1/leads', () => {
     it('should list leads with pagination', async () => {
+      await request(app)
+        .post('/api/v1/leads')
+        .set(AUTH_HEADER)
+        .send({
+          firstName: 'List',
+          lastName: 'Test',
+          email: 'list-test-integration@example.com',
+          source: 'WEB_FORM',
+          insuranceType: 'AUTO',
+        });
+
       const response = await request(app)
         .get('/api/v1/leads?skip=0&take=10')
+        .set(AUTH_HEADER)
         .expect(200)
         .expect('Content-Type', /json/);
 
       expect(response.body).toMatchObject({
-        success: true,
         data: expect.any(Array),
         pagination: {
           skip: 0,
@@ -134,23 +133,32 @@ describe('Leads API Integration Tests', () => {
     });
 
     it('should filter leads by status', async () => {
+      await request(app)
+        .post('/api/v1/leads')
+        .set(AUTH_HEADER)
+        .send({
+          firstName: 'Filter',
+          lastName: 'Status',
+          email: 'filter-status-integration@example.com',
+          source: 'WEB_FORM',
+          insuranceType: 'AUTO',
+        });
+
       const response = await request(app)
-        .get('/api/v1/leads?status=NEW')
+        .get('/api/v1/leads?status=RECEIVED')
+        .set(AUTH_HEADER)
         .expect(200)
         .expect('Content-Type', /json/);
 
-      expect(response.body).toMatchObject({
-        success: true,
-        data: expect.any(Array),
-      });
+      expect(response.body.data).toEqual(expect.any(Array));
     });
   });
 
   describe('PUT /api/v1/leads/:id', () => {
     it('should update lead', async () => {
-      // Create a lead first
       const createResponse = await request(app)
         .post('/api/v1/leads')
+        .set(AUTH_HEADER)
         .send({
           firstName: 'Update',
           lastName: 'Test',
@@ -163,9 +171,8 @@ describe('Leads API Integration Tests', () => {
           zipCode: '60601',
         });
 
-      const leadId = createResponse.body.data.id;
+      const leadId = createResponse.body.id;
 
-      // Update it
       const updateData = {
         firstName: 'Updated',
         city: 'Boston',
@@ -174,15 +181,15 @@ describe('Leads API Integration Tests', () => {
 
       const response = await request(app)
         .put(`/api/v1/leads/${leadId}`)
+        .set(AUTH_HEADER)
         .send(updateData)
         .expect(200)
         .expect('Content-Type', /json/);
 
       expect(response.body).toMatchObject({
-        success: true,
-        data: {
-          id: leadId,
-          firstName: 'Updated',
+        id: leadId,
+        firstName: 'Updated',
+        address: {
           city: 'Boston',
           state: 'MA',
         },
@@ -192,9 +199,9 @@ describe('Leads API Integration Tests', () => {
 
   describe('DELETE /api/v1/leads/:id', () => {
     it('should delete lead', async () => {
-      // Create a lead first
       const createResponse = await request(app)
         .post('/api/v1/leads')
+        .set(AUTH_HEADER)
         .send({
           firstName: 'Delete',
           lastName: 'Test',
@@ -207,23 +214,11 @@ describe('Leads API Integration Tests', () => {
           zipCode: '33101',
         });
 
-      const leadId = createResponse.body.data.id;
+      const leadId = createResponse.body.id;
 
-      // Delete it
-      const response = await request(app)
-        .delete(`/api/v1/leads/${leadId}`)
-        .expect(200)
-        .expect('Content-Type', /json/);
+      await request(app).delete(`/api/v1/leads/${leadId}`).set(AUTH_HEADER).expect(204);
 
-      expect(response.body).toMatchObject({
-        success: true,
-        message: expect.any(String),
-      });
-
-      // Verify it's deleted
-      await request(app)
-        .get(`/api/v1/leads/${leadId}`)
-        .expect(404);
+      await request(app).get(`/api/v1/leads/${leadId}`).set(AUTH_HEADER).expect(404);
     });
   });
 });
