@@ -388,3 +388,6 @@ export * from './reports.js';
 
 // Validation Schemas
 export * from './validation.js';
+
+// Integration Types
+export * from './integrations.js';

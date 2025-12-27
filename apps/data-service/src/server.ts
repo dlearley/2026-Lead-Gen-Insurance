@@ -4,6 +4,10 @@ import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { reportsRouter } from './routes/reports.routes.js';
 import { alertsRouter } from './routes/alerts.routes.js';
+import carriersRouter from './routes/carriers.routes.js';
+import brokersRouter from './routes/brokers.routes.js';
+import integrationConfigsRouter from './routes/integration-configs.routes.js';
+import integrationLogsRouter from './routes/integration-logs.routes.js';
 import { AlertService } from './services/alert-service.js';
 
 const config = getConfig();
@@ -18,11 +22,11 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
-  
+
   next();
 });
 
@@ -45,6 +49,10 @@ app.get('/health', (req: Request, res: Response) => {
 
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/alerts', alertsRouter);
+app.use('/api/v1/carriers', carriersRouter);
+app.use('/api/v1/brokers', brokersRouter);
+app.use('/api/v1/integration-configs', integrationConfigsRouter);
+app.use('/api/v1/integration-logs', integrationLogsRouter);
 
 app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
   logger.error('Unhandled error', { error: err, path: req.path });
