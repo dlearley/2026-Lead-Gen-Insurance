@@ -8,6 +8,7 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
+    from app.models.automation import Automation
 
 
 class Campaign(Base, TimestampMixin):
@@ -36,5 +37,9 @@ class Campaign(Base, TimestampMixin):
     )
     leads: Mapped[List["Lead"]] = relationship(
         "Lead",
+        back_populates="campaign"
+    )
+    automations: Mapped[List["Automation"]] = relationship(
+        "Automation",
         back_populates="campaign"
     )
