@@ -1,0 +1,251 @@
+# Cloudflare CDN Configuration for Insurance Lead Gen Platform
+# This file documents the recommended Cloudflare settings for optimal performance
+
+zones:
+  - name: insurance-lead-gen.example.com
+    
+    # Caching Configuration
+    caching:
+      # Cache Level: Standard
+      level: standard
+      
+      # Browser Cache TTL
+      browser_ttl: 14400  # 4 hours
+      
+      # Page Rules for different content types
+      page_rules:
+        - pattern: "*.example.com/api/*"
+          settings:
+            cache_level: bypass
+            security_level: high
+            
+        - pattern: "*.example.com/static/*"
+          settings:
+            cache_level: cache_everything
+            edge_cache_ttl: 604800  # 7 days
+            browser_cache_ttl: 604800
+            
+        - pattern: "*.example.com/uploads/*"
+          settings:
+            cache_level: cache_everything
+            edge_cache_ttl: 2592000  # 30 days
+            browser_cache_ttl: 2592000
+            
+        - pattern: "*.example.com/*.js"
+          settings:
+            cache_level: cache_everything
+            edge_cache_ttl: 604800
+            
+        - pattern: "*.example.com/*.css"
+          settings:
+            cache_level: cache_everything
+            edge_cache_ttl: 604800
+            
+        - pattern: "*.example.com/*.{jpg,jpeg,png,gif,ico,svg,woff,woff2,ttf,eot}"
+          settings:
+            cache_level: cache_everything
+            edge_cache_ttl: 2592000
+    
+    # Performance Optimization
+    performance:
+      # Auto Minify
+      minify:
+        html: true
+        css: true
+        js: true
+      
+      # Brotli compression
+      brotli: true
+      
+      # Early Hints
+      early_hints: true
+      
+      # HTTP/2 & HTTP/3
+      http2: true
+      http3: true
+      
+      # Rocket Loader (defer JS execution)
+      rocket_loader: false  # May interfere with React/Vue apps
+      
+      # Mirage (image optimization)
+      mirage: true
+      
+      # Polish (image optimization)
+      polish: lossy
+      
+      # Mobile Redirect
+      mobile_redirect: false
+    
+    # Security Settings
+    security:
+      # Security Level
+      level: medium
+      
+      # DDoS Protection
+      ddos_protection: true
+      
+      # Rate Limiting
+      rate_limiting:
+        - name: api_rate_limit
+          threshold: 1000
+          period: 60
+          action: challenge
+          match:
+            request:
+              url_pattern: "*/api/*"
+        
+        - name: strict_rate_limit
+          threshold: 10
+          period: 60
+          action: block
+          match:
+            request:
+              url_pattern: "*/admin/*"
+      
+      # WAF (Web Application Firewall)
+      waf:
+        enabled: true
+        mode: on
+        rules:
+          - owasp_core_ruleset: true
+          - cloudflare_managed: true
+      
+      # Bot Fight Mode
+      bot_fight_mode: true
+      
+      # Challenge Passage
+      challenge_passage: 30  # minutes
+    
+    # SSL/TLS Configuration
+    ssl:
+      mode: full_strict
+      min_tls_version: "1.2"
+      tls_1_3: true
+      automatic_https_rewrites: true
+      always_use_https: true
+      opportunistic_encryption: true
+      
+    # DNS Settings
+    dns:
+      # DNSSEC
+      dnssec: true
+      
+      # Records
+      records:
+        - type: A
+          name: "@"
+          content: "YOUR_LOAD_BALANCER_IP"
+          proxied: true
+          
+        - type: A
+          name: "www"
+          content: "YOUR_LOAD_BALANCER_IP"
+          proxied: true
+          
+        - type: CNAME
+          name: "api"
+          content: "insurance-lead-gen.example.com"
+          proxied: true
+          
+        - type: CNAME
+          name: "cdn"
+          content: "insurance-lead-gen.example.com"
+          proxied: true
+    
+    # Workers (Edge Computing)
+    workers:
+      - name: cache_api_responses
+        route: "*/api/v1/public/*"
+        script: |
+          addEventListener('fetch', event => {
+            event.respondWith(handleRequest(event.request))
+          })
+          
+          async function handleRequest(request) {
+            const cache = caches.default
+            const cacheKey = new Request(request.url, request)
+            let response = await cache.match(cacheKey)
+            
+            if (!response) {
+              response = await fetch(request)
+              const newResponse = new Response(response.body, response)
+              newResponse.headers.set('Cache-Control', 'max-age=300')
+              event.waitUntil(cache.put(cacheKey, newResponse.clone()))
+            }
+            
+            return response
+          }
+
+# Alternative CDN Configurations
+
+aws_cloudfront:
+  distribution:
+    enabled: true
+    price_class: PriceClass_All
+    
+    origins:
+      - id: load-balancer
+        domain_name: lb.insurance-lead-gen.example.com
+        origin_protocol_policy: https-only
+        
+    default_cache_behavior:
+      target_origin_id: load-balancer
+      viewer_protocol_policy: redirect-to-https
+      allowed_methods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+      cached_methods: [GET, HEAD, OPTIONS]
+      compress: true
+      
+      forwarded_values:
+        query_string: true
+        cookies: all
+        headers: [Host, Authorization, CloudFront-Forwarded-Proto]
+      
+      min_ttl: 0
+      default_ttl: 3600
+      max_ttl: 86400
+      
+    cache_behaviors:
+      - path_pattern: "/api/*"
+        target_origin_id: load-balancer
+        viewer_protocol_policy: https-only
+        min_ttl: 0
+        default_ttl: 0
+        max_ttl: 0
+        
+      - path_pattern: "/static/*"
+        target_origin_id: load-balancer
+        viewer_protocol_policy: https-only
+        compress: true
+        min_ttl: 604800
+        default_ttl: 604800
+        max_ttl: 2592000
+
+fastly:
+  service:
+    name: insurance-lead-gen-cdn
+    
+    backends:
+      - name: origin
+        address: lb.insurance-lead-gen.example.com
+        port: 443
+        use_ssl: true
+        
+    domains:
+      - name: insurance-lead-gen.example.com
+      - name: www.insurance-lead-gen.example.com
+      
+    vcl_snippets:
+      - name: cache_static_assets
+        type: recv
+        content: |
+          if (req.url ~ "^/static/") {
+            set req.http.X-Long-TTL = "true";
+          }
+      
+      - name: set_cache_headers
+        type: fetch
+        content: |
+          if (req.http.X-Long-TTL) {
+            set beresp.ttl = 7d;
+            set beresp.http.Cache-Control = "public, max-age=604800";
+          }
