@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -16,6 +17,8 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { createRetentionRoutes } from './routes/retention.routes.js';
+import { createCampaignsRoutes } from './routes/campaigns.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -37,8 +40,10 @@ const start = async (): Promise<void> => {
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
 
-  // Setup analytics routes
+  // Setup routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  app.use('/api/v1/retention', createRetentionRoutes());
+  app.use('/api/v1/retention', createCampaignsRoutes());
 
   // Health check endpoint
   app.get('/health', (req, res) => {

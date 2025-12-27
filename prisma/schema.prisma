@@ -7,7 +7,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/@prisma/client"
+  output   = "../node_modules/.prisma/client"
 }
 
 // Lead model - stores all lead information
@@ -116,6 +116,237 @@ model Event {
   @@index([timestamp])
 }
 
+// Customer model - converted leads become customers
+model Customer {
+  id                      String      @id @default(uuid())
+  leadId                  String      @unique
+  agentId                 String
+  firstName               String
+  lastName                String
+  email                   String
+  phone                   String?
+  dateOfBirth             DateTime?
+  street                  String?
+  city                    String?
+  state                   String?
+  zipCode                 String?
+  country                 String?
+  customerSince           DateTime    @default(now())
+  totalPolicies           Int         @default(0)
+  activePolicies          Int         @default(0)
+  lifetimeValue           Float       @default(0.0)
+  satisfactionScore       Float?
+  healthScore             Float       @default(50.0)
+  churnRisk               ChurnRisk   @default(LOW)
+  lastContactDate         DateTime?
+  nextRenewalDate         DateTime?
+  preferredContactMethod  String?
+  tags                    String[]
+  metadata                Json?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relationships
+  policies                Policy[]
+  healthScores            CustomerHealthScore[]
+  ltvCalculations         CustomerLTV[]
+  touchpoints             CampaignTouchpoint[]
+  retentionEvents         RetentionEvent[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([agentId])
+  @@index([email])
+  @@index([churnRisk])
+  @@index([healthScore])
+  @@index([nextRenewalDate])
+  @@index([customerSince])
+}
+
+// Policy model
+model Policy {
+  id                  String        @id @default(uuid())
+  customerId          String
+  agentId             String
+  policyNumber        String        @unique
+  policyType          PolicyType
+  status              PolicyStatus  @default(ACTIVE)
+  premiumAmount       Float
+  premiumFrequency    String
+  premiumCurrency     String        @default("USD")
+  coverageType        String
+  coverageAmount      Float
+  coverageDeductible  Float?
+  coverageLimits      Json?
+  effectiveDate       DateTime
+  expirationDate      DateTime
+  renewalDate         DateTime
+  lastRenewalDate     DateTime?
+  renewalCount        Int           @default(0)
+  totalPaid           Float         @default(0.0)
+  claimsCount         Int           @default(0)
+  totalClaimAmount    Float         @default(0.0)
+  underwriter         String?
+  documents           String[]
+  metadata            Json?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relationships
+  customer            Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  retentionEvents     RetentionEvent[]
+
+  // Indexes
+  @@index([customerId])
+  @@index([agentId])
+  @@index([policyNumber])
+  @@index([status])
+  @@index([policyType])
+  @@index([renewalDate])
+  @@index([expirationDate])
+}
+
+// Customer Health Score tracking
+model CustomerHealthScore {
+  id                    String    @id @default(uuid())
+  customerId            String
+  overallScore          Float
+  engagementScore       Float
+  financialScore        Float
+  satisfactionScore     Float
+  lifecycleScore        Float
+  churnRisk             ChurnRisk
+  churnProbability      Float
+  riskFactors           Json
+  recommendations       String[]
+  calculatedAt          DateTime  @default(now())
+
+  // Relationships
+  customer              Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([customerId])
+  @@index([overallScore])
+  @@index([churnRisk])
+  @@index([calculatedAt])
+}
+
+// Customer Lifetime Value tracking
+model CustomerLTV {
+  id                  String    @id @default(uuid())
+  customerId          String
+  currentLTV          Float
+  projectedLTV        Float
+  monthlyRevenue      Float
+  annualRevenue       Float
+  retentionRate       Float
+  averageLifespan     Float
+  acquisitionCost     Float
+  profitMargin        Float
+  totalRevenue        Float
+  totalCost           Float
+  netProfit           Float
+  revenueBreakdown    Json
+  tier                String
+  category            String
+  calculatedAt        DateTime  @default(now())
+
+  // Relationships
+  customer            Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([customerId])
+  @@index([currentLTV])
+  @@index([tier])
+  @@index([category])
+  @@index([calculatedAt])
+}
+
+// Retention Campaign
+model RetentionCampaign {
+  id                    String          @id @default(uuid())
+  name                  String
+  description           String?
+  type                  CampaignType
+  status                CampaignStatus  @default(DRAFT)
+  targetSegment         Json
+  schedule              Json
+  touchpoints           Json
+  goals                 Json
+  customersTargeted     Int             @default(0)
+  customersReached      Int             @default(0)
+  customersEngaged      Int             @default(0)
+  customersRetained     Int             @default(0)
+  revenueGenerated      Float           @default(0.0)
+  roi                   Float           @default(0.0)
+  createdBy             String
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  // Relationships
+  campaignTouchpoints   CampaignTouchpoint[]
+
+  // Indexes
+  @@index([type])
+  @@index([status])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+// Campaign Touchpoint (individual interactions)
+model CampaignTouchpoint {
+  id              String            @id @default(uuid())
+  campaignId      String
+  customerId      String
+  type            TouchpointType
+  status          TouchpointStatus  @default(PENDING)
+  content         Json
+  scheduledFor    DateTime
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  respondedAt     DateTime?
+  response        String?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  campaign        RetentionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([campaignId])
+  @@index([customerId])
+  @@index([status])
+  @@index([scheduledFor])
+}
+
+// Retention Event tracking
+model RetentionEvent {
+  id                String    @id @default(uuid())
+  customerId        String
+  policyId          String?
+  eventType         String
+  severity          String
+  data              Json
+  triggeredActions  String[]
+  timestamp         DateTime  @default(now())
+  metadata          Json?
+
+  // Relationships
+  customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  policy            Policy?   @relation(fields: [policyId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([customerId])
+  @@index([policyId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([timestamp])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -139,4 +370,63 @@ enum InsuranceType {
   LIFE
   HEALTH
   COMMERCIAL
+}
+
+enum PolicyStatus {
+  ACTIVE
+  PENDING_RENEWAL
+  EXPIRED
+  CANCELLED
+  LAPSED
+}
+
+enum PolicyType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  COMMERCIAL
+}
+
+enum ChurnRisk {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CampaignType {
+  RENEWAL_REMINDER
+  ENGAGEMENT
+  WINBACK
+  CROSS_SELL
+  UPSELL
+  LOYALTY
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum TouchpointType {
+  EMAIL
+  SMS
+  CALL
+  NOTIFICATION
+  MAIL
+}
+
+enum TouchpointStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  RESPONDED
+  FAILED
 }
