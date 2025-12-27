@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@insurance-lead-gen/types": "workspace:*",
+    "@insurance-lead-gen/core": "workspace:*",
     "zod": "^3.22.0"
   },
   "devDependencies": {
