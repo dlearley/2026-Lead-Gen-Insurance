@@ -20,7 +20,13 @@ export interface User {
 // ========================================
 
 export type InsuranceType = 'auto' | 'home' | 'life' | 'health' | 'commercial';
-export type LeadStatus = 'received' | 'processing' | 'qualified' | 'routed' | 'converted' | 'rejected';
+export type LeadStatus =
+  | 'received'
+  | 'processing'
+  | 'qualified'
+  | 'routed'
+  | 'converted'
+  | 'rejected';
 
 export interface Lead {
   id: string;
@@ -153,7 +159,15 @@ export interface ActivityFilterParams {
 // EMAIL TYPES
 // ========================================
 
-export type EmailStatus = 'pending' | 'scheduled' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'failed' | 'bounced';
+export type EmailStatus =
+  | 'pending'
+  | 'scheduled'
+  | 'sent'
+  | 'delivered'
+  | 'opened'
+  | 'clicked'
+  | 'failed'
+  | 'bounced';
 
 export interface Email {
   id: string;
@@ -388,3 +402,6 @@ export * from './reports.js';
 
 // Validation Schemas
 export * from './validation.js';
+
+// Retention Types
+export * from './retention.js';
