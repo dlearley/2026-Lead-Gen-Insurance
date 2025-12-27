@@ -45,6 +45,100 @@ export interface Lead {
 }
 
 // ========================================
+// POLICY TYPES
+// ========================================
+
+export type PolicyStatus =
+  | 'draft'
+  | 'pending_payment'
+  | 'active'
+  | 'cancelled'
+  | 'lapsed'
+  | 'expired'
+  | 'non_renewed';
+
+export type PolicyBillingFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
+
+export interface MoneyAmount {
+  amount: number;
+  currency: string;
+}
+
+export interface PolicyEndorsement {
+  id: string;
+  policyId: string;
+  type: string;
+  effectiveDate: Date;
+  description?: string;
+  changes?: Record<string, unknown>;
+  premiumDelta?: number;
+  createdAt: Date;
+  createdBy?: string;
+}
+
+export type PolicyInvoiceStatus = 'open' | 'paid' | 'void' | 'overdue';
+
+export interface PolicyInvoice {
+  id: string;
+  policyId: string;
+  invoiceNumber: string;
+  amount: MoneyAmount;
+  dueDate: Date;
+  status: PolicyInvoiceStatus;
+  paidAt?: Date;
+  createdAt: Date;
+}
+
+export interface Policy {
+  id: string;
+  leadId: string;
+  agentId?: string;
+  insuranceType: InsuranceType;
+  policyNumber: string;
+  carrier?: string;
+  productName?: string;
+  status: PolicyStatus;
+  effectiveDate: Date;
+  expirationDate: Date;
+  cancelledAt?: Date;
+  cancellationReason?: string;
+  premium: MoneyAmount;
+  billingFrequency: PolicyBillingFrequency;
+  coverage?: Record<string, unknown>;
+  endorsements: PolicyEndorsement[];
+  invoices: PolicyInvoice[];
+  renewalOfPolicyId?: string;
+  renewedToPolicyId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreatePolicyDto {
+  leadId: string;
+  agentId?: string;
+  insuranceType: InsuranceType;
+  carrier?: string;
+  productName?: string;
+  effectiveDate: Date;
+  expirationDate: Date;
+  premium: MoneyAmount;
+  billingFrequency: PolicyBillingFrequency;
+  coverage?: Record<string, unknown>;
+}
+
+export interface UpdatePolicyDto {
+  agentId?: string;
+  carrier?: string;
+  productName?: string;
+  status?: PolicyStatus;
+  effectiveDate?: Date;
+  expirationDate?: Date;
+  premium?: MoneyAmount;
+  billingFrequency?: PolicyBillingFrequency;
+  coverage?: Record<string, unknown>;
+}
+
+// ========================================
 // NOTE TYPES
 // ========================================
 
