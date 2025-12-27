@@ -1,0 +1,79 @@
+# Default values for frontend chart
+replicaCount: 2
+
+image:
+  repository: insurance-lead-gen-frontend
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: regcred
+
+service:
+  type: LoadBalancer
+  port: 3000
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+env:
+  NODE_ENV: "production"
+  NEXT_PUBLIC_API_URL: "http://api:3000"
+  NEXT_PUBLIC_ENV: "production"
+
+secrets:
+  existingSecret: frontend-secrets
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+metrics:
+  enabled: true
+  path: /metrics
+
+configMap:
+  existingConfigMap: frontend-config
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: frontend.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []

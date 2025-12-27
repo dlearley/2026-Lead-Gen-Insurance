@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configMap.existingConfigMap }}
+  labels:
+    {{- include "api.labels" . | nindent 4 }}
+data:
+  NODE_ENV: {{ .Values.env.NODE_ENV | quote }}
+  PORT: {{ .Values.env.PORT | quote }}
+  DATA_SERVICE_URL: {{ .Values.env.DATA_SERVICE_URL | quote }}
+  ORCHESTRATOR_URL: {{ .Values.env.ORCHESTRATOR_URL | quote }}
+  REDIS_URL: {{ .Values.env.REDIS_URL | quote }}
+  NATS_URL: {{ .Values.env.NATS_URL | quote }}
+  METRICS_PATH: {{ .Values.metrics.path | quote }}

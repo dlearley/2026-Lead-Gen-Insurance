@@ -1,0 +1,64 @@
+# NGINX Ingress Controller values
+controller:
+  replicaCount: 2
+  image:
+    repository: registry.k8s.io/ingress-nginx/controller
+    tag: "v1.9.0"
+    digest: ""
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  service:
+    type: LoadBalancer
+    ports:
+      http: 80
+      https: 443
+    externalTrafficPolicy: "Local"
+  ingressClass: nginx
+  ingressClassResource:
+    name: nginx
+    enabled: true
+  publishService:
+    enabled: true
+  metrics:
+    enabled: true
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "10254"
+  config:
+    proxy-body-size: "50m"
+    proxy-connect-timeout: "30"
+    proxy-send-timeout: "60"
+    proxy-read-timeout: "60"
+    use-forwarded-headers: "true"
+  podSecurityContext:
+    fsGroup: 101
+  securityContext:
+    runAsUser: 101
+    allowPrivilegeEscalation: true
+  admissionWebhooks:
+    enabled: true
+    patch:
+      enabled: true
+      image:
+        repository: registry.k8s.io/ingress-nginx/kube-webhook-certgen
+        tag: "v20230907"
+
+defaultBackend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: registry.k8s.io/defaultbackend-amd64
+    tag: "1.5"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
