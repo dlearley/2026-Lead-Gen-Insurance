@@ -388,3 +388,4 @@ export * from './reports.js';
 
 // Validation Schemas
 export * from './validation.js';
+export * from './scoring.js';
