@@ -1,0 +1,150 @@
+version: '3.8'
+
+# Performance & Scalability Stack
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.perf.yml up -d
+
+services:
+  # NGINX Load Balancer
+  nginx:
+    build:
+      context: ./deploy/nginx
+      dockerfile: Dockerfile
+    container_name: insurance-lead-gen-nginx
+    ports:
+      - '80:80'
+      - '8080:8080'
+    depends_on:
+      - api
+      - data-service
+      - orchestrator
+      - backend
+    networks:
+      - insurance-lead-gen
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - nginx_cache:/var/cache/nginx
+      - nginx_logs:/var/log/nginx
+
+  # API Service (multiple replicas for load balancing)
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/insurance_lead_gen
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - insurance-lead-gen
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Data Service (multiple replicas)
+  data-service:
+    build:
+      context: .
+      dockerfile: apps/data-service/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/insurance_lead_gen
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - insurance-lead-gen
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Orchestrator Service (multiple replicas)
+  orchestrator:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - NEO4J_URI=bolt://neo4j:7687
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - redis
+      - neo4j
+      - qdrant
+    networks:
+      - insurance-lead-gen
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Python Backend (multiple replicas)
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/insurance_lead_gen
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - insurance-lead-gen
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cluster for distributed caching (optional enhancement)
+  redis-replica:
+    image: redis:7-alpine
+    container_name: insurance-lead-gen-redis-replica
+    command: redis-server --slaveof redis 6379
+    depends_on:
+      - redis
+    networks:
+      - insurance-lead-gen
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  insurance-lead-gen:
+    driver: bridge
+
+volumes:
+  nginx_cache:
+  nginx_logs:
