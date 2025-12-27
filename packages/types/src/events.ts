@@ -50,3 +50,36 @@ export type LeadProcessedEvent = EventEnvelope<
     leadId: string;
   }
 >;
+
+export type LeadGetRequest = {
+  leadId: string;
+};
+
+export type LeadGetResponse = {
+  lead: any; // Using any for now to avoid circular dependency or complex types
+  error?: string;
+};
+
+export type AgentsMatchRequest = {
+  insuranceType?: string;
+  state?: string;
+  limit?: number;
+};
+
+export type AgentsMatchResponse = {
+  agents: any[];
+  error?: string;
+};
+
+export type LeadAssignRequest = {
+  leadId: string;
+  agentId: string;
+  strategy?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type LeadAssignResponse = {
+  assignmentId: string;
+  success: boolean;
+  error?: string;
+};
