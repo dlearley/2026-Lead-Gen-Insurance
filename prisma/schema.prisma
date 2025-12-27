@@ -116,6 +116,87 @@ model Event {
   @@index([timestamp])
 }
 
+// Partner model - stores referral partner information
+model Partner {
+  id              String     @id @default(uuid())
+  userId          String?    // Link to existing user if applicable
+  firstName       String
+  lastName        String
+  email           String     @unique
+  phone           String
+  companyName     String?
+  referralCode    String     @unique
+  status          PartnerStatus @default(ACTIVE)
+  commissionRate  Float      @default(0.1) // 10% default commission
+  totalReferrals  Int        @default(0)
+  successfulReferrals Int     @default(0)
+  totalEarnings    Float      @default(0.0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  // Relationships
+  referrals       Referral[]
+  rewards         Reward[]
+
+  // Indexes
+  @@index([email])
+  @@index([referralCode])
+  @@index([status])
+}
+
+// Referral model - tracks referred leads
+model Referral {
+  id              String     @id @default(uuid())
+  partnerId       String
+  leadId          String?    // Linked when lead is created
+  referralCode    String
+  source          ReferralSource
+  status          ReferralStatus @default(PENDING)
+  referredAt      DateTime   @default(now())
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  convertedAt     DateTime?
+  conversionValue Float?     // Value of converted lead
+  notes           String?
+  
+  // Relationships
+  partner         Partner    @relation(fields: [partnerId], references: [id])
+  lead            Lead?      @relation(fields: [leadId], references: [id])
+  reward          Reward?
+
+  // Indexes
+  @@index([partnerId])
+  @@index([leadId])
+  @@index([referralCode])
+  @@index([status])
+  @@index([referredAt])
+}
+
+// Reward model - tracks partner rewards
+model Reward {
+  id              String     @id @default(uuid())
+  partnerId       String
+  referralId      String
+  amount          Float
+  currency        String     @default("USD")
+  status          RewardStatus @default(PENDING)
+  calculatedAt    DateTime   @default(now())
+  paidAt          DateTime?
+  paymentMethod   String?
+  transactionId   String?
+  notes           String?
+  
+  // Relationships
+  partner         Partner    @relation(fields: [partnerId], references: [id])
+  referral        Referral   @relation(fields: [referralId], references: [id])
+
+  // Indexes
+  @@index([partnerId])
+  @@index([referralId])
+  @@index([status])
+  @@index([calculatedAt])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -139,4 +220,38 @@ enum InsuranceType {
   LIFE
   HEALTH
   COMMERCIAL
+}
+
+enum PartnerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum ReferralSource {
+  WEBSITE
+  MOBILE_APP
+  EMAIL
+  PHONE
+  IN_PERSON
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CONVERTED
+  PAID
+  EXPIRED
+}
+
+enum RewardStatus {
+  PENDING
+  CALCULATED
+  APPROVED
+  PAID
+  CANCELLED
 }

@@ -16,6 +16,12 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { PartnerService } from './services/partner.service.js';
+import { ReferralService } from './services/referral.service.js';
+import { RewardService } from './services/reward.service.js';
+import partnerRoutes from './routes/partners.routes.js';
+import referralRoutes from './routes/referrals.routes.js';
+import rewardRoutes from './routes/rewards.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -36,9 +42,19 @@ const start = async (): Promise<void> => {
 
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
+  
+  // Initialize referral services
+  const partnerService = new PartnerService();
+  const referralService = new ReferralService();
+  const rewardService = new RewardService();
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  
+  // Setup referral program routes
+  app.use('/api/v1/partners', partnerRoutes);
+  app.use('/api/v1/referrals', referralRoutes);
+  app.use('/api/v1/rewards', rewardRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
