@@ -529,3 +529,220 @@ model SystemConfig {
   @@index([category])
   @@map("system_config")
 }
+
+// ========================================
+// INSURANCE CARRIER & BROKER INTEGRATIONS (Phase 8.6)
+// ========================================
+
+model InsuranceCarrier {
+  id                String               @id @default(uuid())
+  name              String
+  code              String               @unique
+  website           String?
+  logoUrl           String?
+  contactEmail      String?
+  contactPhone      String?
+
+  // Carrier capabilities
+  supportedProducts InsuranceType[]
+  apiEndpoint       String?
+  webhookUrl        String?
+  documentationUrl  String?
+
+  // Integration details
+  integrationType   IntegrationType      @default(REST_API)
+  apiKey            String?
+  apiSecret         String?
+  apiVersion        String?
+
+  // Configuration
+  isActive          Boolean              @default(true)
+  isPrimary         Boolean              @default(false)
+  priority          Int                  @default(0)
+
+  // Rate limiting
+  rateLimit         Int                  @default(100)
+  rateLimitWindow   Int                  @default(60) // seconds
+
+  // Metadata
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  brokers           Broker[]
+  configs           IntegrationConfig[]
+  logs              IntegrationLog[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([integrationType])
+  @@map("insurance_carriers")
+}
+
+model Broker {
+  id                String               @id @default(uuid())
+  name              String
+  code              String               @unique
+  website           String?
+  logoUrl           String?
+  contactEmail      String?
+  contactPhone      String?
+
+  // Broker details
+  licenseNumber     String?
+  ein               String?
+  businessAddress   Json?
+
+  // Carrier relationships
+  carrierId         String?
+  carrier           InsuranceCarrier?    @relation(fields: [carrierId], references: [id])
+
+  // Integration details
+  integrationType   IntegrationType      @default(REST_API)
+  apiKey            String?
+  apiSecret         String?
+  apiVersion        String?
+
+  // Configuration
+  isActive          Boolean              @default(true)
+  priority          Int                  @default(0)
+
+  // Rate limiting
+  rateLimit         Int                  @default(100)
+  rateLimitWindow   Int                  @default(60)
+
+  // Metadata
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  configs           IntegrationConfig[]
+  logs              IntegrationLog[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([integrationType])
+  @@map("brokers")
+}
+
+model IntegrationConfig {
+  id          String               @id @default(uuid())
+  name        String
+  description String?
+
+  // Entity references
+  carrierId   String?
+  carrier     InsuranceCarrier?    @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  brokerId    String?
+  broker      Broker?              @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+
+  // Configuration
+  configType  IntegrationConfigType
+  config      Json                 // Configuration data (endpoints, mappings, etc.)
+
+  // Status
+  isActive    Boolean              @default(true)
+  isEnabled   Boolean              @default(true)
+
+  // Metadata
+  metadata    Json?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  // Relations
+  logs        IntegrationLog[]
+
+  @@index([configType])
+  @@index([isActive])
+  @@index([isEnabled])
+  @@map("integration_configs")
+}
+
+model IntegrationLog {
+  id          String             @id @default(uuid())
+  entityType  IntegrationEntityType
+  entityId    String
+
+  // Entity references
+  carrierId   String?
+  carrier     InsuranceCarrier?  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  brokerId    String?
+  broker      Broker?            @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+  configId    String?
+  config      IntegrationConfig? @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  // Log details
+  action      IntegrationAction
+  direction   Direction          @default(OUTBOUND)
+  requestData Json?
+  responseData Json?
+  statusCode  Int?
+  success     Boolean
+  error       String?
+
+  // Performance
+  duration    Int?               // milliseconds
+
+  // Metadata
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([success])
+  @@index([createdAt])
+  @@map("integration_logs")
+}
+
+// Enums for integrations
+
+enum IntegrationType {
+  REST_API
+  SOAP_API
+  WEBHOOK
+  FTP
+  SFTP
+  FILE_IMPORT
+  FILE_EXPORT
+}
+
+enum IntegrationConfigType {
+  API_ENDPOINTS
+  MAPPING_RULES
+  VALIDATION_RULES
+  TRANSFORMATION_RULES
+  NOTIFICATION_SETTINGS
+  RATE_LIMITING
+  AUTHENTICATION
+}
+
+enum IntegrationEntityType {
+  INSURANCE_CARRIER
+  BROKER
+  LEAD
+  POLICY
+  CLAIM
+  QUOTE
+}
+
+enum IntegrationAction {
+  LEAD_SUBMITTED
+  LEAD_STATUS_UPDATE
+  QUOTE_REQUESTED
+  QUOTE_RECEIVED
+  POLICY_CREATED
+  POLICY_UPDATED
+  CLAIM_SUBMITTED
+  CLAIM_STATUS_UPDATE
+  WEBHOOK_RECEIVED
+  DATA_SYNC
+  VALIDATION_CHECK
+  ERROR_RETRY
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
