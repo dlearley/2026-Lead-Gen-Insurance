@@ -163,6 +163,7 @@ pytest -v          # Run tests with verbose output
 | Main API (TypeScript) | 🚧 Planned | 3000 | - |
 | Data Service | 🚧 Planned | 3001 | - |
 | Orchestrator | 🚧 Planned | 3002 | - |
+| Marketing Automation | ✅ Live | 8000 | [Phase 9.2 Docs](./docs/PHASE_9.2.md) |
 
 ### Infrastructure Services
 
@@ -203,11 +204,31 @@ pytest -v          # Run tests with verbose output
 - User management
 - Session handling
 
+### ✅ Phase 9.2: Marketing Automation & Advanced Targeting (Complete)
+- Advanced lead segmentation engine with dynamic and static segments
+- Rule-based targeting with 10+ field operators
+- Marketing automation workflows with 9 trigger types
+- 8 action types for comprehensive workflow automation
+- Email template management with HTML/text support
+- Scheduled task system for delayed operations
+- Segment-based automation triggers
+- Full campaign integration
+
 ### 🚧 Phase 1.3: Frontend Foundation (Planned)
 - Next.js 14 application setup
 - Tailwind CSS & component library
 - State management
 - API integration
+
+### ✅ Phase 9.2: Marketing Automation & Advanced Targeting (Complete)
+- Advanced lead segmentation engine
+- Dynamic and static segment management
+- Rule-based targeting with flexible operators
+- Marketing automation workflows
+- Email template management
+- Scheduled task system
+- Campaign integration
+- See [docs/PHASE_9.2.md](./docs/PHASE_9.2.md)
 
 ### 📋 Phase 1.4: Lead Management (Planned)
 - Full-stack lead management features
@@ -235,6 +256,13 @@ pytest -v          # Run tests with verbose output
 - Lead enrichment module
 - Agent matching service
 - Neo4j & Qdrant integration
+
+### ✅ Phase 9.2: Marketing Automation & Advanced Targeting (Complete)
+- Advanced segmentation engine with dynamic rule evaluation
+- Marketing automation workflows with multiple trigger and action types
+- Email template management system
+- Scheduled task processing
+- Full API integration and documentation
 
 ### 📋 Phase 4: Multi-Agent Routing & Distribution (Planned)
 - Intelligent agent matching
@@ -265,6 +293,9 @@ pytest -v          # Run tests with verbose output
 
 See [Implementation Phases](./docs/PHASES.md) for detailed roadmap.
 
+### ✅ Phase 9.2: Marketing Automation & Advanced Targeting
+- See [Phase 9.2 Documentation](./docs/PHASE_9.2.md) for complete details
+
 ## 🧪 Testing
 
 ### Backend (Python)
@@ -286,6 +317,7 @@ pnpm --filter @insurance/api test  # Run specific package tests
 - [Database Schema](./apps/backend/docs/DATABASE_SCHEMA.md)
 - [Quick Start Guide](./apps/backend/QUICKSTART.md)
 - [Phase 1.1 Completion](./apps/backend/PHASE_1.1_COMPLETION.md)
+- [Phase 9.2 Marketing Automation](./docs/PHASE_9.2.md)
 
 ### Monorepo
 - [Architecture Overview](./docs/ARCHITECTURE.md)
@@ -472,4 +504,4 @@ For issues and questions:
 
 ---
 
-**Project Status**: Phase 1.1 Complete ✅ | Merging Phase 1.2-3.5 🚧
+**Project Status**: Phase 1.1 & 9.2 Complete ✅ | Merging Phase 1.2-3.5 🚧
