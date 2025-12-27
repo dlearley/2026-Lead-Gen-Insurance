@@ -14,6 +14,8 @@ import {
   startLeadIngestionWorker,
 } from './queues/lead-ingestion.queue.js';
 import { LeadRepository } from './repositories/lead.repository.js';
+import { AgentRepository } from './repositories/agent.repository.js';
+import { AssignmentRepository } from './repositories/assignment.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
 
@@ -35,6 +37,8 @@ const start = async (): Promise<void> => {
   const redis = createRedisConnection();
 
   const leadRepository = new LeadRepository(prisma);
+  const agentRepository = new AgentRepository(prisma);
+  const assignmentRepository = new AssignmentRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
 
   // Setup analytics routes
@@ -107,6 +111,59 @@ const start = async (): Promise<void> => {
     }
   })().catch((error) => {
     logger.error('Lead get subscription terminated', { error });
+  });
+
+  const agentsMatchSub = eventBus.subscribe(EVENT_SUBJECTS.AgentsMatch);
+  (async () => {
+    for await (const msg of agentsMatchSub) {
+      try {
+        const filters = eventBus.decode<any>(msg.data);
+        const agents = await agentRepository.findMany({
+          isActive: true,
+          state: filters.state,
+          specialization: filters.insuranceType,
+        }, 0, filters.limit || 50);
+
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { agents });
+        }
+      } catch (error) {
+        logger.error('Failed to handle agents.match request', { error });
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { agents: [], error: 'internal_error' });
+        }
+      }
+    }
+  })().catch((error) => {
+    logger.error('Agents match subscription terminated', { error });
+  });
+
+  const leadAssignSub = eventBus.subscribe(EVENT_SUBJECTS.LeadAssign);
+  (async () => {
+    for await (const msg of leadAssignSub) {
+      try {
+        const data = eventBus.decode<any>(msg.data);
+        const assignment = await assignmentRepository.create({
+          leadId: data.leadId,
+          agentId: data.agentId,
+          status: 'PENDING',
+        });
+
+        // Also update lead status to ROUTED
+        await leadRepository.updateLeadStatus(data.leadId, 'ROUTED');
+
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { assignmentId: assignment.id, success: true });
+        }
+      } catch (error) {
+        logger.error('Failed to handle lead.assign request', { error });
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { success: false, error: 'internal_error' });
+        }
+      }
+    }
+  })().catch((error) => {
+    logger.error('Lead assign subscription terminated', { error });
   });
 
   const shutdown = async (): Promise<void> => {
