@@ -35,6 +35,11 @@ model Lead {
   events          Event[]
   customer        Customer?
   referrals       Referral[]
+  churnPrediction ChurnPrediction?
+  touchpoints     CustomerTouchpoint[]
+  winBackOffers   WinBackOffer[]
+  engagement      CustomerEngagement?
+  retentionAlerts RetentionAlert[]
 
   // Indexes for performance
   @@index([email])
@@ -66,6 +71,7 @@ model Agent {
 
   // Relationships
   assignments         LeadAssignment[]
+  retentionAlerts     RetentionAlert[]
 
   // Indexes
   @@index([email])
@@ -431,6 +437,172 @@ model RetentionEvent {
   @@index([timestamp])
 }
 
+// Customer churn prediction model
+model ChurnPrediction {
+  id                    String                @id @default(uuid())
+  leadId                String                @unique
+  churnProbability      Float                 // 0.0 to 1.0
+  churnRisk             ChurnRisk             // LOW, MEDIUM, HIGH, CRITICAL
+  primaryReason         String?
+  accuracyScore         Float?                // model confidence
+  predictionDate        DateTime              @default(now())
+  lastEngagementDate    DateTime?
+  daysSinceLastActivity Int                   @default(0)
+  keyRiskFactors        String[]              // JSON array of risk indicators
+
+  // Relationships
+  lead                  Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaigns             ChurnRetentionCampaign[]
+  alerts                RetentionAlert[]
+
+  @@index([churnRisk])
+  @@index([predictionDate])
+  @@index([leadId])
+}
+
+// Churn retention campaign management (separate from main RetentionCampaign)
+model ChurnRetentionCampaign {
+  id                  String              @id @default(uuid())
+  churnPredictionId   String?
+  name                String
+  description         String?
+  type                ChurnCampaignType
+  status              CampaignStatus      @default(DRAFT)
+  targetAudience      Json                // Filter criteria
+  startDate           DateTime?
+  endDate             DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Metrics
+  leadsTargeted       Int                 @default(0)
+  leadsEngaged        Int                 @default(0)
+  leadsConverted      Int                 @default(0)
+  totalCost           Float               @default(0)
+  roi                 Float?              // Return on investment
+
+  // Relationships
+  churnPrediction     ChurnPrediction?    @relation(fields: [churnPredictionId], references: [id], onDelete: Cascade)
+  touchpoints         CustomerTouchpoint[]
+  offers              WinBackOffer[]
+
+  @@index([status])
+  @@index([type])
+  @@index([startDate])
+}
+
+// Customer touchpoints across channels
+model CustomerTouchpoint {
+  id                  String              @id @default(uuid())
+  leadId              String
+  retentionCampaignId String?
+  channel             ContactChannel
+  touchpointType      ChurnTouchpointType
+  sentAt              DateTime            @default(now())
+  openedAt            DateTime?
+  clickedAt           DateTime?
+  responseAt          DateTime?
+  status              TouchpointStatus    @default(SENT)
+  subject             String?
+  content             Json?               // Message content/attachments
+  metadata            Json?
+
+  // Relationships
+  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  retentionCampaign   ChurnRetentionCampaign?  @relation(fields: [retentionCampaignId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([channel])
+  @@index([sentAt])
+  @@index([status])
+}
+
+// Win-back offers and incentives
+model WinBackOffer {
+  id                  String              @id @default(uuid())
+  retentionCampaignId String?
+  leadId              String
+  offerType           OfferType
+  title               String
+  description         String?
+  discountPercentage  Float?              // e.g., 15% discount
+  discountAmount      Float?              // e.g., $200 off
+  premiumAdjustment   Float?              // Premium reduction amount
+  coverageEnhancement Json?               // Additional coverage details
+  conditions          String[]            // Requirements to qualify
+  validFrom           DateTime
+  validUntil          DateTime
+  status              OfferStatus         @default(DRAFT)
+  createdAt           DateTime            @default(now())
+  redeemedAt          DateTime?
+  acceptedAt          DateTime?
+  rejectionReason     String?
+
+  // Metrics
+  viewedCount         Int                 @default(0)
+  sharedCount         Int                 @default(0)
+
+  // Relationships
+  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  retentionCampaign   ChurnRetentionCampaign?  @relation(fields: [retentionCampaignId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([status])
+  @@index([validFrom, validUntil])
+}
+
+// Customer engagement tracking
+model CustomerEngagement {
+  id                  String              @id @default(uuid())
+  leadId              String              @unique
+  engagementScore     Int                 @default(0) // 0-100
+  lastActivityDate    DateTime            @default(now())
+  activityCount30d    Int                 @default(0) // Last 30 days
+  activityCount90d    Int                 @default(0) // Last 90 days
+  emailOpenRate       Float               @default(0) // Percentage
+  clickThroughRate    Float               @default(0) // Percentage
+  quoteRequests       Int                 @default(0)
+  proposalViews       Int                 @default(0)
+  websiteVisits       Int                 @default(0)
+  preferredChannel    ContactChannel?
+  preferredTime       String?             // e.g., "morning", "afternoon"
+  interests           String[]            // Tags from behavior
+
+  // Relationships
+  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([engagementScore])
+  @@index([activityCount30d])
+  @@index([leadId])
+}
+
+// Retention alerts for agents
+model RetentionAlert {
+  id                  String              @id @default(uuid())
+  leadId              String
+  agentId             String?
+  churnPredictionId   String?
+  alertType           AlertType
+  severity            AlertSeverity       @default(MEDIUM)
+  message             String
+  actionableSteps     String[]            // Recommended actions
+  status              AlertStatus         @default(ACTIVE)
+  createdAt           DateTime            @default(now())
+  acknowledgedAt      DateTime?
+  resolvedAt          DateTime?
+  snoozeUntil         DateTime?
+
+  // Relationships
+  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent               Agent?              @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  churnPrediction     ChurnPrediction?    @relation(fields: [churnPredictionId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([severity])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -605,6 +777,7 @@ enum ChurnRisk {
   CRITICAL
 }
 
+// Retention campaign types (for main retention campaigns)
 enum CampaignType {
   RENEWAL_REMINDER
   ENGAGEMENT
@@ -614,21 +787,56 @@ enum CampaignType {
   LOYALTY
 }
 
+// Churn-specific campaign types
+enum ChurnCampaignType {
+  EMAIL
+  SMS
+  CALL
+  MULTI_CHANNEL
+  WIN_BACK
+  RETENTION
+  REACTIVATION
+}
+
 enum CampaignStatus {
   DRAFT
   SCHEDULED
   ACTIVE
+  RUNNING
   PAUSED
   COMPLETED
   CANCELLED
 }
 
+// Contact channels for customer touchpoints
+enum ContactChannel {
+  EMAIL
+  SMS
+  CALL
+  WHATSAPP
+  DIRECT_MAIL
+  IN_APP
+}
+
+// Retention touchpoint types (for main campaigns)
 enum TouchpointType {
   EMAIL
   SMS
   CALL
   NOTIFICATION
   MAIL
+}
+
+// Churn touchpoint types
+enum ChurnTouchpointType {
+  WELCOME
+  REMINDER
+  FOLLOWUP
+  EDUCATIONAL
+  PROMOTIONAL
+  SURVEY
+  WIN_BACK
+  RETENTION
 }
 
 enum TouchpointStatus {
@@ -638,5 +846,49 @@ enum TouchpointStatus {
   OPENED
   CLICKED
   RESPONDED
+  BOUNCED
   FAILED
+}
+
+enum OfferType {
+  DISCOUNT
+  PREMIUM_REDUCTION
+  COVERAGE_ENHANCEMENT
+  CASHBACK
+  REFERRAL_BONUS
+  LOYALTY_REWARD
+}
+
+enum OfferStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REDEEMED
+  EXPIRED
+  REJECTED
+}
+
+enum AlertType {
+  HIGH_CHURN_RISK
+  LOW_ENGAGEMENT
+  STALE_LEAD
+  COMPETITOR_ALERT
+  PRICE_SENSITIVITY
+  SERVICE_COMPLAINT
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  SNOOZED
+  RESOLVED
+  DISMISSED
 }
