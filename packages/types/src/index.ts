@@ -380,6 +380,9 @@ export interface ProcessingResult {
   processingTime: number;
 }
 
+// Claims Management (Phase 10.1)
+export * from './claims.js';
+
 export * from './events.js';
 export * from './analytics.js';
 

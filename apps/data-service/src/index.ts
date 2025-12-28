@@ -16,6 +16,8 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { ClaimRepository } from './services/claim-repository.js';
+import { createClaimsRoutes } from './routes/claims.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -36,9 +38,11 @@ const start = async (): Promise<void> => {
 
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
+  const claimRepository = new ClaimRepository(prisma);
 
-  // Setup analytics routes
+  // Setup routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
