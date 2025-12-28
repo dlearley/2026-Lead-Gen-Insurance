@@ -32,6 +32,8 @@ import { createRetentionRoutes } from './routes/retention.routes.js';
 import { createCampaignsRoutes } from './routes/campaigns.routes.js';
 import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
+import { ClaimRepository } from './services/claim-repository.js';
+import { createClaimsRoutes } from './routes/claims.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -54,6 +56,7 @@ const start = async (): Promise<void> => {
   const agentRepository = new AgentRepository(prisma);
   const assignmentRepository = new AssignmentRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
+  const claimRepository = new ClaimRepository(prisma);
 
   // Initialize referral services
   const partnerService = new PartnerService();
@@ -63,8 +66,6 @@ const start = async (): Promise<void> => {
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
-  app.use('/api/v1/vip', createVIPRoutes());
-  app.use('/api/v1/community', createCommunityRoutes());
 
   // Setup referral program routes
   app.use('/api/v1/partners', partnerRoutes);
@@ -84,6 +85,9 @@ const start = async (): Promise<void> => {
   // Setup VIP and community routes
   app.use('/api/v1/vip', createVIPRoutes());
   app.use('/api/v1/community', createCommunityRoutes());
+
+  // Setup claims routes
+  app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
   // Health check endpoint
   app.get('/health', (req, res) => {

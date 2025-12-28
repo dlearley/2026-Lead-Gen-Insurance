@@ -40,6 +40,7 @@ model Lead {
   winBackOffers   WinBackOffer[]
   engagement      CustomerEngagement?
   retentionAlerts RetentionAlert[]
+  claims          Claim[]
 
   // Indexes for performance
   @@index([email])
@@ -76,6 +77,7 @@ model Agent {
   communityPosts      CommunityPost[]
   communityComments   CommunityComment[]
   communityLikes      CommunityLike[]
+  claims              Claim[]
 
   // Indexes
   @@index([email])
@@ -991,4 +993,200 @@ model CommunityLike {
   @@index([commentId])
   @@unique([agentId, postId])
   @@unique([agentId, commentId])
+}
+
+// Phase 10.1: Claims Management Models
+
+// Claim model - stores all insurance claims
+model Claim {
+  id                    String          @id @default(uuid())
+  claimNumber           String          @unique
+  leadId                String
+  agentId               String?
+  policyNumber          String?
+  insuranceType         String
+  claimType             ClaimType
+  status                ClaimStatus     @default(DRAFT)
+  priority              ClaimPriority   @default(MEDIUM)
+  severity              ClaimSeverity   @default(MODERATE)
+
+  // Incident details
+  incidentDate          DateTime
+  incidentLocation      String?
+  incidentDescription   String          @db.Text
+
+  // Financial information
+  claimedAmount         Float
+  approvedAmount        Float?
+  deductible            Float?
+  paidAmount            Float?
+
+  // Timeline
+  submittedAt           DateTime?
+  reviewedAt            DateTime?
+  approvedAt            DateTime?
+  deniedAt              DateTime?
+  paidAt                DateTime?
+  closedAt              DateTime?
+
+  // Additional information
+  denialReason          String?         @db.Text
+  adjusterNotes         String?         @db.Text
+  fraudScore            Float?
+  metadata              Json?
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  // Relationships
+  lead                  Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent                 Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  documents             ClaimDocument[]
+  notes                 ClaimNote[]
+  activities            ClaimActivity[]
+
+  // Indexes
+  @@index([claimNumber])
+  @@index([leadId])
+  @@index([agentId])
+  @@index([policyNumber])
+  @@index([insuranceType])
+  @@index([claimType])
+  @@index([status])
+  @@index([priority])
+  @@index([incidentDate])
+  @@index([submittedAt])
+  @@index([createdAt])
+}
+
+// ClaimDocument model - stores claim documents and attachments
+model ClaimDocument {
+  id              String            @id @default(uuid())
+  claimId         String
+  documentType    ClaimDocumentType
+  fileName        String
+  fileUrl         String
+  fileSize        Int
+  mimeType        String
+  uploadedBy      String
+  description     String?           @db.Text
+  isVerified      Boolean           @default(false)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  createdAt       DateTime          @default(now())
+
+  // Relationships
+  claim           Claim             @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([claimId])
+  @@index([documentType])
+  @@index([uploadedBy])
+  @@index([createdAt])
+}
+
+// ClaimNote model - stores notes and comments on claims
+model ClaimNote {
+  id              String      @id @default(uuid())
+  claimId         String
+  authorId        String
+  content         String      @db.Text
+  isInternal      Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relationships
+  claim           Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([claimId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+// ClaimActivity model - audit trail for claims
+model ClaimActivity {
+  id              String      @id @default(uuid())
+  claimId         String
+  userId          String?
+  activityType    String
+  action          String
+  description     String      @db.Text
+  oldValue        String?
+  newValue        String?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+
+  // Relationships
+  claim           Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([claimId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+}
+
+// Enums for Claims
+
+enum ClaimType {
+  AUTO_ACCIDENT
+  AUTO_THEFT
+  AUTO_VANDALISM
+  HOME_PROPERTY_DAMAGE
+  HOME_THEFT
+  HOME_FIRE
+  HOME_WATER_DAMAGE
+  HOME_NATURAL_DISASTER
+  LIFE_DEATH
+  LIFE_TERMINAL_ILLNESS
+  HEALTH_MEDICAL
+  HEALTH_HOSPITALIZATION
+  HEALTH_SURGERY
+  LIABILITY_PERSONAL
+  LIABILITY_PROFESSIONAL
+  OTHER
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  INVESTIGATING
+  AWAITING_INFORMATION
+  APPROVED
+  DENIED
+  IN_PAYMENT
+  PAID
+  CLOSED
+  DISPUTED
+  CANCELLED
+}
+
+enum ClaimPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ClaimSeverity {
+  MINOR
+  MODERATE
+  MAJOR
+  CATASTROPHIC
+}
+
+enum ClaimDocumentType {
+  POLICE_REPORT
+  MEDICAL_RECORD
+  PHOTO_EVIDENCE
+  REPAIR_ESTIMATE
+  INVOICE
+  RECEIPT
+  WITNESS_STATEMENT
+  INSURANCE_CARD
+  DRIVERS_LICENSE
+  INCIDENT_REPORT
+  OTHER
 }
