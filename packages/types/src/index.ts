@@ -1,7 +1,3 @@
-// ========================================
-// USER TYPES
-// ========================================
-
 export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 
 export interface User {
@@ -388,3 +384,6 @@ export * from './reports.js';
 
 // Validation Schemas
 export * from './validation.js';
+
+// Pricing Types
+export * from './pricing.js';

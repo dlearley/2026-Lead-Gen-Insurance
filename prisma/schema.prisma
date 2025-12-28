@@ -140,3 +140,184 @@ enum InsuranceType {
   HEALTH
   COMMERCIAL
 }
+
+// ========================================
+// PRICING INTELLIGENCE MODELS
+// ========================================
+
+// Quote model - stores insurance quotes
+model Quote {
+  id              String      @id @default(uuid())
+  leadId          String
+  agentId         String
+  insuranceType   InsuranceType
+  coverageTier    CoverageTier @default(BASIC)
+  status          QuoteStatus  @default(DRAFT)
+  coverage        Json         // Coverage details
+  premium         Json         // Premium breakdown
+  version         Int          @default(1)
+  expiresAt       DateTime
+  pricingStrategyId String?
+  pricingStrategy PricingStrategy? @relation(fields: [pricingStrategyId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relationships
+  marginAnalyses  MarginAnalysis[]
+  pricingExperiments PricingExperiment[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([agentId])
+  @@index([insuranceType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// PricingStrategy model - stores pricing strategies and rules
+model PricingStrategy {
+  id            String      @id @default(uuid())
+  name          String
+  description   String?
+  insuranceType InsuranceType
+  isActive      Boolean     @default(true)
+  rules         Json        // Pricing rules configuration
+  marginTarget  Float       // Target margin percentage
+  minMargin     Float       // Minimum acceptable margin
+  maxMargin     Float       // Maximum margin ceiling
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relationships
+  quotes        Quote[]
+  pricingExperiments PricingExperiment[]
+
+  // Indexes
+  @@index([insuranceType])
+  @@index([isActive])
+}
+
+// MarginAnalysis model - stores margin calculations for quotes
+model MarginAnalysis {
+  id                String   @id @default(uuid())
+  quoteId           String
+  quote             Quote    @relation(fields: [quoteId], references: [id])
+  calculatedPremium Float
+  targetPremium     Float?
+  costBreakdown     Json     // Detailed cost components
+  margin            Float    // Actual margin percentage
+  targetMargin      Float?   // Target margin percentage
+  factors           Json     // Factors affecting margin
+  recommendations   Json     // AI recommendations
+  createdAt         DateTime @default(now())
+
+  // Indexes
+  @@index([quoteId])
+}
+
+// CompetitivePrice model - stores competitor price intelligence
+model CompetitivePrice {
+  id            String      @id @default(uuid())
+  competitor    String      // Competitor name or identifier
+  insuranceType InsuranceType
+  coverageTier  CoverageTier?
+  premium       Float
+  coverage      Json        // Coverage details
+  location      Json        // Geographic market data
+  dateCollected DateTime
+  marketShare   Float?      // Estimated market share
+  qualityScore  Float?      // Competitor quality rating
+  notes         String?
+  createdAt     DateTime    @default(now())
+
+  // Indexes
+  @@index([insuranceType])
+  @@index([competitor])
+  @@index([dateCollected])
+}
+
+// PricingExperiment model - stores A/B testing experiments
+model PricingExperiment {
+  id             String          @id @default(uuid())
+  name           String
+  description    String?
+  variantA       Json           // Control group pricing
+  variantB       Json           // Test group pricing
+  status         ExperimentStatus @default(DRAFT)
+  results        Json?          // Experiment results
+  startDate      DateTime?
+  endDate        DateTime?
+  winner         String?        // Winning variant
+  insights       String?
+  pricingStrategyId String?
+  pricingStrategy PricingStrategy? @relation(fields: [pricingStrategyId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Indexes
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+}
+
+// PricingAnomaly model - stores detected pricing anomalies
+model PricingAnomaly {
+  id          String         @id @default(uuid())
+  quoteId     String?
+  quote       Quote?         @relation(fields: [quoteId], references: [id])
+  detectedAt  DateTime       @default(now())
+  severity    AnomalySeverity
+  type        AnomalyType
+  description String
+  metrics     Json           // Detailed metrics
+  recommendations String[]   // Recommended actions
+  resolved    Boolean        @default(false)
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Indexes
+  @@index([quoteId])
+  @@index([severity])
+  @@index([type])
+  @@index([resolved])
+}
+
+// Enums for Pricing Intelligence
+enum CoverageTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ELITE
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+enum AnomalySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AnomalyType {
+  OVERPRICED
+  UNDERPRICED
+  LOW_MARGIN
+  COMPETITIVE_THREAT
+}

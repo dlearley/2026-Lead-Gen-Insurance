@@ -16,6 +16,8 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { createPricingRoutes } from './routes/pricing.routes.js';
+import { MarginAnalysisService, CompetitiveAnalysisService, PricingOptimizationService } from './services/index.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -36,9 +38,13 @@ const start = async (): Promise<void> => {
 
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
+  const marginService = new MarginAnalysisService();
+  const competitiveService = new CompetitiveAnalysisService();
+  const pricingService = new PricingOptimizationService();
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  app.use('/api/pricing', createPricingRoutes(marginService, competitiveService, pricingService));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
