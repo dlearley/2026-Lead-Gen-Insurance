@@ -21,6 +21,7 @@
     "@insurance-lead-gen/types": "workspace:*",
     "@insurance-lead-gen/config": "workspace:*",
     "@insurance-lead-gen/data-service": "workspace:*",
+    "@insurance-lead-gen/orchestrator": "workspace:*",
     "@nestjs/common": "^10.3.0",
     "@nestjs/core": "^10.3.0",
     "@nestjs/platform-express": "^10.3.0",

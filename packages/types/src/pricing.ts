@@ -2,7 +2,7 @@
 // PRICING STRATEGY AND MARGIN TYPES
 // ========================================
 
-export type InsuranceType = 'AUTO' | 'HOME' | 'LIFE' | 'HEALTH' | 'COMMERCIAL';
+export type PricingInsuranceType = 'AUTO' | 'HOME' | 'LIFE' | 'HEALTH' | 'COMMERCIAL';
 export type CoverageTier = 'BASIC' | 'STANDARD' | 'PREMIUM' | 'ELITE';
 export type QuoteStatus = 'DRAFT' | 'PENDING' | 'SENT' | 'VIEWED' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 export type ExperimentStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'PAUSED';
@@ -15,7 +15,7 @@ export interface Quote {
   id: string;
   leadId: string;
   agentId: string;
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   coverageTier: CoverageTier;
   status: QuoteStatus;
   coverage: CoverageDetails;
@@ -53,7 +53,7 @@ export interface PricingStrategy {
   id: string;
   name: string;
   description?: string;
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   isActive: boolean;
   rules: PricingRule[];
   marginTarget: number; // target margin percentage
@@ -96,7 +96,7 @@ export interface Adjustment {
 export interface CompetitivePrice {
   id: string;
   competitor: string;
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   coverageTier?: CoverageTier;
   premium: number;
   coverage: Record<string, any>;
@@ -114,7 +114,7 @@ export interface CompetitivePrice {
 }
 
 export interface CompetitiveAnalysis {
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   coverageTier?: CoverageTier;
   location: {
     state: string;
@@ -277,7 +277,7 @@ export interface MarginDashboard {
     improvementOpportunity: number;
     annualImpact: number;
   };
-  byInsuranceType: Record<InsuranceType, MarginMetrics>;
+  byInsuranceType: Record<PricingInsuranceType, MarginMetrics>;
   byCoverageTier: Record<CoverageTier, MarginMetrics>;
   topOpportunities: MarginOpportunity[];
 }
@@ -303,7 +303,7 @@ export interface MarginOpportunity {
 // ========================================
 
 export interface MarketBenchmark {
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   coverageTier: CoverageTier;
   location: {
     state: string;
@@ -349,7 +349,7 @@ export interface PricingAnalytics {
   }>;
   segmentation: {
     byInsuranceType: Array<{
-      type: InsuranceType;
+      type: PricingInsuranceType;
       volume: number;
       revenue: number;
       margin: number;
@@ -395,7 +395,7 @@ export interface GetMarginAnalysisParams {
 }
 
 export interface ListPricingStrategiesParams {
-  insuranceType?: InsuranceType;
+  insuranceType?: PricingInsuranceType;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -404,7 +404,7 @@ export interface ListPricingStrategiesParams {
 export interface CreatePricingStrategyDto {
   name: string;
   description?: string;
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   rules: PricingRule[];
   marginTarget: number;
   minMargin: number;
@@ -422,7 +422,7 @@ export interface UpdatePricingStrategyDto {
 }
 
 export interface GetCompetitivePricesParams {
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   coverageTier?: CoverageTier;
   location?: {
     state: string;
@@ -436,7 +436,7 @@ export interface GetCompetitivePricesParams {
 
 export interface CreateCompetitivePriceDto {
   competitor: string;
-  insuranceType: InsuranceType;
+  insuranceType: PricingInsuranceType;
   coverageTier?: CoverageTier;
   premium: number;
   coverage: Record<string, any>;
@@ -488,7 +488,7 @@ export interface MarginReport {
     averageMargin: number;
     grossProfit: number;
   };
-  byInsuranceType: Record<InsuranceType, MarginMetrics>;
+  byInsuranceType: Record<PricingInsuranceType, MarginMetrics>;
   byCoverageTier: Record<CoverageTier, MarginMetrics>;
   topPerformers: {
     agents: Array<{ id: string; name: string; margin: number; revenue: number }>;

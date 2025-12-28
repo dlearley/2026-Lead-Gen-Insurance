@@ -803,6 +803,12 @@ export interface ProcessingResult {
 // Claims Management (Phase 10.1)
 export * from './claims.js';
 
+// Pricing & Margin Types
+export * from './pricing.js';
+
+// Underwriting (Phase 11.1)
+export * from './underwriting.js';
+
 export * from './events.js';
 export * from './analytics.js';
 
