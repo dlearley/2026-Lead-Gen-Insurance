@@ -30,6 +30,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
 ## 🛠️ Tech Stack
 
 ### Backend (Python)
+
 - **Framework**: FastAPI 0.109.0
 - **Database**: PostgreSQL 16
 - **ORM**: SQLAlchemy 2.0.25 (async)
@@ -38,6 +39,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
 - **Testing**: pytest 7.4.4
 
 ### TypeScript Services
+
 - **Runtime**: Node.js 20+, TypeScript 5.3+
 - **Framework**: NestJS (API), Express
 - **Package Manager**: pnpm 8+
@@ -45,6 +47,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
 - **Testing**: Jest, Supertest
 
 ### Infrastructure
+
 - **Databases**: PostgreSQL 16, Neo4j 5.x, Redis 7, Qdrant
 - **Message Broker**: NATS
 - **AI/ML**: OpenAI GPT-4, LangChain
@@ -63,6 +66,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
 ### Setup
 
 1. **Clone and install:**
+
    ```bash
    git clone <repository-url>
    cd 2026-Lead-Gen-Insurance
@@ -80,6 +84,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
    ```
 
 2. **Environment setup:**
+
    ```bash
    # Root .env for TypeScript services
    cp .env.example .env
@@ -91,11 +96,13 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
    ```
 
 3. **Start infrastructure:**
+
    ```bash
    docker compose up -d
    ```
 
 4. **Run database migrations:**
+
    ```bash
    cd apps/backend
    alembic upgrade head
@@ -103,6 +110,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
    ```
 
 5. **Start services:**
+
    ```bash
    # Python Backend
    cd apps/backend
@@ -114,6 +122,7 @@ This monorepo contains a complete AI-driven insurance lead generation platform c
    ```
 
 Or run everything at once:
+
 ```bash
 pnpm dev
 ```
@@ -121,6 +130,7 @@ pnpm dev
 ## 📦 Available Scripts
 
 ### Monorepo (Root)
+
 ```bash
 # Development
 pnpm dev                    # Start all services & apps
@@ -143,6 +153,7 @@ pnpm format:check          # Check code formatting
 ```
 
 ### Backend (Python)
+
 ```bash
 cd apps/backend
 make help          # Show available commands
@@ -157,39 +168,40 @@ pytest -v          # Run tests with verbose output
 
 ### Application Services
 
-| Service | Status | Port | Documentation |
-|---------|--------|------|---------------|
-| Backend API (FastAPI) | ✅ Live | 8000 | [Swagger](http://localhost:8000/docs) |
-| Main API (TypeScript) | 🚧 Planned | 3000 | - |
-| Data Service | 🚧 Planned | 3001 | - |
-| Orchestrator | 🚧 Planned | 3002 | - |
+| Service               | Status     | Port | Documentation                         |
+| --------------------- | ---------- | ---- | ------------------------------------- |
+| Backend API (FastAPI) | ✅ Live    | 8000 | [Swagger](http://localhost:8000/docs) |
+| Main API (TypeScript) | 🚧 Planned | 3000 | -                                     |
+| Data Service          | 🚧 Planned | 3001 | -                                     |
+| Orchestrator          | 🚧 Planned | 3002 | -                                     |
 
 ### Infrastructure Services
 
-| Service | Status | Port | Documentation |
-|---------|--------|------|---------------|
-| PostgreSQL | ✅ Running | 5432 | - |
-| Redis | ✅ Running | 6379 | - |
+| Service       | Status     | Port | Documentation         |
+| ------------- | ---------- | ---- | --------------------- |
+| PostgreSQL    | ✅ Running | 5432 | -                     |
+| Redis         | ✅ Running | 6379 | -                     |
 | Neo4j Browser | ✅ Running | 7474 | http://localhost:7474 |
-| Qdrant | ✅ Running | 6333 | http://localhost:6333 |
-| NATS | ✅ Running | 4222 | Monitor: 8222 |
+| Qdrant        | ✅ Running | 6333 | http://localhost:6333 |
+| NATS          | ✅ Running | 4222 | Monitor: 8222         |
 
 ### Monitoring Services (Phase 6.3)
 
-| Service | Status | Port | Documentation |
-|---------|--------|------|---------------|
-| Prometheus | ✅ Live | 9090 | http://localhost:9090 |
-| Grafana | ✅ Live | 3003 | http://localhost:3003 (admin/admin) |
-| Loki | ✅ Live | 3100 | http://localhost:3100 |
-| Jaeger UI | ✅ Live | 16686 | http://localhost:16686 |
-| AlertManager | ✅ Live | 9093 | http://localhost:9093 |
-| Node Exporter | ✅ Live | 9100 | http://localhost:9100/metrics |
-| PostgreSQL Exporter | ✅ Live | 9187 | http://localhost:9187/metrics |
-| Redis Exporter | ✅ Live | 9121 | http://localhost:9121/metrics |
+| Service             | Status  | Port  | Documentation                       |
+| ------------------- | ------- | ----- | ----------------------------------- |
+| Prometheus          | ✅ Live | 9090  | http://localhost:9090               |
+| Grafana             | ✅ Live | 3003  | http://localhost:3003 (admin/admin) |
+| Loki                | ✅ Live | 3100  | http://localhost:3100               |
+| Jaeger UI           | ✅ Live | 16686 | http://localhost:16686              |
+| AlertManager        | ✅ Live | 9093  | http://localhost:9093               |
+| Node Exporter       | ✅ Live | 9100  | http://localhost:9100/metrics       |
+| PostgreSQL Exporter | ✅ Live | 9187  | http://localhost:9187/metrics       |
+| Redis Exporter      | ✅ Live | 9121  | http://localhost:9121/metrics       |
 
 ## 🎯 Development Phases
 
 ### ✅ Phase 1.1: Core Backend & Database Foundations (Complete)
+
 - Python FastAPI backend with CRUD operations
 - PostgreSQL database with SQLAlchemy
 - Alembic migrations
@@ -198,55 +210,88 @@ pytest -v          # Run tests with verbose output
 - See [apps/backend/PHASE_1.1_COMPLETION.md](./apps/backend/PHASE_1.1_COMPLETION.md)
 
 ### 🚧 Phase 1.2: Authentication & Authorization (In Progress)
+
 - JWT-based authentication
 - Role-based access control (RBAC)
 - User management
 - Session handling
 
 ### 🚧 Phase 1.3: Frontend Foundation (Planned)
+
 - Next.js 14 application setup
 - Tailwind CSS & component library
 - State management
 - API integration
 
 ### 📋 Phase 1.4: Lead Management (Planned)
+
 - Full-stack lead management features
 - Campaign management
 - Lead routing & assignment
 
 ### 📋 Phase 1.5: Communication System (Planned)
+
 - Notes & activity tracking
 - Email integration
 - Tasks & notifications
 
 ### 📋 Phase 2: Data Pipeline & Real-time Processing (Planned)
+
 - Real-time lead processing
 - Event-driven architecture with NATS
 - Data validation & enrichment
 
 ### 📋 Phase 3: AI Lead Qualification & Scoring (Planned)
+
 - LLM integration for lead scoring
 - Natural language processing
 - Automated lead qualification
 - Intelligent recommendations
 
 ### 📋 Phase 3.5: AI Lead Pipeline & Enrichment (Planned)
+
 - LangChain integration
 - Lead enrichment module
 - Agent matching service
 - Neo4j & Qdrant integration
 
 ### 📋 Phase 4: Multi-Agent Routing & Distribution (Planned)
+
 - Intelligent agent matching
 - Load balancing
 - Priority routing
 
 ### 📋 Phase 5: Analytics Dashboard & Optimization (Planned)
+
 - Real-time analytics
 - Performance metrics
 - System optimization
 
+### ✅ Phase 6.3: Advanced Monitoring & Observability (Complete)
+
+- ✅ Prometheus + Grafana stack for metrics and visualization
+- ✅ Loki + Promtail for log aggregation
+- ✅ Jaeger for distributed tracing with OpenTelemetry
+- ✅ AlertManager for alert routing and management
+- ✅ System exporters (Node, PostgreSQL, Redis)
+- ✅ Custom business metrics for leads and AI models
+- ✅ Pre-configured dashboards and alerts
+- See [docs/MONITORING.md](./docs/MONITORING.md)
+
+### ✅ Phase 6.4: Performance & Scalability (Complete)
+
+- ✅ Two-tier caching system (local + Redis)
+- ✅ Rate limiting with multiple presets
+- ✅ NGINX load balancer with connection pooling
+- ✅ Horizontal Pod Autoscaler (HPA) for Kubernetes
+- ✅ Vertical Pod Autoscaler (VPA) for resource optimization
+- ✅ Database query optimizer and connection pooling
+- ✅ CDN configuration (Cloudflare, CloudFront, Fastly)
+- ✅ Performance testing suite
+- See [docs/PHASE_6.4_IMPLEMENTATION.md](./docs/PHASE_6.4_IMPLEMENTATION.md)
+
 ### ✅ Phase 6.5: Production Deployment & Operations (Complete)
+
 - ✅ Helm charts for all microservices (API, backend, data-service, orchestrator, frontend)
 - ✅ Helm charts for ingress-nginx and monitoring stack
 - ✅ Shared common templates library
@@ -261,18 +306,20 @@ pytest -v          # Run tests with verbose output
 - ✅ Helm deployment guide
 - See [docs/PHASE_6_5_COMPLETION.md](./docs/PHASE_6_5_COMPLETION.md)
 
-### ✅ Phase 6.4: Performance & Scalability (Complete)
-- ✅ Two-tier caching system (local + Redis)
-- ✅ Rate limiting with multiple presets
-- ✅ NGINX load balancer with connection pooling
-- ✅ Horizontal Pod Autoscaler (HPA) for Kubernetes
-- ✅ Vertical Pod Autoscaler (VPA) for resource optimization
-- ✅ Database query optimizer and connection pooling
-- ✅ CDN configuration (Cloudflare, CloudFront, Fastly)
-- ✅ Performance testing suite
-- See [docs/PHASE_6.4_IMPLEMENTATION.md](./docs/PHASE_6.4_IMPLEMENTATION.md)
+### ✅ Phase 6.6: Security Hardening & Compliance (Complete)
+
+- ✅ Rate limiting and DDoS protection (Redis-backed)
+- ✅ Security headers (HSTS, CSP, XSS protection)
+- ✅ Audit logging for security events
+- ✅ Input sanitization and validation
+- ✅ Encryption utilities (AES-256-GCM)
+- ✅ Secrets management (env, AWS, Vault support)
+- ✅ GDPR/CCPA compliance helpers
+- ✅ Data privacy APIs (export, deletion, consent)
+- See [docs/PHASE_6_6_IMPLEMENTATION.md](./docs/PHASE_6_6_IMPLEMENTATION.md)
 
 ### ✅ Phase 6: Production Deployment (Complete)
+
 - ✅ Kubernetes deployment manifests (Kustomize)
 - ✅ Helm charts for all microservices
 - ✅ Infrastructure as Code (Terraform)
@@ -288,12 +335,14 @@ See [Implementation Phases](./docs/PHASES.md) for detailed roadmap.
 ## 🧪 Testing
 
 ### Backend (Python)
+
 ```bash
 cd apps/backend
 pytest -v --cov=app --cov-report=term-missing
 ```
 
 ### TypeScript Services
+
 ```bash
 pnpm test                    # Run all tests
 pnpm --filter @insurance/api test  # Run specific package tests
@@ -302,16 +351,19 @@ pnpm --filter @insurance/api test  # Run specific package tests
 ## 📚 Documentation
 
 ### Backend
+
 - [Backend README](./apps/backend/README.md)
 - [Database Schema](./apps/backend/docs/DATABASE_SCHEMA.md)
 - [Quick Start Guide](./apps/backend/QUICKSTART.md)
 - [Phase 1.1 Completion](./apps/backend/PHASE_1.1_COMPLETION.md)
 
 ### Monorepo
+
 - [Architecture Overview](./docs/ARCHITECTURE.md)
 - [Technology Stack](./docs/TECH_STACK.md)
 - [Development Guide](./docs/DEVELOPMENT.md)
-- [Monitoring & Observability](./docs/MONITORING.md) ✨ **NEW**
+- [Monitoring & Observability](./docs/MONITORING.md)
+- [Security & Compliance](./docs/PHASE_6_6_IMPLEMENTATION.md) ✨ **NEW**
 - [Implementation Phases](./docs/PHASES.md)
 
 ## 📝 Commit Convention
@@ -327,6 +379,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` Build/tooling changes
 
 Examples:
+
 ```bash
 git commit -m "feat: add lead scoring endpoint"
 git commit -m "fix: resolve redis connection issue"
@@ -340,18 +393,18 @@ The platform uses Docker Compose for infrastructure services:
 ```yaml
 # Core Infrastructure
 services:
-  - postgres:5432    # Primary database
-  - redis:6379       # Cache and sessions
-  - neo4j:7474/7687  # Graph database
-  - qdrant:6333      # Vector database
-  - nats:4222        # Message broker
+  - postgres:5432 # Primary database
+  - redis:6379 # Cache and sessions
+  - neo4j:7474/7687 # Graph database
+  - qdrant:6333 # Vector database
+  - nats:4222 # Message broker
 
 # Monitoring Stack (Phase 6.3)
 monitoring:
-  - prometheus:9090  # Metrics collection
-  - grafana:3003     # Visualization
-  - loki:3100        # Log aggregation
-  - jaeger:16686     # Distributed tracing
+  - prometheus:9090 # Metrics collection
+  - grafana:3003 # Visualization
+  - loki:3100 # Log aggregation
+  - jaeger:16686 # Distributed tracing
   - alertmanager:9093 # Alert management
 ```
 
@@ -409,6 +462,7 @@ open http://localhost:16686
 ### Available Metrics
 
 All services expose metrics at `/metrics`:
+
 - API Service: http://localhost:3000/metrics
 - Data Service: http://localhost:3001/metrics
 - Orchestrator: http://localhost:3002/metrics
@@ -419,6 +473,7 @@ See [Monitoring Guide](./docs/MONITORING.md) for detailed documentation.
 ## 🐛 Troubleshooting
 
 ### Database Connection Issues
+
 ```bash
 # Check if services are running
 docker compose ps
@@ -431,6 +486,7 @@ docker compose logs postgres
 ```
 
 ### Python Backend Issues
+
 ```bash
 # Verify virtual environment is activated
 source apps/backend/venv/bin/activate
@@ -443,6 +499,7 @@ pip install -r apps/backend/requirements.txt
 ```
 
 ### TypeScript Services Issues
+
 ```bash
 # Clear node_modules and reinstall
 pnpm clean
@@ -484,6 +541,7 @@ MIT License - see LICENSE file for details.
 ## 📞 Support
 
 For issues and questions:
+
 - Open an issue in the repository
 - Check the documentation in each service's directory
 - Review the troubleshooting guide above

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { loadEnv } from './env.js';
 
 export function getConfig() {
@@ -37,3 +38,4 @@ export function getConfig() {
 }
 
 export * from './env.js';
+export * from './security.config.js';
