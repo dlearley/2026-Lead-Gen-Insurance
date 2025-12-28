@@ -1,0 +1,32 @@
+# Staging environment values for api chart
+replicaCount: 2
+
+image:
+  repository: insurance-lead-gen-api
+  tag: "staging"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  hosts:
+    - host: staging-api.insurance-lead-gen.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+env:
+  NODE_ENV: "staging"
+  LOG_LEVEL: "debug"

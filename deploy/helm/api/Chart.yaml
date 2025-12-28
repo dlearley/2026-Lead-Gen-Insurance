@@ -1,0 +1,19 @@
+apiVersion: v2
+name: api
+description: Insurance Lead Gen API Service Helm Chart
+version: 1.0.0
+appVersion: "1.0.0"
+dependencies:
+  - name: common
+    version: "1.0.0"
+    repository: "file://../common"
+
+maintainers:
+  - name: Insurance AI Team
+    email: team@insurance-lead-gen.local
+
+keywords:
+  - insurance
+  - lead-generation
+  - api
+  - rest
