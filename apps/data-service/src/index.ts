@@ -23,6 +23,8 @@ import { RewardService } from './services/reward.service.js';
 import partnerRoutes from './routes/partners.routes.js';
 import referralRoutes from './routes/referrals.routes.js';
 import rewardRoutes from './routes/rewards.routes.js';
+import { default as biRoutes } from './routes/bi.routes.js';
+import { AdvancedAnalyticsService } from './services/advanced-analytics.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -43,11 +45,12 @@ const start = async (): Promise<void> => {
 
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
-  
+
   // Initialize referral services
   const partnerService = new PartnerService();
   const referralService = new ReferralService();
   const rewardService = new RewardService();
+  const advancedAnalyticsService = new AdvancedAnalyticsService();
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
@@ -59,6 +62,9 @@ const start = async (): Promise<void> => {
 
   // Setup customer portal routes
   app.use('/api/customers', customersRoutes);
+
+  // Setup BI routes
+  app.use('/api/v1/bi', biRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {

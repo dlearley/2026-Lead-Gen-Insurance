@@ -665,6 +665,9 @@ export * from './customers.js';
 // Report Types
 export * from './reports.js';
 
+// Business Intelligence Types
+export * from './bi.js';
+
 // Validation Schemas
 export * from './validation.js';
 export * from './scoring.js';

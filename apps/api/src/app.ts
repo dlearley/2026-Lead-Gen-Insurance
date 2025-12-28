@@ -19,6 +19,7 @@ import scoringRouter from './routes/scoring.js';
 import carriersRouter from './routes/carriers.js';
 import brokersRouter from './routes/brokers.js';
 import integrationsRouter from './routes/integrations.js';
+import biRouter from './routes/bi.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -56,6 +57,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/carriers', carriersRouter);
   app.use('/api/v1/brokers', brokersRouter);
   app.use('/api/v1/integrations', integrationsRouter);
+  app.use('/api/v1/bi', biRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -72,6 +74,7 @@ export function createApp(): express.Express {
   app.use('/api/carriers', carriersRouter);
   app.use('/api/brokers', brokersRouter);
   app.use('/api/integrations', integrationsRouter);
+  app.use('/api/bi', biRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
