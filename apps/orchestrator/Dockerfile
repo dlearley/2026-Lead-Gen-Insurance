@@ -26,4 +26,4 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 ENV NODE_ENV production
 EXPOSE 3002
-CMD ["node", "apps/orchestrator/dist/index.js"]
+CMD ["node", "apps/orchestrator/dist/server.js"]
