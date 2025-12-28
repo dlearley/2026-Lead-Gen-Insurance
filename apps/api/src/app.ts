@@ -20,6 +20,8 @@ import carriersRouter from './routes/carriers.js';
 import brokersRouter from './routes/brokers.js';
 import integrationsRouter from './routes/integrations.js';
 import biRouter from './routes/bi.js';
+import vipRouter from './routes/vip.js';
+import communityRouter from './routes/community.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -58,6 +60,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/brokers', brokersRouter);
   app.use('/api/v1/integrations', integrationsRouter);
   app.use('/api/v1/bi', biRouter);
+  app.use('/api/v1/vip', vipRouter);
+  app.use('/api/v1/community', communityRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -75,6 +79,8 @@ export function createApp(): express.Express {
   app.use('/api/brokers', brokersRouter);
   app.use('/api/integrations', integrationsRouter);
   app.use('/api/bi', biRouter);
+  app.use('/api/vip', vipRouter);
+  app.use('/api/community', communityRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

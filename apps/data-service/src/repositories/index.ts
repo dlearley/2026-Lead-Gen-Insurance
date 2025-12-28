@@ -5,3 +5,5 @@ export * from './lead-event.repository.js';
 export * from './partner.repository.js';
 export * from './referral.repository.js';
 export * from './reward.repository.js';
+export * from './vip.repository.js';
+export * from './community.repository.js';

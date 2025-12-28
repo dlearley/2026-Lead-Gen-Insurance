@@ -691,3 +691,7 @@ export * from './integrations.js';
 
 // Retention Types
 export * from './retention.js';
+
+// VIP & Community
+export * from './vip.js';
+export * from './community.js';

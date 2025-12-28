@@ -30,6 +30,8 @@ import { default as biRoutes } from './routes/bi.routes.js';
 import { AdvancedAnalyticsService } from './services/advanced-analytics.js';
 import { createRetentionRoutes } from './routes/retention.routes.js';
 import { createCampaignsRoutes } from './routes/campaigns.routes.js';
+import { createVIPRoutes } from './routes/vip.routes.js';
+import { createCommunityRoutes } from './routes/community.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -61,6 +63,8 @@ const start = async (): Promise<void> => {
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  app.use('/api/v1/vip', createVIPRoutes());
+  app.use('/api/v1/community', createCommunityRoutes());
 
   // Setup referral program routes
   app.use('/api/v1/partners', partnerRoutes);
@@ -76,6 +80,10 @@ const start = async (): Promise<void> => {
   // Setup retention routes
   app.use('/api/v1/retention', createRetentionRoutes());
   app.use('/api/v1/retention', createCampaignsRoutes());
+
+  // Setup VIP and community routes
+  app.use('/api/v1/vip', createVIPRoutes());
+  app.use('/api/v1/community', createCommunityRoutes());
 
   // Health check endpoint
   app.get('/health', (req, res) => {

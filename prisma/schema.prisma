@@ -72,6 +72,10 @@ model Agent {
   // Relationships
   assignments         LeadAssignment[]
   retentionAlerts     RetentionAlert[]
+  vipStatus           AgentVIPStatus?
+  communityPosts      CommunityPost[]
+  communityComments   CommunityComment[]
+  communityLikes      CommunityLike[]
 
   // Indexes
   @@index([email])
@@ -891,4 +895,100 @@ enum AlertStatus {
   SNOOZED
   RESOLVED
   DISMISSED
+}
+
+// VIP Tier Enum
+enum VIPTier {
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+// Post Category Enum
+enum PostCategory {
+  GENERAL
+  SUCCESS_STORY
+  TIP
+  QUESTION
+  ANNOUNCEMENT
+}
+
+// AgentVIPStatus model - tracks VIP status and points for agents
+model AgentVIPStatus {
+  id              String     @id @default(uuid())
+  agentId         String     @unique
+  tier            VIPTier    @default(SILVER)
+  points          Int        @default(0)
+  joinedAt        DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  expiresAt       DateTime?
+
+  // Relationships
+  agent           Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([agentId])
+  @@index([tier])
+}
+
+// CommunityPost model - for agent community engagement
+model CommunityPost {
+  id              String            @id @default(uuid())
+  authorId        String
+  title           String
+  content         String
+  category        PostCategory      @default(GENERAL)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  author          Agent             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments        CommunityComment[]
+  likes           CommunityLike[]
+
+  // Indexes
+  @@index([authorId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+// CommunityComment model
+model CommunityComment {
+  id              String            @id @default(uuid())
+  postId          String
+  authorId        String
+  content         String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  post            CommunityPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author          Agent             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes           CommunityLike[]
+
+  // Indexes
+  @@index([postId])
+  @@index([authorId])
+}
+
+// CommunityLike model - for posts and comments
+model CommunityLike {
+  id              String            @id @default(uuid())
+  agentId         String
+  postId          String?
+  commentId       String?
+  createdAt       DateTime          @default(now())
+
+  // Relationships
+  agent           Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  post            CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment         CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([agentId])
+  @@index([postId])
+  @@index([commentId])
+  @@unique([agentId, postId])
+  @@unique([agentId, commentId])
 }
