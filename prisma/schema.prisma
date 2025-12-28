@@ -183,6 +183,80 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
+// CustomerHealthScore model - predictive health scoring for customer success
+model CustomerHealthScore {
+  id                 String                   @id @default(uuid())
+  customerId         String                   @unique
+  overallScore       Int                      @default(0)
+  lastCalculated     DateTime                 @default(now())
+  previousScore      Int?
+  scoreChange        Int?
+  calculationVersion String                   @default("v1.0")
+  churnRisk          ChurnRiskLevel           @default(LOW)
+  churnProbability   Float                    @default(0.0)
+  riskFactors        Json?
+  recommendedActions String[]
+  autoTriggerActions String[]
+  scoringCategories  Json? // Store detailed category scores: engagement, satisfaction, usage, etc.
+  engagementScore    Int? // 0-100
+  satisfactionScore  Int? // 0-100
+  usageScore         Int? // 0-100
+  supportScore       Int? // 0-100
+  financialScore     Int? // 0-100
+  trend              ScoreTrend               @default(STABLE)
+  nextReviewDate     DateTime?
+  notes              String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  // Relationships
+  interventions      CustomerIntervention[]
+
+  // Indexes
+  @@index([overallScore])
+  @@index([churnRisk])
+  @@index([lastCalculated])
+  @@index([customerId])
+}
+
+// CustomerIntervention model - tracks retention efforts and outcomes
+model CustomerIntervention {
+  id                 String                 @id @default(uuid())
+  healthScoreId      String
+  customerId         String
+  interventionType   InterventionType
+  priority           PriorityLevel          @default(MEDIUM)
+  status             InterventionStatus     @default(PENDING)
+  title              String
+  description        String?
+  assignedTo         String? // Agent or team member ID
+  assignedAt         DateTime?
+  completedAt        DateTime?
+  dueDate            DateTime?
+  notes              String?
+  outcome            String? // SUCCESS, PARTIAL, FAILED, CUSTOMER_RESPONDED, etc.
+  outcomeNotes       String?
+  cost               Float? // Resource cost of intervention
+  effectivenessScore Int? // 0-100 - how effective was this intervention
+  triggerSource      String? // What triggered this intervention (alert, manual, scheduled)
+  metadata           Json? // Additional context
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  // Relationships
+  healthScore        CustomerHealthScore    @relation(fields: [healthScoreId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([healthScoreId])
+  @@index([customerId])
+  @@index([interventionType])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+  @@index([dueDate])
+  @@index([createdAt])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -222,4 +296,51 @@ enum PartnershipStatus {
   SUSPENDED
   TERMINATED
   RENEWAL_NEEDED
+}
+
+// Predictive Maintenance Enums
+enum ChurnRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ScoreTrend {
+  DECLINING
+  STABLE
+  IMPROVING
+}
+
+enum InterventionType {
+  PROACTIVE_OUTREACH
+  APPRECIATION_CALL
+  RENEWAL_REMINDER
+  POLICY_REVIEW
+  PREMIUM_ANALYSIS
+  CUSTOMER_FEEDBACK
+  RELATIONSHIP_BUILDING
+  EDUCATIONAL_TOUCHPOINT
+  REFERRAL_REQUEST
+  SPECIAL_OFFER
+  SURVEY_INVITATION
+  ACCOUNT_MANAGER_ASSIGNMENT
+  SWOOP_SAVE // Emergency intervention for high-risk customers
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum InterventionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+  DELAYED
 }
