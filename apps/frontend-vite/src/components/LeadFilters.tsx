@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { LeadStatus, LeadPriority } from '../types/lead';
+import { LeadStatus, LeadPriority } from '../types/lead';
 import './LeadFilters.css';
 
 interface LeadFiltersProps {

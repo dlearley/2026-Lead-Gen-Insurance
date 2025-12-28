@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { LeadStatus } from '../types/lead';
+import React from 'react';
+import { LeadStatus } from '../types/lead';
 import './StatusBadge.css';
 
 interface StatusBadgeProps {

@@ -1,22 +1,22 @@
 import React from 'react';
-import type { LeadDetail, ActivityType, StatusHistory, AssignmentHistory } from '../types/lead';
+import type { LeadDetail as LeadDetailType } from '../types/lead';
+import { ActivityType } from '../types/lead';
 import './LeadDetail.css';
 
 interface LeadDetailProps {
-  lead: LeadDetail;
+  lead: LeadDetailType;
   onClose: () => void;
   onEdit: () => void;
   onAssign: () => void;
-  onStatusChange: (status: any) => void;
+  onStatusChange: (status: string) => void;
 }
 
-export const LeadDetail: React.FC<LeadDetailProps> = ({
+export function LeadDetail({
   lead,
   onClose,
   onEdit,
   onAssign,
-  onStatusChange,
-}) => {
+}: LeadDetailProps): React.ReactElement {
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',

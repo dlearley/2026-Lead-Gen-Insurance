@@ -1,4 +1,5 @@
-import type { LeadSource, LeadSourceType } from '../types/user';
+import type { LeadSource } from '../types/user';
+import type { LeadSourceType } from '../types/lead';
 
 const API_BASE = '/api/v1';
 

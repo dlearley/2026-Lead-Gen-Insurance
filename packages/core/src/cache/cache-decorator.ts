@@ -1,5 +1,5 @@
 import { CacheManager } from './cache-manager.js';
-import { logger } from '../logger/index.js';
+import { logger } from '../logger.js';
 
 export interface CacheDecoratorOptions {
   ttl?: number;

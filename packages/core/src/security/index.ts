@@ -1,6 +1,6 @@
 // Rate Limiting
 export {
-  createRateLimiter,
+  createSecurityRateLimiter,
   rateLimitPresets,
   type RateLimitConfig,
   type RateLimitStore,

@@ -2,7 +2,6 @@ import React from "react";
 import { cn } from "@/utils/cn";
 import type { Lead, LeadStatus, LeadPriority } from "@/types/leads";
 import { StatusBadge } from "./StatusBadge";
-import { PriorityIndicator } from "./PriorityIndicator";
 import {
   Phone,
   Mail,

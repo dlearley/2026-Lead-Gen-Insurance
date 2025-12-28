@@ -13,7 +13,7 @@ import {
 import { leadSourceApi } from '../services/leadSourceApi';
 import { campaignApi } from '../services/campaignApi';
 import { leadApi } from '../services/leadApi';
-import type { Lead, LeadSource, Campaign, LeadStatus } from '../types';
+import type { Lead, LeadSource, Campaign } from '../types';
 import './LeadsPage.css';
 
 export const LeadsPage: React.FC = () => {
@@ -26,7 +26,6 @@ export const LeadsPage: React.FC = () => {
     totalPages,
     sortBy,
     sortOrder,
-    searchQuery,
     isLoading,
     error,
     fetchLeads,
@@ -39,7 +38,6 @@ export const LeadsPage: React.FC = () => {
     setPageSize,
     setSortBy,
     setSortOrder,
-    setSearchQuery,
   } = useLeads();
 
   const [sources, setSources] = useState<LeadSource[]>([]);
@@ -306,7 +304,7 @@ export const LeadsPage: React.FC = () => {
             setViewingLead(null);
             setShowAssignModal(true);
           }}
-          onStatusChange={(status) => {
+          onStatusChange={() => {
             setLeadToAssign(viewingLead);
             setViewingLead(null);
             setShowStatusModal(true);

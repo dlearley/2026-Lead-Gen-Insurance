@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLeadStore } from '../store/leadStore';
 import { leadApi } from '../services/leadApi';
 import type { Lead, LeadStatus, LeadPriority } from '../types/lead';

@@ -1,5 +1,5 @@
 import { Pool, PoolConfig } from 'pg';
-import { logger } from '../logger/index.js';
+import { logger } from '../logger.js';
 
 export interface ConnectionPoolOptions extends PoolConfig {
   name?: string;

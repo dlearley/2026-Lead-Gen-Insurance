@@ -30,8 +30,8 @@ export type TouchpointStatus =
   | 'responded'
   | 'failed';
 
-// Customer model - converted leads
-export interface Customer {
+// RetentionCustomer model - converted leads (renamed to avoid conflict with portal Customer)
+export interface RetentionCustomer {
   id: string;
   leadId: string;
   agentId: string;
@@ -63,8 +63,8 @@ export interface Customer {
   updatedAt: Date;
 }
 
-// Policy model
-export interface Policy {
+// RetentionPolicy model (renamed to avoid conflict with main Policy type)
+export interface RetentionPolicy {
   id: string;
   customerId: string;
   agentId: string;
@@ -333,7 +333,7 @@ export interface RetentionMetrics {
 }
 
 // DTOs
-export interface CreateCustomerDto {
+export interface CreateRetentionCustomerDto {
   leadId: string;
   agentId: string;
   firstName: string;
@@ -353,7 +353,7 @@ export interface CreateCustomerDto {
   metadata?: Record<string, unknown>;
 }
 
-export interface CreatePolicyDto {
+export interface CreateRetentionPolicyDto {
   customerId: string;
   agentId: string;
   policyNumber: string;
@@ -405,7 +405,7 @@ export interface CreateRetentionCampaignDto {
   };
 }
 
-export interface UpdateCustomerDto {
+export interface UpdateRetentionCustomerDto {
   firstName?: string;
   lastName?: string;
   email?: string;
@@ -424,7 +424,7 @@ export interface UpdateCustomerDto {
   metadata?: Record<string, unknown>;
 }
 
-export interface UpdatePolicyDto {
+export interface UpdateRetentionPolicyDto {
   status?: PolicyStatus;
   premium?: {
     amount: number;

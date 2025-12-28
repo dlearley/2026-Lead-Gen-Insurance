@@ -1,5 +1,5 @@
 import { Redis } from 'ioredis';
-import { logger } from '../logger/index.js';
+import { logger } from '../logger.js';
 
 export interface CacheOptions {
   ttl?: number;

@@ -117,7 +117,7 @@ class RedisStore implements RateLimitStore {
   }
 }
 
-export function createRateLimiter(config: RateLimitConfig) {
+export function createSecurityRateLimiter(config: RateLimitConfig) {
   const {
     windowMs,
     maxRequests,

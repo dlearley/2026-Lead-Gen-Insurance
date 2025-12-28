@@ -1,5 +1,6 @@
 import React from 'react';
-import type { Lead, LeadStatus, LeadPriority } from '../types/lead';
+import type { Lead } from '../types/lead';
+import { LeadStatus, LeadPriority } from '../types/lead';
 import './LeadsTable.css';
 
 interface LeadsTableProps {

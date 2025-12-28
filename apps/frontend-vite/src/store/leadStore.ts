@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { Lead, LeadFilters, LeadStatus, LeadPriority } from '../types/lead';
+import type { Lead, LeadFilters } from '../types/lead';
 
 interface LeadState {
   // Data

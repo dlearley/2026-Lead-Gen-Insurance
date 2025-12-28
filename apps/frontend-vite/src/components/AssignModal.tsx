@@ -4,13 +4,12 @@ import { agentApi } from '../services/agentApi';
 import './AssignModal.css';
 
 interface AssignModalProps {
-  leadId: number;
+  leadId?: number;
   onClose: () => void;
   onAssign: (agentId: string, reason?: string) => Promise<void>;
 }
 
 export const AssignModal: React.FC<AssignModalProps> = ({
-  leadId,
   onClose,
   onAssign,
 }) => {
@@ -123,7 +122,7 @@ export const AssignModal: React.FC<AssignModalProps> = ({
                         <div className="agent-email">{agent.email}</div>
                         <div className="agent-details">
                           <span className="agent-location">
-                            📍 {agent.city}, {agent.state}
+                            📍 {agent.location.city}, {agent.location.state}
                           </span>
                           {agent.specializations.length > 0 && (
                             <span className="agent-specializations">

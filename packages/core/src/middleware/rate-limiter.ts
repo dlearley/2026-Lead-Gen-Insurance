@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Redis } from 'ioredis';
-import { logger } from '../logger/index.js';
+import { logger } from '../logger.js';
 
 export interface RateLimiterOptions {
   windowMs: number;
@@ -58,15 +58,17 @@ export class RateLimiter {
         }
 
         const originalSend = res.send.bind(res);
-        res.send = function (body: any) {
+        const skipFailedRequests = this.options.skipFailedRequests;
+        const skipSuccessfulRequests = this.options.skipSuccessfulRequests;
+        res.send = function (body: unknown) {
           if (
-            (res.statusCode >= 400 && !this.options.skipFailedRequests) ||
-            (res.statusCode < 400 && !this.options.skipSuccessfulRequests)
+            (res.statusCode >= 400 && !skipFailedRequests) ||
+            (res.statusCode < 400 && !skipSuccessfulRequests)
           ) {
             // Request counted
           }
           return originalSend(body);
-        }.bind(this);
+        };
 
         next();
       } catch (error) {

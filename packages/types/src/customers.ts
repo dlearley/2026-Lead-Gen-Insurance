@@ -2,6 +2,59 @@
 // CUSTOMER TYPES
 // ========================================
 
+// Local type references to avoid circular imports
+type CustomerInsuranceType = 'auto' | 'home' | 'life' | 'health' | 'commercial';
+
+interface CustomerLeadRef {
+  id: string;
+  source: string;
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  insuranceType?: CustomerInsuranceType;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface CustomerLeadAssignmentRef {
+  id: string;
+  leadId: string;
+  agentId: string;
+  assignedAt: Date;
+  status: 'pending' | 'accepted' | 'rejected' | 'timeout';
+}
+
+interface CustomerQuoteRef {
+  id: string;
+  insuranceType: CustomerInsuranceType;
+  status: string;
+  premium: number;
+  totalCoverage: number;
+  validUntil: Date;
+  createdAt: Date;
+}
+
+interface CustomerProposalRef {
+  id: string;
+  title: string;
+  status: string;
+  totalPremium: number;
+  totalCoverage: number;
+  validUntil: Date;
+  createdAt: Date;
+}
+
+interface CustomerActivityLogRef {
+  id: string;
+  leadId: string;
+  activityType: string;
+  action: string;
+  description?: string;
+  createdAt: Date;
+}
+
 export interface Customer {
   id: string;
   leadId: string;
@@ -11,7 +64,7 @@ export interface Customer {
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
-  lead?: Lead;
+  lead?: CustomerLeadRef;
   profile?: CustomerProfile;
   documents?: CustomerDocument[];
 }
@@ -131,19 +184,19 @@ export interface ChangePasswordDto {
 // ========================================
 
 export interface CustomerDashboard {
-  lead: Lead;
-  assignments: LeadAssignment[];
-  quotes: Quote[];
-  proposals: Proposal[];
+  lead: CustomerLeadRef;
+  assignments: CustomerLeadAssignmentRef[];
+  quotes: CustomerQuoteRef[];
+  proposals: CustomerProposalRef[];
   pendingDocuments: number;
   unreadMessages: number;
-  recentActivity: ActivityLog[];
+  recentActivity: CustomerActivityLogRef[];
 }
 
 export interface CustomerQuote {
   id: string;
   quoteId: string;
-  insuranceType: InsuranceType;
+  insuranceType: CustomerInsuranceType;
   coverageTier: string;
   status: string;
   premium: number;

@@ -2,6 +2,7 @@
 // This schema defines the relational data model for PostgreSQL
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { PageSpinner } from "@/ui/Spinner";
+import { PageSpinner } from "@/components/ui/Spinner";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

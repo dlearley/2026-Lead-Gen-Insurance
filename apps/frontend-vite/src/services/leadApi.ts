@@ -9,8 +9,9 @@ import type {
   PaginatedResponse,
   BulkOperationResponse,
   ExportFormat,
-  LeadStats
+  LeadStats,
 } from '../types/lead';
+import { LeadStatus } from '../types/lead';
 
 const API_BASE = '/api/v1';
 

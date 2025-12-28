@@ -1,3 +1,5 @@
+import { LeadSourceType } from './lead';
+
 // User-related types
 export interface User {
   id: number;
@@ -22,18 +24,6 @@ export interface LeadSource {
   created_at: string;
   updated_at: string;
   lead_count: number;
-}
-
-export enum LeadSourceType {
-  WEB_FORM = 'web_form',
-  CALL = 'call',
-  REFERRAL = 'referral',
-  PAID_ADS = 'paid_ads',
-  ORGANIC = 'organic',
-  SOCIAL_MEDIA = 'social_media',
-  EMAIL = 'email',
-  PARTNER = 'partner',
-  OTHER = 'other'
 }
 
 // Campaign types
