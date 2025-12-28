@@ -388,3 +388,7 @@ export * from './reports.js';
 
 // Validation Schemas
 export * from './validation.js';
+
+// VIP & Community
+export * from './vip.js';
+export * from './community.js';

@@ -16,6 +16,8 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { createVIPRoutes } from './routes/vip.routes.js';
+import { createCommunityRoutes } from './routes/community.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -39,6 +41,8 @@ const start = async (): Promise<void> => {
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  app.use('/api/v1/vip', createVIPRoutes());
+  app.use('/api/v1/community', createCommunityRoutes());
 
   // Health check endpoint
   app.get('/health', (req, res) => {
