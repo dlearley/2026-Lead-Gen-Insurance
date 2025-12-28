@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -27,6 +28,8 @@ import referralRoutes from './routes/referrals.routes.js';
 import rewardRoutes from './routes/rewards.routes.js';
 import { default as biRoutes } from './routes/bi.routes.js';
 import { AdvancedAnalyticsService } from './services/advanced-analytics.js';
+import { createRetentionRoutes } from './routes/retention.routes.js';
+import { createCampaignsRoutes } from './routes/campaigns.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -58,7 +61,7 @@ const start = async (): Promise<void> => {
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
-  
+
   // Setup referral program routes
   app.use('/api/v1/partners', partnerRoutes);
   app.use('/api/v1/referrals', referralRoutes);
@@ -69,6 +72,10 @@ const start = async (): Promise<void> => {
 
   // Setup BI routes
   app.use('/api/v1/bi', biRoutes);
+
+  // Setup retention routes
+  app.use('/api/v1/retention', createRetentionRoutes());
+  app.use('/api/v1/retention', createCampaignsRoutes());
 
   // Health check endpoint
   app.get('/health', (req, res) => {
