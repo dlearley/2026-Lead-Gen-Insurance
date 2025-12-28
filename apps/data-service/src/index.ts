@@ -16,6 +16,7 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import brokerNetworkRoutes from './routes/broker-network.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -39,6 +40,9 @@ const start = async (): Promise<void> => {
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+
+  // Setup broker network routes
+  app.use('/api/broker-network', brokerNetworkRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {

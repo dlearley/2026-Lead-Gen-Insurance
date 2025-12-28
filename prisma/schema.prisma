@@ -64,6 +64,16 @@ model Agent {
 
   // Relationships
   assignments         LeadAssignment[]
+  networkProfile      BrokerNetwork?
+  connections         BrokerConnection[]        @relation("BrokerConnections")
+  connectedTo         BrokerConnection[]        @relation("ConnectedTo")
+  referralsSent       BrokerReferral[]          @relation("ReferralsSent")
+  referralsReceived   BrokerReferral[]          @relation("ReferralsReceived")
+  teamsAsLeader       BrokerTeam[]
+  teamMemberships     BrokerTeamMember[]
+  commissionSplits    CommissionSplit[]
+  networkEffects      NetworkEffect[]          @relation("NetworkEffectsSource")
+  affectedByEffects   NetworkEffect[]          @relation("NetworkEffectsAffected")
 
   // Indexes
   @@index([email])
@@ -116,7 +126,209 @@ model Event {
   @@index([timestamp])
 }
 
+// BrokerNetwork model - tracks broker's network profile and metrics
+model BrokerNetwork {
+  id                  String      @id @default(uuid())
+  brokerId            String      @unique
+  networkTier         NetworkTier @default(BRONZE)
+  totalConnections    Int         @default(0)
+  activeConnections   Int         @default(0)
+  networkValue        Float       @default(0.0)
+  networkScore        Float       @default(0.0)
+  referralMultiplier  Float       @default(1.0)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relationships
+  broker              Agent       @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([brokerId])
+  @@index([networkTier])
+  @@index([networkScore])
+}
+
+// BrokerConnection model - tracks connections between brokers
+model BrokerConnection {
+  id                  String                @id @default(uuid())
+  brokerId            String
+  connectedBrokerId   String
+  relationshipType    BrokerRelationshipType
+  strength            Float                 @default(0.5)
+  isActive            Boolean               @default(true)
+  referralCount       Int                   @default(0)
+  revenueGenerated    Float                 @default(0.0)
+  lastReferralAt      DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  // Relationships
+  broker              Agent                 @relation("BrokerConnections", fields: [brokerId], references: [id], onDelete: Cascade)
+  connectedBroker     Agent                 @relation("ConnectedTo", fields: [connectedBrokerId], references: [id], onDelete: Cascade)
+
+  // Unique constraint to prevent duplicate connections
+  @@unique([brokerId, connectedBrokerId])
+  @@index([brokerId])
+  @@index([connectedBrokerId])
+  @@index([relationshipType])
+  @@index([isActive])
+}
+
+// BrokerReferral model - tracks referrals between brokers
+model BrokerReferral {
+  id                  String              @id @default(uuid())
+  leadId              String
+  referringBrokerId   String
+  receivingBrokerId   String
+  status              ReferralStatus      @default(PENDING)
+  commissionRate      Float
+  commissionAmount    Float?
+  referralReason      String?
+  notes               String?             @db.Text
+  expiresAt           DateTime?
+  convertedAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Relationships
+  referringBroker     Agent               @relation("ReferralsSent", fields: [referringBrokerId], references: [id], onDelete: Cascade)
+  receivingBroker     Agent               @relation("ReferralsReceived", fields: [receivingBrokerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([leadId])
+  @@index([referringBrokerId])
+  @@index([receivingBrokerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+// BrokerTeam model - tracks broker teams
+model BrokerTeam {
+  id                  String      @id @default(uuid())
+  teamLeaderId        String
+  teamName            String
+  totalLeads          Int         @default(0)
+  totalConversions    Int         @default(0)
+  totalRevenue        Float       @default(0.0)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relationships
+  teamLeader          Agent       @relation(fields: [teamLeaderId], references: [id], onDelete: Cascade)
+  members             BrokerTeamMember[]
+
+  // Indexes
+  @@index([teamLeaderId])
+  @@index([teamName])
+}
+
+// BrokerTeamMember model - tracks team membership
+model BrokerTeamMember {
+  id              String      @id @default(uuid())
+  teamId          String
+  brokerId        String
+  joinedAt        DateTime    @default(now())
+  isActive        Boolean     @default(true)
+  leftAt          DateTime?
+
+  // Relationships
+  team            BrokerTeam  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  broker          Agent       @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+
+  // Unique constraint for one membership per broker
+  @@unique([teamId, brokerId])
+  @@index([teamId])
+  @@index([brokerId])
+  @@index([isActive])
+}
+
+// CommissionSplit model - tracks commission splits for referrals
+model CommissionSplit {
+  id              String            @id @default(uuid())
+  referralId      String
+  brokerId        String
+  splitPercentage Float
+  amount          Float
+  status          CommissionStatus  @default(PENDING)
+  processedAt     DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  broker          Agent             @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([referralId])
+  @@index([brokerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// NetworkEffect model - tracks network effects and their impact
+model NetworkEffect {
+  id                String              @id @default(uuid())
+  sourceBrokerId    String
+  affectedBrokerId  String
+  effectType        NetworkEffectType
+  value             Float
+  description       String              @db.Text
+  timestamp         DateTime            @default(now())
+  metadata          Json?
+
+  // Relationships
+  sourceBroker      Agent               @relation("NetworkEffectsSource", fields: [sourceBrokerId], references: [id], onDelete: Cascade)
+  affectedBroker    Agent               @relation("NetworkEffectsAffected", fields: [affectedBrokerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([sourceBrokerId])
+  @@index([affectedBrokerId])
+  @@index([effectType])
+  @@index([timestamp])
+}
+
 // Enums for type safety
+enum NetworkTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum BrokerRelationshipType {
+  DIRECT_REFERRAL
+  CROSS_REFERRAL
+  MENTORSHIP
+  PARTNERSHIP
+  TEAM_MEMBER
+  TEAM_LEADER
+  NETWORK_MEMBER
+}
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  CONVERTED
+  DECLINED
+  EXPIRED
+}
+
+enum CommissionStatus {
+  PENDING
+  PROCESSED
+  PAID
+}
+
+enum NetworkEffectType {
+  REFERRAL_BOOST
+  KNOWLEDGE_SHARING
+  RESOURCE_SHARING
+  MARKET_EXPANSION
+}
+
+// Original enums
 enum LeadStatus {
   RECEIVED
   PROCESSING
