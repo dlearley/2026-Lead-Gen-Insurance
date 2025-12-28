@@ -5,12 +5,23 @@ import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/analytics/MetricCard";
-import { Target, Users, TrendingUp, FileText, Brain, BarChart3 } from "lucide-react";
+import { FieldWorkWidget } from "@/components/leads/FieldWorkWidget";
+import { MobileQuickActions } from "@/components/leads/FieldWorkWidget";
+import { Target, Users, TrendingUp, FileText, Brain, BarChart3, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useState, useEffect } from "react";
 
 function DashboardContent() {
   const { data: dashboard, loading } = useAnalytics("7d");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -37,6 +48,12 @@ function DashboardContent() {
           <Link href="/leads/new">Add New Lead</Link>
         </Button>
       </div>
+
+      {isMobile && (
+        <div className="lg:hidden">
+          <FieldWorkWidget compact />
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
@@ -71,8 +88,12 @@ function DashboardContent() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="lg:col-span-1 xl:col-span-1 hidden lg:block">
+          <FieldWorkWidget />
+        </div>
+
+        <Card className="lg:col-span-1 xl:col-span-1">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>Latest actions from your team</CardDescription>
@@ -94,7 +115,7 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-1 xl:col-span-1">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Frequently used tasks</CardDescription>
@@ -107,10 +128,10 @@ function DashboardContent() {
                   Create New Lead
                 </Button>
               </Link>
-              <Link href="/users/new">
+              <Link href="/leads/nearby">
                 <Button variant="outline" className="w-full justify-start">
-                  <Users className="h-4 w-4 mr-2" />
-                  Add Team Member
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Find Nearby Leads
                 </Button>
               </Link>
               <Link href="/analytics">
@@ -135,6 +156,8 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </div>
+
+      {isMobile && <MobileQuickActions />}
     </div>
   );
 }
