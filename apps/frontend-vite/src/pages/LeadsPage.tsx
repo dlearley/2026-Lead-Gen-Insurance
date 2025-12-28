@@ -7,11 +7,13 @@ import {
   Pagination,
   LeadForm,
   LeadDetail,
+  AssignModal,
+  StatusChangeModal,
 } from '../components';
 import { leadSourceApi } from '../services/leadSourceApi';
 import { campaignApi } from '../services/campaignApi';
 import { leadApi } from '../services/leadApi';
-import type { Lead, LeadSource, Campaign } from '../types';
+import type { Lead, LeadSource, Campaign, LeadStatus } from '../types';
 import './LeadsPage.css';
 
 export const LeadsPage: React.FC = () => {
@@ -45,6 +47,9 @@ export const LeadsPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [viewingLead, setViewingLead] = useState<Lead | null>(null);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [leadToAssign, setLeadToAssign] = useState<Lead | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Load sources and campaigns
@@ -297,12 +302,44 @@ export const LeadsPage: React.FC = () => {
             setViewingLead(null);
           }}
           onAssign={() => {
-            // TODO: Implement assign modal
-            console.log('Assign lead:', viewingLead);
+            setLeadToAssign(viewingLead);
+            setViewingLead(null);
+            setShowAssignModal(true);
           }}
           onStatusChange={(status) => {
-            // TODO: Implement status change
-            console.log('Change status:', status);
+            setLeadToAssign(viewingLead);
+            setViewingLead(null);
+            setShowStatusModal(true);
+          }}
+        />
+      )}
+
+      {showAssignModal && leadToAssign && (
+        <AssignModal
+          leadId={leadToAssign.id}
+          onClose={() => {
+            setShowAssignModal(false);
+            setLeadToAssign(null);
+          }}
+          onAssign={async (agentId, reason) => {
+            await leadApi.assignLead(leadToAssign.id, { assignee_id: parseInt(agentId), reason });
+            showNotification('success', 'Lead assigned successfully!');
+            fetchLeads();
+          }}
+        />
+      )}
+
+      {showStatusModal && leadToAssign && (
+        <StatusChangeModal
+          currentStatus={leadToAssign.status}
+          onClose={() => {
+            setShowStatusModal(false);
+            setLeadToAssign(null);
+          }}
+          onStatusChange={async (newStatus, reason) => {
+            await leadApi.updateLeadStatus(leadToAssign.id, { status: newStatus, reason });
+            showNotification('success', 'Status changed successfully!');
+            fetchLeads();
           }}
         />
       )}
