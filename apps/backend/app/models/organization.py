@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from app.models.lead import Lead
     from app.models.campaign import Campaign
     from app.models.team import Team
+    from app.models.segmentation import Segment
+    from app.models.automation import Automation, EmailTemplate, ScheduledTask
 
 
 class Organization(Base, TimestampMixin):
@@ -42,6 +44,26 @@ class Organization(Base, TimestampMixin):
     )
     teams: Mapped[List["Team"]] = relationship(
         "Team",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    segments: Mapped[List["Segment"]] = relationship(
+        "Segment",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    automations: Mapped[List["Automation"]] = relationship(
+        "Automation",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    email_templates: Mapped[List["EmailTemplate"]] = relationship(
+        "EmailTemplate",
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+    scheduled_tasks: Mapped[List["ScheduledTask"]] = relationship(
+        "ScheduledTask",
         back_populates="organization",
         cascade="all, delete-orphan"
     )

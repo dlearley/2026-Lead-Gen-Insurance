@@ -174,7 +174,9 @@ class Lead(Base):
     activities = relationship("LeadActivity", back_populates="lead", order_by="LeadActivity.created_at.desc()")
     status_history = relationship("LeadStatusHistory", back_populates="lead", order_by="LeadStatusHistory.created_at.desc()")
     assignments = relationship("LeadAssignment", back_populates="lead", order_by="LeadAssignment.created_at.desc()")
-    
+    segments = relationship("Segment", secondary="lead_segments", back_populates="leads")
+    lead_segments = relationship("LeadSegment", back_populates="lead")
+
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
