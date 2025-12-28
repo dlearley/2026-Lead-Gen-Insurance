@@ -16,6 +16,9 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { CarrierService } from './services/carrier-service.js';
+import { CarrierRepository } from './repositories/carrier.repository.js';
+import { createCarrierRoutes } from './routes/carriers.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -36,9 +39,14 @@ const start = async (): Promise<void> => {
 
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
+  const carrierRepository = new CarrierRepository(prisma);
+  const carrierService = new CarrierService(carrierRepository);
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  
+  // Setup carrier routes
+  app.use('/api/v1/carriers', createCarrierRoutes(carrierService));
 
   // Health check endpoint
   app.get('/health', (req, res) => {

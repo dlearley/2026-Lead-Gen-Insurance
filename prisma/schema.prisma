@@ -2,7 +2,6 @@
 // This schema defines the relational data model for PostgreSQL
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -116,6 +115,73 @@ model Event {
   @@index([timestamp])
 }
 
+// Carrier model - stores insurance carrier information and partnership details
+model Carrier {
+  id                  String     @id @default(uuid())
+  name                String
+  description         String?
+  website             String?
+  contactEmail        String
+  contactPhone        String
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  country             String?
+  partnershipTier     PartnershipTier @default(BASIC)
+  partnershipStatus   PartnershipStatus @default(ACTIVE)
+  contractStartDate   DateTime
+  contractEndDate     DateTime?
+  commissionRate      Float      @default(0.0)
+  isActive            Boolean    @default(true)
+  integrationEnabled  Boolean    @default(false)
+  apiEndpoint         String?
+  apiKey              String?
+  performanceScore    Float      @default(0.0)
+  conversionRate      Float      @default(0.0)
+  averageResponseTime Float      @default(0.0)
+  totalLeadsReceived  Int        @default(0)
+  totalLeadsConverted Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  performanceMetrics CarrierPerformanceMetric[]
+
+  // Indexes
+  @@index([name])
+  @@index([partnershipStatus])
+  @@index([partnershipTier])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+// CarrierPerformanceMetric model - tracks carrier performance over time
+model CarrierPerformanceMetric {
+  id                    String     @id @default(uuid())
+  carrierId             String
+  month                 Int
+  year                  Int
+  leadsReceived         Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  averageResponseTime   Float      @default(0.0)
+  averageQuoteValue     Float      @default(0.0)
+  customerSatisfaction  Float      @default(0.0)
+  onTimeDeliveryRate    Float      @default(0.0)
+  createdAt             DateTime   @default(now())
+
+  // Relationships
+  carrier               Carrier    @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([carrierId])
+  @@index([year])
+  @@index([month])
+  @@index([createdAt])
+  @@unique([carrierId, year, month])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -139,4 +205,20 @@ enum InsuranceType {
   LIFE
   HEALTH
   COMMERCIAL
+}
+
+enum PartnershipTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ELITE
+  STRATEGIC
+}
+
+enum PartnershipStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  TERMINATED
+  RENEWAL_NEEDED
 }
