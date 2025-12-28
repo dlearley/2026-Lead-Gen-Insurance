@@ -2,8 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
-import { validateBody } from '../utils/validation.js';
-import { createLeadSchema, updateLeadSchema } from '../utils/validation.js';
+import { createLeadSchema, leadListSchema, updateLeadSchema, validateBody, validateQuery } from '../utils/validation.js';
 import { store, generateId } from '../storage/in-memory.js';
 import type { Lead } from '@insurance-lead-gen/types';
 import { logger } from '@insurance-lead-gen/core';
@@ -59,6 +58,51 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
       return;
     }
     logger.error('Error creating lead', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const filters = validateQuery(leadListSchema, req.query);
+
+    let leads = Array.from(store.leads.values());
+
+    if (filters.status) {
+      leads = leads.filter((l) => l.status.toUpperCase() === filters.status);
+    }
+
+    if (filters.insuranceType) {
+      leads = leads.filter((l) => l.insuranceType?.toUpperCase() === filters.insuranceType);
+    }
+
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      leads = leads.filter((l) => {
+        const blob = `${l.firstName ?? ''} ${l.lastName ?? ''} ${l.email ?? ''} ${l.phone ?? ''}`.toLowerCase();
+        return blob.includes(s);
+      });
+    }
+
+    leads.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    const total = leads.length;
+    const data = leads.slice(filters.skip, filters.skip + filters.take);
+
+    res.json({
+      data,
+      pagination: {
+        skip: filters.skip,
+        take: filters.take,
+        total,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation error', details: error.errors });
+      return;
+    }
+    logger.error('Error listing leads', { error });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -313,6 +357,64 @@ router.post('/:leadId/assign/:agentId', authMiddleware, async (req: Request, res
     });
   } catch (error) {
     logger.error('Error assigning lead', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:leadId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { leadId } = req.params;
+
+    const lead = store.leads.get(leadId);
+    if (!lead) {
+      res.status(404).json({ error: 'Lead not found' });
+      return;
+    }
+
+    const assignmentsToDelete: string[] = [];
+    for (const [id, a] of store.assignments.entries()) {
+      if (a.leadId === leadId) {
+        assignmentsToDelete.push(id);
+      }
+    }
+
+    for (const assignmentId of assignmentsToDelete) {
+      const assignment = store.assignments.get(assignmentId);
+      if (assignment) {
+        const agent = store.agents.get(assignment.agentId);
+        if (agent && agent.currentLeadCount > 0) {
+          agent.currentLeadCount -= 1;
+          store.agents.set(agent.id, agent);
+        }
+      }
+      store.assignments.delete(assignmentId);
+    }
+
+    for (const [id, note] of store.notes.entries()) {
+      if (note.leadId === leadId) store.notes.delete(id);
+    }
+
+    for (const [id, task] of store.tasks.entries()) {
+      if (task.leadId === leadId) store.tasks.delete(id);
+    }
+
+    for (const [id, email] of store.emails.entries()) {
+      if (email.leadId === leadId) store.emails.delete(id);
+    }
+
+    for (const [id, activity] of store.activities.entries()) {
+      if (activity.leadId === leadId) store.activities.delete(id);
+    }
+
+    for (const [id, policy] of store.policies.entries()) {
+      if (policy.leadId === leadId) store.policies.delete(id);
+    }
+
+    store.leads.delete(leadId);
+
+    res.status(204).send();
+  } catch (error) {
+    logger.error('Error deleting lead', { error });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

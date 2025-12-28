@@ -173,6 +173,88 @@ export const updateLeadSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+export const leadListSchema = z.object({
+  skip: z.coerce.number().int().nonnegative().default(0),
+  take: z.coerce.number().int().positive().max(100).default(20),
+  status: z
+    .enum(['RECEIVED', 'PROCESSING', 'QUALIFIED', 'ROUTED', 'CONVERTED', 'REJECTED'])
+    .optional(),
+  insuranceType: z.enum(['AUTO', 'HOME', 'LIFE', 'HEALTH', 'COMMERCIAL']).optional(),
+  search: z.string().optional(),
+});
+
+// ========================================
+// POLICY VALIDATION SCHEMAS
+// ========================================
+
+const moneySchema = z.object({
+  amount: z.coerce.number().finite().nonnegative(),
+  currency: z.string().min(3).max(3).optional().default('USD'),
+});
+
+export const createPolicySchema = z.object({
+  agentId: z.string().uuid().optional(),
+  insuranceType: z.enum(['AUTO', 'HOME', 'LIFE', 'HEALTH', 'COMMERCIAL']).optional(),
+  carrier: z.string().max(200).optional(),
+  productName: z.string().max(200).optional(),
+  effectiveDate: z.string().datetime().optional(),
+  expirationDate: z.string().datetime().optional(),
+  premium: moneySchema,
+  billingFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL']).optional().default('MONTHLY'),
+  coverage: z.record(z.unknown()).optional(),
+});
+
+export const updatePolicySchema = z.object({
+  agentId: z.string().uuid().optional(),
+  carrier: z.string().max(200).optional(),
+  productName: z.string().max(200).optional(),
+  status: z.enum(['DRAFT', 'PENDING_PAYMENT', 'ACTIVE', 'CANCELLED', 'LAPSED', 'EXPIRED', 'NON_RENEWED']).optional(),
+  effectiveDate: z.string().datetime().optional(),
+  expirationDate: z.string().datetime().optional(),
+  premium: moneySchema.optional(),
+  billingFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL']).optional(),
+  coverage: z.record(z.unknown()).optional(),
+});
+
+export const policyFilterSchema = z.object({
+  status: z.enum(['DRAFT', 'PENDING_PAYMENT', 'ACTIVE', 'CANCELLED', 'LAPSED', 'EXPIRED', 'NON_RENEWED']).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const activatePolicySchema = z.object({
+  effectiveDate: z.string().datetime().optional(),
+});
+
+export const cancelPolicySchema = z.object({
+  cancelledAt: z.string().datetime().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export const createEndorsementSchema = z.object({
+  type: z.string().min(1).max(100),
+  effectiveDate: z.string().datetime().optional(),
+  description: z.string().max(2000).optional(),
+  changes: z.record(z.unknown()).optional(),
+  premiumDelta: z.coerce.number().finite().optional(),
+});
+
+export const renewPolicySchema = z.object({
+  effectiveDate: z.string().datetime(),
+  expirationDate: z.string().datetime(),
+  premium: moneySchema.optional(),
+});
+
+export const createInvoiceSchema = z.object({
+  invoiceNumber: z.string().max(100).optional(),
+  amount: moneySchema,
+  dueDate: z.string().datetime(),
+});
+
+export const payInvoiceSchema = z.object({
+  paidAt: z.string().datetime().optional(),
+});
+
 // Helper function to validate request body
 export function validateBody<T>(schema: z.ZodSchema<T>, data: unknown): T {
   return schema.parse(data);

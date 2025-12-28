@@ -1,7 +1,6 @@
 import request from 'supertest';
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { app } from '../app.js';
-import { logger } from '@insurance-lead-gen/core';
+import { describe, it, expect } from '@jest/globals';
+import { app } from '../../app.js';
 
 describe('API Health Integration Tests', () => {
   it('should return health status', async () => {
