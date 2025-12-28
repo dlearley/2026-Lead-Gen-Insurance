@@ -477,6 +477,9 @@ export interface ProcessingResult {
 export * from './events.js';
 export * from './analytics.js';
 
+// Customer Types
+export * from './customers.js';
+
 // Report Types
 export * from './reports.js';
 
