@@ -819,6 +819,9 @@ export * from './bi.js';
 export * from './validation.js';
 export * from './scoring.js';
 
+// API Ecosystem Types (Phase 11.4)
+export * from './api-ecosystem.js';
+
 // Integration Types
 export * from './integrations.js';
 
