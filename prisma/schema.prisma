@@ -223,3 +223,200 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// API Client model - represents external partner applications
+model ApiClient {
+  id                  String     @id @default(uuid())
+  name                String
+  description         String?
+  redirectUris        String[]
+  website             String?
+  logoUrl             String?
+  contactEmail        String
+  status              ApiClientStatus @default(ACTIVE)
+  rateLimitTier       RateLimitTier @default(BASIC)
+  webhookUrl          String?
+  webhookSecret       String?
+  scopes              String[]
+  metadata            Json?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  apiKeys             ApiKey[]
+  webhookSubscriptions WebhookSubscription[]
+  apiUsageLogs        ApiUsageLog[]
+  apiRateLimits       ApiRateLimit[]
+
+  // Indexes
+  @@index([status])
+  @@index([rateLimitTier])
+  @@index([contactEmail])
+  @@index([createdAt])
+}
+
+// API Key model - for authentication
+model ApiKey {
+  id                  String     @id @default(uuid())
+  clientId            String
+  keyId               String     @unique
+  keyHash             String
+  keyPrefix           String
+  name                String
+  status              ApiKeyStatus @default(ACTIVE)
+  lastUsedAt          DateTime?
+  expiresAt           DateTime?
+  scopes              String[]
+  rateLimitOverride   Int?
+  metadata            Json?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([clientId])
+  @@index([keyId])
+  @@index([keyPrefix])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// Webhook Subscription model - for event subscriptions
+model WebhookSubscription {
+  id                  String     @id @default(uuid())
+  clientId            String
+  url                 String
+  secret              String
+  events              String[]
+  status              WebhookStatus @default(ACTIVE)
+  retryConfig         Json?
+  metadata            Json?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  deliveries          WebhookDelivery[]
+
+  // Indexes
+  @@index([clientId])
+  @@index([status])
+  @@index([events])
+  @@index([createdAt])
+}
+
+// Webhook Delivery model - tracks webhook deliveries
+model WebhookDelivery {
+  id                  String     @id @default(uuid())
+  subscriptionId      String
+  eventType           String
+  payload             Json
+  responseCode        Int?
+  responseBody        String?
+  attemptCount        Int        @default(0)
+  status              DeliveryStatus @default(PENDING)
+  scheduledFor        DateTime   @default(now())
+  deliveredAt         DateTime?
+  nextRetryAt         DateTime?
+  errorMessage        String?
+  metadata            Json?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  subscription        WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([subscriptionId])
+  @@index([eventType])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([nextRetryAt])
+  @@index([createdAt])
+}
+
+// API Usage Log model - tracks API usage
+model ApiUsageLog {
+  id                  String     @id @default(uuid())
+  clientId            String
+  apiKeyId            String?
+  endpoint            String
+  method              String
+  statusCode          Int
+  responseTimeMs      Int
+  requestIp           String?
+  userAgent           String?
+  requestSize         Int?
+  responseSize        Int?
+  timestamp           DateTime   @default(now())
+
+  // Relationships
+  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([clientId])
+  @@index([endpoint])
+  @@index([method])
+  @@index([statusCode])
+  @@index([timestamp])
+  @@index([clientId, timestamp])
+}
+
+// API Rate Limit model - tracks rate limiting
+model ApiRateLimit {
+  id                  String     @id @default(uuid())
+  clientId            String
+  window              String
+  requestCount        Int        @default(0)
+  requestLimit        Int
+  resetAt             DateTime
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([clientId])
+  @@index([window])
+  @@index([resetAt])
+  @@unique([clientId, window])
+}
+
+// Enums for API Ecosystem
+enum ApiClientStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  PENDING_VERIFICATION
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum WebhookStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  RETRYING
+  MAX_RETRIES_EXCEEDED
+}
+
+enum RateLimitTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
