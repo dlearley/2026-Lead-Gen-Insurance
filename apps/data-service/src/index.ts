@@ -16,6 +16,8 @@ import {
 import { LeadRepository } from './repositories/lead.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { default as biRoutes } from './routes/bi.routes.js';
+import { AdvancedAnalyticsService } from './services/advanced-analytics.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -36,9 +38,13 @@ const start = async (): Promise<void> => {
 
   const leadRepository = new LeadRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
+  const advancedAnalyticsService = new AdvancedAnalyticsService();
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+  
+  // Setup BI routes
+  app.use('/api/v1/bi', biRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
