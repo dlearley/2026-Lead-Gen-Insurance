@@ -241,3 +241,6 @@ start().catch((error) => {
 setInterval(() => {
   logger.debug('Data service heartbeat');
 }, 60000);
+
+// Re-export for package consumers
+export { prisma, disconnectPrisma } from './database/prisma.client.js';

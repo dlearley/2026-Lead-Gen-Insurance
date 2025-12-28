@@ -23,6 +23,7 @@ import biRouter from './routes/bi.js';
 import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
+import brokerToolsRouter from './routes/broker-tools.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -52,6 +53,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/leads/:leadId/tasks', tasksRouter);
   app.use('/api/v1/leads/:leadId/policies', policiesRouter);
   app.use('/api/v1/leads/:leadId/send-email', sendEmailRouter);
+  app.use('/api/v1/leads/:leadId/broker-tools', brokerToolsRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/analytics', analyticsRouter);
   app.use('/api/v1/reports', reportsRouter);
@@ -72,6 +74,7 @@ export function createApp(): express.Express {
   app.use('/api/leads/:leadId/tasks', tasksRouter);
   app.use('/api/leads/:leadId/policies', policiesRouter);
   app.use('/api/leads/:leadId/send-email', sendEmailRouter);
+  app.use('/api/leads/:leadId/broker-tools', brokerToolsRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/reports', reportsRouter);
