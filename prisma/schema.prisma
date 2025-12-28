@@ -2,12 +2,11 @@
 // This schema defines the relational data model for PostgreSQL
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
+  output   = "../node_modules/@prisma/client"
 }
 
 // Lead model - stores all lead information
@@ -33,14 +32,6 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
-  customer        Customer?
-  referrals       Referral[]
-  churnPrediction ChurnPrediction?
-  touchpoints     CustomerTouchpoint[]
-  winBackOffers   WinBackOffer[]
-  engagement      CustomerEngagement?
-  retentionAlerts RetentionAlert[]
-  claims          Claim[]
 
   // Indexes for performance
   @@index([email])
@@ -72,12 +63,6 @@ model Agent {
 
   // Relationships
   assignments         LeadAssignment[]
-  retentionAlerts     RetentionAlert[]
-  vipStatus           AgentVIPStatus?
-  communityPosts      CommunityPost[]
-  communityComments   CommunityComment[]
-  communityLikes      CommunityLike[]
-  claims              Claim[]
 
   // Indexes
   @@index([email])
@@ -130,483 +115,71 @@ model Event {
   @@index([timestamp])
 }
 
-// Partner model - stores referral partner information
-model Partner {
-  id              String     @id @default(uuid())
-  userId          String?    // Link to existing user if applicable
-  firstName       String
-  lastName        String
-  email           String     @unique
-  phone           String
-  companyName     String?
-  referralCode    String     @unique
-  status          PartnerStatus @default(ACTIVE)
-  commissionRate  Float      @default(0.1) // 10% default commission
-  totalReferrals  Int        @default(0)
-  successfulReferrals Int     @default(0)
-  totalEarnings    Float      @default(0.0)
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  
-  // Relationships
-  referrals       Referral[]
-  rewards         Reward[]
-
-  // Indexes
-  @@index([email])
-  @@index([referralCode])
-  @@index([status])
-}
-
-// Referral model - tracks referred leads
-model Referral {
-  id              String     @id @default(uuid())
-  partnerId       String
-  leadId          String?    // Linked when lead is created
-  referralCode    String
-  source          ReferralSource
-  status          ReferralStatus @default(PENDING)
-  referredAt      DateTime   @default(now())
-  acceptedAt      DateTime?
-  rejectedAt      DateTime?
-  convertedAt     DateTime?
-  conversionValue Float?     // Value of converted lead
-  notes           String?
-  
-  // Relationships
-  partner         Partner    @relation(fields: [partnerId], references: [id])
-  lead            Lead?      @relation(fields: [leadId], references: [id])
-  reward          Reward?
-
-  // Indexes
-  @@index([partnerId])
-  @@index([leadId])
-  @@index([referralCode])
-  @@index([status])
-  @@index([referredAt])
-}
-
-// Reward model - tracks partner rewards
-model Reward {
-  id              String     @id @default(uuid())
-  partnerId       String
-  referralId      String     @unique
-  amount          Float
-  currency        String     @default("USD")
-  status          RewardStatus @default(PENDING)
-  calculatedAt    DateTime   @default(now())
-  paidAt          DateTime?
-  paymentMethod   String?
-  transactionId   String?
-  notes           String?
-  
-  // Relationships
-  partner         Partner    @relation(fields: [partnerId], references: [id])
-  referral        Referral   @relation(fields: [referralId], references: [id])
-
-  // Indexes
-  @@index([partnerId])
-  @@index([referralId])
-  @@index([status])
-  @@index([calculatedAt])
-}
-
-
-// RetentionCustomer model - converted leads become customers for retention tracking
-model RetentionCustomer {
-  id                      String      @id @default(uuid())
-  leadId                  String      @unique
-  agentId                 String
-  firstName               String
-  lastName                String
-  email                   String
-  phone                   String?
-  dateOfBirth             DateTime?
-  street                  String?
-  city                    String?
-  state                   String?
-  zipCode                 String?
-  country                 String?
-  customerSince           DateTime    @default(now())
-  totalPolicies           Int         @default(0)
-  activePolicies          Int         @default(0)
-  lifetimeValue           Float       @default(0.0)
-  satisfactionScore       Float?
-  healthScore             Float       @default(50.0)
-  churnRisk               ChurnRisk   @default(LOW)
-  lastContactDate         DateTime?
-  nextRenewalDate         DateTime?
-  preferredContactMethod  String?
-  tags                    String[]
-  metadata                Json?
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
+// Carrier model - stores insurance carrier information and partnership details
+model Carrier {
+  id                  String     @id @default(uuid())
+  name                String
+  description         String?
+  website             String?
+  contactEmail        String
+  contactPhone        String
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  country             String?
+  partnershipTier     PartnershipTier @default(BASIC)
+  partnershipStatus   PartnershipStatus @default(ACTIVE)
+  contractStartDate   DateTime
+  contractEndDate     DateTime?
+  commissionRate      Float      @default(0.0)
+  isActive            Boolean    @default(true)
+  integrationEnabled  Boolean    @default(false)
+  apiEndpoint         String?
+  apiKey              String?
+  performanceScore    Float      @default(0.0)
+  conversionRate      Float      @default(0.0)
+  averageResponseTime Float      @default(0.0)
+  totalLeadsReceived  Int        @default(0)
+  totalLeadsConverted Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   // Relationships
-  policies                RetentionPolicy[]
-  healthScores            CustomerHealthScore[]
-  ltvCalculations         CustomerLTV[]
-  touchpoints             CampaignTouchpoint[]
-  retentionEvents         RetentionEvent[]
+  performanceMetrics CarrierPerformanceMetric[]
 
   // Indexes
-  @@index([leadId])
-  @@index([agentId])
-  @@index([email])
-  @@index([churnRisk])
-  @@index([healthScore])
-  @@index([nextRenewalDate])
-  @@index([customerSince])
-}
-
-// RetentionPolicy model
-model RetentionPolicy {
-  id                  String        @id @default(uuid())
-  customerId          String
-  agentId             String
-  policyNumber        String        @unique
-  policyType          PolicyType
-  status              PolicyStatus  @default(ACTIVE)
-  premiumAmount       Float
-  premiumFrequency    String
-  premiumCurrency     String        @default("USD")
-  coverageType        String
-  coverageAmount      Float
-  coverageDeductible  Float?
-  coverageLimits      Json?
-  effectiveDate       DateTime
-  expirationDate      DateTime
-  renewalDate         DateTime
-  lastRenewalDate     DateTime?
-  renewalCount        Int           @default(0)
-  totalPaid           Float         @default(0.0)
-  claimsCount         Int           @default(0)
-  totalClaimAmount    Float         @default(0.0)
-  underwriter         String?
-  documents           String[]
-  metadata            Json?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  // Relationships
-  retentionCustomer   RetentionCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  retentionEvents     RetentionEvent[]
-
-  // Indexes
-  @@index([customerId])
-  @@index([agentId])
-  @@index([policyNumber])
-  @@index([status])
-  @@index([policyType])
-  @@index([renewalDate])
-  @@index([expirationDate])
-}
-
-// Customer Health Score tracking
-model CustomerHealthScore {
-  id                    String    @id @default(uuid())
-  customerId            String
-  overallScore          Float
-  engagementScore       Float
-  financialScore        Float
-  satisfactionScore     Float
-  lifecycleScore        Float
-  churnRisk             ChurnRisk
-  churnProbability      Float
-  riskFactors           Json
-  recommendations       String[]
-  calculatedAt          DateTime  @default(now())
-
-  // Relationships
-  retentionCustomer     RetentionCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([customerId])
-  @@index([overallScore])
-  @@index([churnRisk])
-  @@index([calculatedAt])
-}
-
-// Customer Lifetime Value tracking
-model CustomerLTV {
-  id                  String    @id @default(uuid())
-  customerId          String
-  currentLTV          Float
-  projectedLTV        Float
-  monthlyRevenue      Float
-  annualRevenue       Float
-  retentionRate       Float
-  averageLifespan     Float
-  acquisitionCost     Float
-  profitMargin        Float
-  totalRevenue        Float
-  totalCost           Float
-  netProfit           Float
-  revenueBreakdown    Json
-  tier                String
-  category            String
-  calculatedAt        DateTime  @default(now())
-
-  // Relationships
-  retentionCustomer   RetentionCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([customerId])
-  @@index([currentLTV])
-  @@index([tier])
-  @@index([category])
-  @@index([calculatedAt])
-}
-
-// Retention Campaign
-model RetentionCampaign {
-  id                    String          @id @default(uuid())
-  name                  String
-  description           String?
-  type                  CampaignType
-  status                CampaignStatus  @default(DRAFT)
-  targetSegment         Json
-  schedule              Json
-  touchpoints           Json
-  goals                 Json
-  customersTargeted     Int             @default(0)
-  customersReached      Int             @default(0)
-  customersEngaged      Int             @default(0)
-  customersRetained     Int             @default(0)
-  revenueGenerated      Float           @default(0.0)
-  roi                   Float           @default(0.0)
-  createdBy             String
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-
-  // Relationships
-  campaignTouchpoints   CampaignTouchpoint[]
-
-  // Indexes
-  @@index([type])
-  @@index([status])
-  @@index([createdBy])
+  @@index([name])
+  @@index([partnershipStatus])
+  @@index([partnershipTier])
+  @@index([isActive])
   @@index([createdAt])
 }
 
-// Campaign Touchpoint (individual interactions)
-model CampaignTouchpoint {
-  id              String            @id @default(uuid())
-  campaignId      String
-  customerId      String
-  type            TouchpointType
-  status          TouchpointStatus  @default(PENDING)
-  content         Json
-  scheduledFor    DateTime
-  sentAt          DateTime?
-  deliveredAt     DateTime?
-  openedAt        DateTime?
-  clickedAt       DateTime?
-  respondedAt     DateTime?
-  response        String?
-  metadata        Json?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+// CarrierPerformanceMetric model - tracks carrier performance over time
+model CarrierPerformanceMetric {
+  id                    String     @id @default(uuid())
+  carrierId             String
+  month                 Int
+  year                  Int
+  leadsReceived         Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  averageResponseTime   Float      @default(0.0)
+  averageQuoteValue     Float      @default(0.0)
+  customerSatisfaction  Float      @default(0.0)
+  onTimeDeliveryRate    Float      @default(0.0)
+  createdAt             DateTime   @default(now())
 
   // Relationships
-  campaign          RetentionCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  retentionCustomer RetentionCustomer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  carrier               Carrier    @relation(fields: [carrierId], references: [id], onDelete: Cascade)
 
   // Indexes
-  @@index([campaignId])
-  @@index([customerId])
-  @@index([status])
-  @@index([scheduledFor])
-}
-
-// Retention Event tracking
-model RetentionEvent {
-  id                String    @id @default(uuid())
-  customerId        String
-  policyId          String?
-  eventType         String
-  severity          String
-  data              Json
-  triggeredActions  String[]
-  timestamp         DateTime  @default(now())
-  metadata          Json?
-
-  // Relationships
-  retentionCustomer RetentionCustomer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  retentionPolicy   RetentionPolicy?    @relation(fields: [policyId], references: [id], onDelete: SetNull)
-
-  // Indexes
-  @@index([customerId])
-  @@index([policyId])
-  @@index([eventType])
-  @@index([severity])
-  @@index([timestamp])
-}
-
-// Customer churn prediction model
-model ChurnPrediction {
-  id                    String                @id @default(uuid())
-  leadId                String                @unique
-  churnProbability      Float                 // 0.0 to 1.0
-  churnRisk             ChurnRisk             // LOW, MEDIUM, HIGH, CRITICAL
-  primaryReason         String?
-  accuracyScore         Float?                // model confidence
-  predictionDate        DateTime              @default(now())
-  lastEngagementDate    DateTime?
-  daysSinceLastActivity Int                   @default(0)
-  keyRiskFactors        String[]              // JSON array of risk indicators
-
-  // Relationships
-  lead                  Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  campaigns             ChurnRetentionCampaign[]
-  alerts                RetentionAlert[]
-
-  @@index([churnRisk])
-  @@index([predictionDate])
-  @@index([leadId])
-}
-
-// Churn retention campaign management (separate from main RetentionCampaign)
-model ChurnRetentionCampaign {
-  id                  String              @id @default(uuid())
-  churnPredictionId   String?
-  name                String
-  description         String?
-  type                ChurnCampaignType
-  status              CampaignStatus      @default(DRAFT)
-  targetAudience      Json                // Filter criteria
-  startDate           DateTime?
-  endDate             DateTime?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-
-  // Metrics
-  leadsTargeted       Int                 @default(0)
-  leadsEngaged        Int                 @default(0)
-  leadsConverted      Int                 @default(0)
-  totalCost           Float               @default(0)
-  roi                 Float?              // Return on investment
-
-  // Relationships
-  churnPrediction     ChurnPrediction?    @relation(fields: [churnPredictionId], references: [id], onDelete: Cascade)
-  touchpoints         CustomerTouchpoint[]
-  offers              WinBackOffer[]
-
-  @@index([status])
-  @@index([type])
-  @@index([startDate])
-}
-
-// Customer touchpoints across channels
-model CustomerTouchpoint {
-  id                  String              @id @default(uuid())
-  leadId              String
-  retentionCampaignId String?
-  channel             ContactChannel
-  touchpointType      ChurnTouchpointType
-  sentAt              DateTime            @default(now())
-  openedAt            DateTime?
-  clickedAt           DateTime?
-  responseAt          DateTime?
-  status              TouchpointStatus    @default(SENT)
-  subject             String?
-  content             Json?               // Message content/attachments
-  metadata            Json?
-
-  // Relationships
-  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  retentionCampaign   ChurnRetentionCampaign?  @relation(fields: [retentionCampaignId], references: [id], onDelete: Cascade)
-
-  @@index([leadId])
-  @@index([channel])
-  @@index([sentAt])
-  @@index([status])
-}
-
-// Win-back offers and incentives
-model WinBackOffer {
-  id                  String              @id @default(uuid())
-  retentionCampaignId String?
-  leadId              String
-  offerType           OfferType
-  title               String
-  description         String?
-  discountPercentage  Float?              // e.g., 15% discount
-  discountAmount      Float?              // e.g., $200 off
-  premiumAdjustment   Float?              // Premium reduction amount
-  coverageEnhancement Json?               // Additional coverage details
-  conditions          String[]            // Requirements to qualify
-  validFrom           DateTime
-  validUntil          DateTime
-  status              OfferStatus         @default(DRAFT)
-  createdAt           DateTime            @default(now())
-  redeemedAt          DateTime?
-  acceptedAt          DateTime?
-  rejectionReason     String?
-
-  // Metrics
-  viewedCount         Int                 @default(0)
-  sharedCount         Int                 @default(0)
-
-  // Relationships
-  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  retentionCampaign   ChurnRetentionCampaign?  @relation(fields: [retentionCampaignId], references: [id], onDelete: Cascade)
-
-  @@index([leadId])
-  @@index([status])
-  @@index([validFrom, validUntil])
-}
-
-// Customer engagement tracking
-model CustomerEngagement {
-  id                  String              @id @default(uuid())
-  leadId              String              @unique
-  engagementScore     Int                 @default(0) // 0-100
-  lastActivityDate    DateTime            @default(now())
-  activityCount30d    Int                 @default(0) // Last 30 days
-  activityCount90d    Int                 @default(0) // Last 90 days
-  emailOpenRate       Float               @default(0) // Percentage
-  clickThroughRate    Float               @default(0) // Percentage
-  quoteRequests       Int                 @default(0)
-  proposalViews       Int                 @default(0)
-  websiteVisits       Int                 @default(0)
-  preferredChannel    ContactChannel?
-  preferredTime       String?             // e.g., "morning", "afternoon"
-  interests           String[]            // Tags from behavior
-
-  // Relationships
-  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@index([engagementScore])
-  @@index([activityCount30d])
-  @@index([leadId])
-}
-
-// Retention alerts for agents
-model RetentionAlert {
-  id                  String              @id @default(uuid())
-  leadId              String
-  agentId             String?
-  churnPredictionId   String?
-  alertType           AlertType
-  severity            AlertSeverity       @default(MEDIUM)
-  message             String
-  actionableSteps     String[]            // Recommended actions
-  status              AlertStatus         @default(ACTIVE)
-  createdAt           DateTime            @default(now())
-  acknowledgedAt      DateTime?
-  resolvedAt          DateTime?
-  snoozeUntil         DateTime?
-
-  // Relationships
-  lead                Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  agent               Agent?              @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  churnPrediction     ChurnPrediction?    @relation(fields: [churnPredictionId], references: [id], onDelete: Cascade)
-
-  @@index([leadId])
-  @@index([agentId])
-  @@index([status])
-  @@index([severity])
+  @@index([carrierId])
+  @@index([year])
+  @@index([month])
+  @@index([createdAt])
+  @@unique([carrierId, year, month])
 }
 
 // Enums for type safety
@@ -634,559 +207,18 @@ enum InsuranceType {
   COMMERCIAL
 }
 
-// Customer model - customer portal users linked to leads
-model Customer {
-  id            String   @id @default(uuid())
-  leadId        String   @unique
-  email         String   @unique
-  passwordHash  String
-  phoneNumber   String?
-  isVerified    Boolean  @default(false)
-  lastLoginAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relationships
-  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  profile       CustomerProfile?
-  documents     CustomerDocument[]
-  messages      CustomerMessage[]
-
-  // Indexes
-  @@index([email])
-  @@index([leadId])
-  @@index([isVerified])
+enum PartnershipTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ELITE
+  STRATEGIC
 }
 
-// CustomerProfile model - extended customer information
-model CustomerProfile {
-  id              String   @id @default(uuid())
-  customerId      String   @unique
-  dateOfBirth     DateTime?
-  preferredContact String  @default("email") // email, phone, both
-  address         Json?
-  emergencyContact Json?
-  preferences     Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([customerId])
-}
-
-// CustomerDocument model - documents uploaded by customers
-model CustomerDocument {
-  id            String   @id @default(uuid())
-  customerId    String
-  fileName      String
-  fileUrl       String
-  fileSize      Int
-  mimeType      String
-  documentType  String   // id_proof, income, address, other
-  status        String   @default("pending") // pending, verified, rejected
-  verifiedBy    String?  // agentId
-  verifiedAt    DateTime?
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relationships
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([customerId])
-  @@index([documentType])
-  @@index([status])
-}
-
-// CustomerMessage model - messages between customers and agents
-model CustomerMessage {
-  id            String   @id @default(uuid())
-  customerId    String
-  agentId       String?
-  senderType    String   // customer, agent, system
-  subject       String?
-  message       String
-  isRead        Boolean  @default(false)
-  readAt        DateTime?
-  createdAt     DateTime @default(now())
-
-  // Relationships
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([customerId])
-  @@index([agentId])
-  @@index([senderType])
-  @@index([createdAt])
-  @@index([isRead])
-}
-
-enum PartnerStatus {
+enum PartnershipStatus {
   ACTIVE
-  INACTIVE
+  PENDING
   SUSPENDED
   TERMINATED
-}
-
-enum ReferralSource {
-  WEBSITE
-  MOBILE_APP
-  EMAIL
-  PHONE
-  IN_PERSON
-  SOCIAL_MEDIA
-  OTHER
-}
-
-enum ReferralStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  CONVERTED
-  PAID
-  EXPIRED
-}
-
-enum RewardStatus {
-  PENDING
-  CALCULATED
-  APPROVED
-  PAID
-  CANCELLED
-}
-
-// Retention-specific enums
-enum PolicyStatus {
-  ACTIVE
-  PENDING_RENEWAL
-  EXPIRED
-  CANCELLED
-  LAPSED
-}
-
-enum PolicyType {
-  AUTO
-  HOME
-  LIFE
-  HEALTH
-  COMMERCIAL
-}
-
-enum ChurnRisk {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-// Retention campaign types (for main retention campaigns)
-enum CampaignType {
-  RENEWAL_REMINDER
-  ENGAGEMENT
-  WINBACK
-  CROSS_SELL
-  UPSELL
-  LOYALTY
-}
-
-// Churn-specific campaign types
-enum ChurnCampaignType {
-  EMAIL
-  SMS
-  CALL
-  MULTI_CHANNEL
-  WIN_BACK
-  RETENTION
-  REACTIVATION
-}
-
-enum CampaignStatus {
-  DRAFT
-  SCHEDULED
-  ACTIVE
-  RUNNING
-  PAUSED
-  COMPLETED
-  CANCELLED
-}
-
-// Contact channels for customer touchpoints
-enum ContactChannel {
-  EMAIL
-  SMS
-  CALL
-  WHATSAPP
-  DIRECT_MAIL
-  IN_APP
-}
-
-// Retention touchpoint types (for main campaigns)
-enum TouchpointType {
-  EMAIL
-  SMS
-  CALL
-  NOTIFICATION
-  MAIL
-}
-
-// Churn touchpoint types
-enum ChurnTouchpointType {
-  WELCOME
-  REMINDER
-  FOLLOWUP
-  EDUCATIONAL
-  PROMOTIONAL
-  SURVEY
-  WIN_BACK
-  RETENTION
-}
-
-enum TouchpointStatus {
-  PENDING
-  SENT
-  DELIVERED
-  OPENED
-  CLICKED
-  RESPONDED
-  BOUNCED
-  FAILED
-}
-
-enum OfferType {
-  DISCOUNT
-  PREMIUM_REDUCTION
-  COVERAGE_ENHANCEMENT
-  CASHBACK
-  REFERRAL_BONUS
-  LOYALTY_REWARD
-}
-
-enum OfferStatus {
-  DRAFT
-  SENT
-  VIEWED
-  ACCEPTED
-  REDEEMED
-  EXPIRED
-  REJECTED
-}
-
-enum AlertType {
-  HIGH_CHURN_RISK
-  LOW_ENGAGEMENT
-  STALE_LEAD
-  COMPETITOR_ALERT
-  PRICE_SENSITIVITY
-  SERVICE_COMPLAINT
-}
-
-enum AlertSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum AlertStatus {
-  ACTIVE
-  ACKNOWLEDGED
-  SNOOZED
-  RESOLVED
-  DISMISSED
-}
-
-// VIP Tier Enum
-enum VIPTier {
-  SILVER
-  GOLD
-  PLATINUM
-  DIAMOND
-}
-
-// Post Category Enum
-enum PostCategory {
-  GENERAL
-  SUCCESS_STORY
-  TIP
-  QUESTION
-  ANNOUNCEMENT
-}
-
-// AgentVIPStatus model - tracks VIP status and points for agents
-model AgentVIPStatus {
-  id              String     @id @default(uuid())
-  agentId         String     @unique
-  tier            VIPTier    @default(SILVER)
-  points          Int        @default(0)
-  joinedAt        DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  expiresAt       DateTime?
-
-  // Relationships
-  agent           Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([agentId])
-  @@index([tier])
-}
-
-// CommunityPost model - for agent community engagement
-model CommunityPost {
-  id              String            @id @default(uuid())
-  authorId        String
-  title           String
-  content         String
-  category        PostCategory      @default(GENERAL)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  // Relationships
-  author          Agent             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments        CommunityComment[]
-  likes           CommunityLike[]
-
-  // Indexes
-  @@index([authorId])
-  @@index([category])
-  @@index([createdAt])
-}
-
-// CommunityComment model
-model CommunityComment {
-  id              String            @id @default(uuid())
-  postId          String
-  authorId        String
-  content         String
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  // Relationships
-  post            CommunityPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author          Agent             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  likes           CommunityLike[]
-
-  // Indexes
-  @@index([postId])
-  @@index([authorId])
-}
-
-// CommunityLike model - for posts and comments
-model CommunityLike {
-  id              String            @id @default(uuid())
-  agentId         String
-  postId          String?
-  commentId       String?
-  createdAt       DateTime          @default(now())
-
-  // Relationships
-  agent           Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  post            CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment         CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([agentId])
-  @@index([postId])
-  @@index([commentId])
-  @@unique([agentId, postId])
-  @@unique([agentId, commentId])
-}
-
-// Phase 10.1: Claims Management Models
-
-// Claim model - stores all insurance claims
-model Claim {
-  id                    String          @id @default(uuid())
-  claimNumber           String          @unique
-  leadId                String
-  agentId               String?
-  policyNumber          String?
-  insuranceType         String
-  claimType             ClaimType
-  status                ClaimStatus     @default(DRAFT)
-  priority              ClaimPriority   @default(MEDIUM)
-  severity              ClaimSeverity   @default(MODERATE)
-
-  // Incident details
-  incidentDate          DateTime
-  incidentLocation      String?
-  incidentDescription   String          @db.Text
-
-  // Financial information
-  claimedAmount         Float
-  approvedAmount        Float?
-  deductible            Float?
-  paidAmount            Float?
-
-  // Timeline
-  submittedAt           DateTime?
-  reviewedAt            DateTime?
-  approvedAt            DateTime?
-  deniedAt              DateTime?
-  paidAt                DateTime?
-  closedAt              DateTime?
-
-  // Additional information
-  denialReason          String?         @db.Text
-  adjusterNotes         String?         @db.Text
-  fraudScore            Float?
-  metadata              Json?
-
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-
-  // Relationships
-  lead                  Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  agent                 Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  documents             ClaimDocument[]
-  notes                 ClaimNote[]
-  activities            ClaimActivity[]
-
-  // Indexes
-  @@index([claimNumber])
-  @@index([leadId])
-  @@index([agentId])
-  @@index([policyNumber])
-  @@index([insuranceType])
-  @@index([claimType])
-  @@index([status])
-  @@index([priority])
-  @@index([incidentDate])
-  @@index([submittedAt])
-  @@index([createdAt])
-}
-
-// ClaimDocument model - stores claim documents and attachments
-model ClaimDocument {
-  id              String            @id @default(uuid())
-  claimId         String
-  documentType    ClaimDocumentType
-  fileName        String
-  fileUrl         String
-  fileSize        Int
-  mimeType        String
-  uploadedBy      String
-  description     String?           @db.Text
-  isVerified      Boolean           @default(false)
-  verifiedBy      String?
-  verifiedAt      DateTime?
-  createdAt       DateTime          @default(now())
-
-  // Relationships
-  claim           Claim             @relation(fields: [claimId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([claimId])
-  @@index([documentType])
-  @@index([uploadedBy])
-  @@index([createdAt])
-}
-
-// ClaimNote model - stores notes and comments on claims
-model ClaimNote {
-  id              String      @id @default(uuid())
-  claimId         String
-  authorId        String
-  content         String      @db.Text
-  isInternal      Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  // Relationships
-  claim           Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([claimId])
-  @@index([authorId])
-  @@index([createdAt])
-}
-
-// ClaimActivity model - audit trail for claims
-model ClaimActivity {
-  id              String      @id @default(uuid())
-  claimId         String
-  userId          String?
-  activityType    String
-  action          String
-  description     String      @db.Text
-  oldValue        String?
-  newValue        String?
-  metadata        Json?
-  createdAt       DateTime    @default(now())
-
-  // Relationships
-  claim           Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([claimId])
-  @@index([userId])
-  @@index([activityType])
-  @@index([createdAt])
-}
-
-// Enums for Claims
-
-enum ClaimType {
-  AUTO_ACCIDENT
-  AUTO_THEFT
-  AUTO_VANDALISM
-  HOME_PROPERTY_DAMAGE
-  HOME_THEFT
-  HOME_FIRE
-  HOME_WATER_DAMAGE
-  HOME_NATURAL_DISASTER
-  LIFE_DEATH
-  LIFE_TERMINAL_ILLNESS
-  HEALTH_MEDICAL
-  HEALTH_HOSPITALIZATION
-  HEALTH_SURGERY
-  LIABILITY_PERSONAL
-  LIABILITY_PROFESSIONAL
-  OTHER
-}
-
-enum ClaimStatus {
-  DRAFT
-  SUBMITTED
-  UNDER_REVIEW
-  INVESTIGATING
-  AWAITING_INFORMATION
-  APPROVED
-  DENIED
-  IN_PAYMENT
-  PAID
-  CLOSED
-  DISPUTED
-  CANCELLED
-}
-
-enum ClaimPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum ClaimSeverity {
-  MINOR
-  MODERATE
-  MAJOR
-  CATASTROPHIC
-}
-
-enum ClaimDocumentType {
-  POLICE_REPORT
-  MEDICAL_RECORD
-  PHOTO_EVIDENCE
-  REPAIR_ESTIMATE
-  INVOICE
-  RECEIPT
-  WITNESS_STATEMENT
-  INSURANCE_CARD
-  DRIVERS_LICENSE
-  INCIDENT_REPORT
-  OTHER
+  RENEWAL_NEEDED
 }

@@ -439,6 +439,136 @@ export interface NotificationFilterParams {
   limit?: number;
 }
 
+// ========================================
+// CARRIER TYPES
+// ========================================
+
+export type PartnershipTier = 'basic' | 'standard' | 'premium' | 'elite' | 'strategic';
+export type PartnershipStatus = 'active' | 'pending' | 'suspended' | 'terminated' | 'renewal_needed';
+
+export interface Carrier {
+  id: string;
+  name: string;
+  description?: string;
+  website?: string;
+  contactEmail: string;
+  contactPhone: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  partnershipTier: PartnershipTier;
+  partnershipStatus: PartnershipStatus;
+  contractStartDate: Date;
+  contractEndDate?: Date;
+  commissionRate: number;
+  isActive: boolean;
+  integrationEnabled: boolean;
+  apiEndpoint?: string;
+  apiKey?: string;
+  performanceScore: number;
+  conversionRate: number;
+  averageResponseTime: number;
+  totalLeadsReceived: number;
+  totalLeadsConverted: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CarrierPerformanceMetric {
+  id: string;
+  carrierId: string;
+  month: number;
+  year: number;
+  leadsReceived: number;
+  leadsConverted: number;
+  conversionRate: number;
+  averageResponseTime: number;
+  averageQuoteValue: number;
+  customerSatisfaction: number;
+  onTimeDeliveryRate: number;
+  createdAt: Date;
+}
+
+export interface CreateCarrierDto {
+  name: string;
+  description?: string;
+  website?: string;
+  contactEmail: string;
+  contactPhone: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  partnershipTier?: PartnershipTier;
+  partnershipStatus?: PartnershipStatus;
+  contractStartDate: Date;
+  contractEndDate?: Date;
+  commissionRate?: number;
+  isActive?: boolean;
+  integrationEnabled?: boolean;
+  apiEndpoint?: string;
+  apiKey?: string;
+}
+
+export interface UpdateCarrierDto {
+  name?: string;
+  description?: string;
+  website?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  partnershipTier?: PartnershipTier;
+  partnershipStatus?: PartnershipStatus;
+  contractStartDate?: Date;
+  contractEndDate?: Date;
+  commissionRate?: number;
+  isActive?: boolean;
+  integrationEnabled?: boolean;
+  apiEndpoint?: string;
+  apiKey?: string;
+}
+
+export interface CarrierFilterParams {
+  name?: string;
+  partnershipStatus?: PartnershipStatus | PartnershipStatus[];
+  partnershipTier?: PartnershipTier | PartnershipTier[];
+  isActive?: boolean;
+  integrationEnabled?: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateCarrierPerformanceMetricDto {
+  carrierId: string;
+  month: number;
+  year: number;
+  leadsReceived: number;
+  leadsConverted: number;
+  conversionRate: number;
+  averageResponseTime: number;
+  averageQuoteValue: number;
+  customerSatisfaction: number;
+  onTimeDeliveryRate: number;
+}
+
+export interface UpdateCarrierPerformanceMetricDto {
+  leadsReceived?: number;
+  leadsConverted?: number;
+  conversionRate?: number;
+  averageResponseTime?: number;
+  averageQuoteValue?: number;
+  customerSatisfaction?: number;
+  onTimeDeliveryRate?: number;
+}
+
 export interface Agent {
   id: string;
   firstName: string;

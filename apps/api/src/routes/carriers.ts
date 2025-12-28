@@ -1,159 +1,48 @@
-import { Router, Request, Response } from 'express';
+import express from 'express';
+import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
-const router = Router();
 const config = getConfig();
+const router = express.Router();
 
-/**
- * Proxy requests to data service for carriers
- */
-const DATA_SERVICE_URL = `http://localhost:${config.ports.dataService || 3001}`;
-
-/**
- * GET /api/v1/carriers
- * Proxy to data service
- */
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers?${new URLSearchParams(req.query as Record<string, string>)}`);
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch carriers' });
-  }
-});
-
-/**
- * GET /api/v1/carriers/:id
- * Proxy to data service
- */
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}`);
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch carrier' });
-  }
-});
-
-/**
- * POST /api/v1/carriers
- * Proxy to data service
- */
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+// Proxy carrier requests to data service
+const carrierProxy = createProxyMiddleware({
+  target: `http://localhost:${config.ports.dataService}`,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/v1/carriers': '/api/v1/carriers',
+    '^/api/carriers': '/api/v1/carriers',
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    logger.debug('Proxying carrier request', {
+      method: req.method,
+      path: req.path,
+      target: `http://localhost:${config.ports.dataService}${req.path}`,
     });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create carrier' });
-  }
+  },
+  onError: (err, req, res) => {
+    logger.error('Carrier proxy error', { error: err, path: req.path });
+    res.status(500).json({ error: 'Proxy error' });
+  },
 });
 
-/**
- * PUT /api/v1/carriers/:id
- * Proxy to data service
- */
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update carrier' });
-  }
-});
-
-/**
- * PATCH /api/v1/carriers/:id
- * Proxy to data service
- */
-router.patch('/:id', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update carrier' });
-  }
-});
-
-/**
- * DELETE /api/v1/carriers/:id
- * Proxy to data service
- */
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}`, {
-      method: 'DELETE',
-    });
-    res.status(response.status).send();
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete carrier' });
-  }
-});
-
-/**
- * POST /api/v1/carriers/:id/test
- * Test carrier integration
- */
-router.post('/:id/test', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to test carrier integration' });
-  }
-});
-
-/**
- * GET /api/v1/carriers/:id/health
- * Get carrier health status
- */
-router.get('/:id/health', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}/health`);
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to get carrier health' });
-  }
-});
-
-/**
- * POST /api/v1/carriers/:id/leads
- * Submit a lead to a carrier
- */
-router.post('/:id/leads', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/carriers/${req.params.id}/leads`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to submit lead to carrier' });
-  }
-});
+// Carrier routes
+router.post('/', carrierProxy);
+router.get('/', carrierProxy);
+router.get('/:id', carrierProxy);
+router.get('/:id/performance', carrierProxy);
+router.put('/:id', carrierProxy);
+router.delete('/:id', carrierProxy);
+router.post('/:id/performance', carrierProxy);
+router.get('/:id/performance/metrics', carrierProxy);
+router.put('/:id/performance/metrics/:metricId', carrierProxy);
+router.post('/:id/performance/calculate', carrierProxy);
+router.get('/top-performing', carrierProxy);
+router.get('/needing-attention', carrierProxy);
+router.put('/:id/partnership-tier', carrierProxy);
+router.put('/:id/partnership-status', carrierProxy);
+router.get('/:id/performance/trends', carrierProxy);
+router.post('/compare', carrierProxy);
 
 export default router;

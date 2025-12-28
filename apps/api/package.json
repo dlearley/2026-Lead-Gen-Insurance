@@ -37,7 +37,8 @@
     "@opentelemetry/api": "^1.7.0",
     "@opentelemetry/sdk-node": "^0.46.0",
     "@opentelemetry/auto-instrumentations-node": "^0.40.0",
-    "@opentelemetry/exporter-jaeger": "^1.19.0"
+    "@opentelemetry/exporter-jaeger": "^1.19.0",
+    "http-proxy-middleware": "^2.0.6"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.3.0",

@@ -1,181 +1,222 @@
-import { Router, Request, Response } from 'express';
-import { CarrierIntegrationService } from '../services/carrier-integration.service.js';
-import { CreateInsuranceCarrierDto, UpdateInsuranceCarrierDto, InsuranceCarrierFilterParams } from '@insurance/types';
-import logger from '../logger.js';
+import express from 'express';
+import { CarrierService } from '../services/carrier-service.js';
+import { logger } from '@insurance-lead-gen/core';
 
-const router = Router();
-const carrierService = new CarrierIntegrationService();
+export function createCarrierRoutes(carrierService: CarrierService): express.Router {
+  const router = express.Router();
 
-/**
- * GET /api/v1/carriers
- * Get all insurance carriers with filtering and pagination
- */
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const filters: InsuranceCarrierFilterParams = {
-      code: req.query.code as string,
-      isActive: req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined,
-      integrationType: req.query.integrationType as any,
-      isPrimary: req.query.isPrimary === 'true' ? true : req.query.isPrimary === 'false' ? false : undefined,
-      supportedProduct: req.query.supportedProduct as string,
-      page: req.query.page ? parseInt(req.query.page as string) : undefined,
-      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-      sortBy: req.query.sortBy as string,
-      sortOrder: req.query.sortOrder as 'asc' | 'desc',
-    };
-
-    const result = await carrierService.getCarriers(filters);
-    res.json(result);
-  } catch (error) {
-    logger.error('Error getting carriers', { error });
-    res.status(500).json({ error: 'Failed to get carriers' });
-  }
-});
-
-/**
- * GET /api/v1/carriers/:id
- * Get a specific carrier by ID
- */
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const carrier = await carrierService.getCarrierById(id);
-
-    if (!carrier) {
-      return res.status(404).json({ error: 'Carrier not found' });
-    }
-
-    res.json(carrier);
-  } catch (error) {
-    logger.error('Error getting carrier', { id: req.params.id, error });
-    res.status(500).json({ error: 'Failed to get carrier' });
-  }
-});
-
-/**
- * POST /api/v1/carriers
- * Create a new insurance carrier
- */
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const data: CreateInsuranceCarrierDto = req.body;
-    const carrier = await carrierService.createCarrier(data);
-    res.status(201).json(carrier);
-  } catch (error) {
-    logger.error('Error creating carrier', { error });
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
-      res.status(409).json({ error: 'Carrier code already exists' });
-    } else {
+  // Create a new carrier
+  router.post('/', async (req, res) => {
+    try {
+      const carrier = await carrierService.createCarrier(req.body);
+      logger.info('Carrier created via API', { carrierId: carrier.id });
+      res.status(201).json(carrier);
+    } catch (error) {
+      logger.error('Failed to create carrier via API', { error });
       res.status(500).json({ error: 'Failed to create carrier' });
     }
-  }
-});
+  });
 
-/**
- * PUT /api/v1/carriers/:id
- * Update an existing carrier
- */
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const data: UpdateInsuranceCarrierDto = req.body;
-    const carrier = await carrierService.updateCarrier(id, data);
-    res.json(carrier);
-  } catch (error) {
-    logger.error('Error updating carrier', { id: req.params.id, error });
-    res.status(500).json({ error: 'Failed to update carrier' });
-  }
-});
+  // Get all carriers
+  router.get('/', async (req, res) => {
+    try {
+      const filters = {
+        name: req.query.name as string | undefined,
+        partnershipStatus: req.query.partnershipStatus as any,
+        partnershipTier: req.query.partnershipTier as any,
+        isActive: req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined,
+        integrationEnabled: req.query.integrationEnabled === 'true' ? true : req.query.integrationEnabled === 'false' ? false : undefined,
+        search: req.query.search as string | undefined,
+      };
 
-/**
- * PATCH /api/v1/carriers/:id
- * Partially update a carrier
- */
-router.patch('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const data: UpdateInsuranceCarrierDto = req.body;
-    const carrier = await carrierService.updateCarrier(id, data);
-    res.json(carrier);
-  } catch (error) {
-    logger.error('Error patching carrier', { id: req.params.id, error });
-    res.status(500).json({ error: 'Failed to update carrier' });
-  }
-});
+      const carriers = await carrierService.getAllCarriers(filters);
+      res.json(carriers);
+    } catch (error) {
+      logger.error('Failed to get carriers via API', { error });
+      res.status(500).json({ error: 'Failed to get carriers' });
+    }
+  });
 
-/**
- * DELETE /api/v1/carriers/:id
- * Delete a carrier
- */
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await carrierService.deleteCarrier(id);
-    res.status(204).send();
-  } catch (error) {
-    logger.error('Error deleting carrier', { id: req.params.id, error });
-    res.status(500).json({ error: 'Failed to delete carrier' });
-  }
-});
+  // Get carrier by ID
+  router.get('/:id', async (req, res) => {
+    try {
+      const carrier = await carrierService.getCarrierById(req.params.id);
+      if (!carrier) {
+        return res.status(404).json({ error: 'Carrier not found' });
+      }
+      res.json(carrier);
+    } catch (error) {
+      logger.error('Failed to get carrier via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to get carrier' });
+    }
+  });
 
-/**
- * POST /api/v1/carriers/:id/test
- * Test carrier integration
- */
-router.post('/:id/test', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const result = await carrierService.testCarrierIntegration(id);
-    res.json(result);
-  } catch (error) {
-    logger.error('Error testing carrier integration', { id: req.params.id, error });
-    res.status(500).json({
-      error: 'Failed to test carrier integration',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
+  // Get carrier with performance metrics
+  router.get('/:id/performance', async (req, res) => {
+    try {
+      const carrier = await carrierService.getCarrierWithPerformance(req.params.id);
+      if (!carrier) {
+        return res.status(404).json({ error: 'Carrier not found' });
+      }
+      res.json(carrier);
+    } catch (error) {
+      logger.error('Failed to get carrier performance via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to get carrier performance' });
+    }
+  });
 
-/**
- * GET /api/v1/carriers/:id/health
- * Get carrier health status
- */
-router.get('/:id/health', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const health = await carrierService.getCarrierHealth(id);
-    res.json(health);
-  } catch (error) {
-    logger.error('Error getting carrier health', { id: req.params.id, error });
-    res.status(500).json({ error: 'Failed to get carrier health' });
-  }
-});
+  // Update carrier
+  router.put('/:id', async (req, res) => {
+    try {
+      const carrier = await carrierService.updateCarrier(req.params.id, req.body);
+      logger.info('Carrier updated via API', { carrierId: carrier.id });
+      res.json(carrier);
+    } catch (error) {
+      logger.error('Failed to update carrier via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to update carrier' });
+    }
+  });
 
-/**
- * POST /api/v1/carriers/:id/leads
- * Submit a lead to a carrier
- */
-router.post('/:id/leads', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const submissionRequest = {
-      leadId: req.body.leadId,
-      carrierId: id,
-      brokerId: req.body.brokerId,
-      submissionData: req.body.submissionData,
-      priority: req.body.priority,
-      scheduledFor: req.body.scheduledFor ? new Date(req.body.scheduledFor) : undefined,
-    };
+  // Delete carrier
+  router.delete('/:id', async (req, res) => {
+    try {
+      const carrier = await carrierService.deleteCarrier(req.params.id);
+      logger.info('Carrier deleted via API', { carrierId: carrier.id });
+      res.json(carrier);
+    } catch (error) {
+      logger.error('Failed to delete carrier via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to delete carrier' });
+    }
+  });
 
-    const result = await carrierService.submitLead(submissionRequest);
-    res.json(result);
-  } catch (error) {
-    logger.error('Error submitting lead to carrier', { id: req.params.id, error });
-    res.status(500).json({
-      error: 'Failed to submit lead to carrier',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
+  // Create performance metric
+  router.post('/:id/performance', async (req, res) => {
+    try {
+      const metric = await carrierService.createPerformanceMetric({
+        carrierId: req.params.id,
+        ...req.body,
+      });
+      logger.info('Carrier performance metric created via API', { metricId: metric.id });
+      res.status(201).json(metric);
+    } catch (error) {
+      logger.error('Failed to create carrier performance metric via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to create performance metric' });
+    }
+  });
 
-export default router;
+  // Get performance metrics
+  router.get('/:id/performance/metrics', async (req, res) => {
+    try {
+      const year = req.query.year ? Number(req.query.year) : undefined;
+      const month = req.query.month ? Number(req.query.month) : undefined;
+
+      const metrics = await carrierService.getPerformanceMetrics(req.params.id, year, month);
+      res.json(metrics);
+    } catch (error) {
+      logger.error('Failed to get carrier performance metrics via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to get performance metrics' });
+    }
+  });
+
+  // Update performance metric
+  router.put('/:id/performance/metrics/:metricId', async (req, res) => {
+    try {
+      const metric = await carrierService.updatePerformanceMetric(req.params.metricId, req.body);
+      logger.info('Carrier performance metric updated via API', { metricId: metric.id });
+      res.json(metric);
+    } catch (error) {
+      logger.error('Failed to update carrier performance metric via API', { error, metricId: req.params.metricId });
+      res.status(500).json({ error: 'Failed to update performance metric' });
+    }
+  });
+
+  // Calculate performance score
+  router.post('/:id/performance/calculate', async (req, res) => {
+    try {
+      const score = await carrierService.calculatePerformanceScore(req.params.id);
+      res.json({ carrierId: req.params.id, performanceScore: score });
+    } catch (error) {
+      logger.error('Failed to calculate performance score via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to calculate performance score' });
+    }
+  });
+
+  // Get top performing carriers
+  router.get('/top-performing', async (req, res) => {
+    try {
+      const limit = req.query.limit ? Math.min(Number(req.query.limit), 20) : 5;
+      const carriers = await carrierService.getTopPerformingCarriers(limit);
+      res.json(carriers);
+    } catch (error) {
+      logger.error('Failed to get top performing carriers via API', { error });
+      res.status(500).json({ error: 'Failed to get top performing carriers' });
+    }
+  });
+
+  // Get carriers needing attention
+  router.get('/needing-attention', async (req, res) => {
+    try {
+      const carriers = await carrierService.getCarriersNeedingAttention();
+      res.json(carriers);
+    } catch (error) {
+      logger.error('Failed to get carriers needing attention via API', { error });
+      res.status(500).json({ error: 'Failed to get carriers needing attention' });
+    }
+  });
+
+  // Update partnership tier
+  router.put('/:id/partnership-tier', async (req, res) => {
+    try {
+      const { tier } = req.body;
+      const carrier = await carrierService.updateCarrierPartnershipTier(req.params.id, tier);
+      logger.info('Carrier partnership tier updated via API', { carrierId: carrier.id, newTier: tier });
+      res.json(carrier);
+    } catch (error) {
+      logger.error('Failed to update carrier partnership tier via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to update partnership tier' });
+    }
+  });
+
+  // Update partnership status
+  router.put('/:id/partnership-status', async (req, res) => {
+    try {
+      const { status } = req.body;
+      const carrier = await carrierService.updateCarrierPartnershipStatus(req.params.id, status);
+      logger.info('Carrier partnership status updated via API', { carrierId: carrier.id, newStatus: status });
+      res.json(carrier);
+    } catch (error) {
+      logger.error('Failed to update carrier partnership status via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to update partnership status' });
+    }
+  });
+
+  // Get performance trends
+  router.get('/:id/performance/trends', async (req, res) => {
+    try {
+      const months = req.query.months ? Math.min(Number(req.query.months), 24) : 6;
+      const trends = await carrierService.getCarrierPerformanceTrends(req.params.id, months);
+      res.json(trends);
+    } catch (error) {
+      logger.error('Failed to get carrier performance trends via API', { error, carrierId: req.params.id });
+      res.status(500).json({ error: 'Failed to get performance trends' });
+    }
+  });
+
+  // Get carrier comparison report
+  router.post('/compare', async (req, res) => {
+    try {
+      const { carrierIds } = req.body;
+      if (!Array.isArray(carrierIds) || carrierIds.length === 0) {
+        return res.status(400).json({ error: 'carrierIds must be a non-empty array' });
+      }
+
+      const comparison = await carrierService.getCarrierComparisonReport(carrierIds);
+      res.json(comparison);
+    } catch (error) {
+      logger.error('Failed to get carrier comparison report via API', { error });
+      res.status(500).json({ error: 'Failed to get carrier comparison report' });
+    }
+  });
+
+  return router;
+}
