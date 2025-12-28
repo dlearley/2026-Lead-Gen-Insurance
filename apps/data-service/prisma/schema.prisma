@@ -746,3 +746,383 @@ enum Direction {
   INBOUND
   OUTBOUND
 }
+
+// ========================================
+// CUSTOMER DATA PLATFORM (CDP) - PHASE 11.2
+// ========================================
+
+// Customer Portal - from Phase 9.1
+model Customer {
+  id            String   @id @default(uuid())
+  leadId        String   @unique
+  email         String   @unique
+  passwordHash  String
+  phoneNumber   String?
+  isVerified    Boolean  @default(false)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  profile        CustomerProfile?
+  documents      CustomerDocument[]
+  messages       CustomerMessage[]
+  
+  // CDP Relations
+  identities     CustomerIdentity[]
+  events         CustomerEvent[]
+  traits         CustomerTrait[]
+  segmentMembers CustomerSegmentMembership[]
+
+  @@index([email])
+  @@index([leadId])
+  @@index([isVerified])
+  @@map("customers")
+}
+
+model CustomerProfile {
+  id               String   @id @default(uuid())
+  customerId       String   @unique
+  dateOfBirth      DateTime?
+  preferredContact String   @default("email")
+  address          Json?
+  emergencyContact Json?
+  preferences      Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_profiles")
+}
+
+model CustomerDocument {
+  id           String   @id @default(uuid())
+  customerId   String
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String
+  documentType String
+  status       String   @default("pending")
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([status])
+  @@index([documentType])
+  @@map("customer_documents")
+}
+
+model CustomerMessage {
+  id         String   @id @default(uuid())
+  customerId String
+  agentId    String?
+  senderType String
+  subject    String?
+  message    String   @db.Text
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([agentId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("customer_messages")
+}
+
+// ========================================
+// CDP - IDENTITY RESOLUTION
+// ========================================
+
+model CustomerIdentity {
+  id           String   @id @default(uuid())
+  customerId   String
+  identityType IdentityType
+  identityValue String
+  provider     String?
+  verifiedAt   DateTime?
+  isPrimary    Boolean  @default(false)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([identityType, identityValue])
+  @@index([customerId])
+  @@index([identityType])
+  @@index([identityValue])
+  @@map("customer_identities")
+}
+
+enum IdentityType {
+  EMAIL
+  PHONE
+  DEVICE_ID
+  SESSION_ID
+  EXTERNAL_ID
+  COOKIE_ID
+  IP_ADDRESS
+}
+
+// ========================================
+// CDP - BEHAVIORAL EVENTS
+// ========================================
+
+model CustomerEvent {
+  id            String   @id @default(uuid())
+  customerId    String?
+  anonymousId   String?
+  sessionId     String?
+  eventType     EventType
+  eventName     String
+  eventCategory String?
+  properties    Json?
+  context       Json?
+  timestamp     DateTime @default(now())
+  
+  // Device & Browser info
+  deviceType    String?
+  browser       String?
+  os            String?
+  ipAddress     String?
+  userAgent     String?
+  
+  // Location
+  country       String?
+  region        String?
+  city          String?
+  
+  // Metadata
+  metadata      Json?
+
+  // Relations
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([anonymousId])
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([eventName])
+  @@index([timestamp])
+  @@map("customer_events")
+}
+
+enum EventType {
+  PAGE_VIEW
+  BUTTON_CLICK
+  FORM_SUBMIT
+  QUOTE_REQUEST
+  QUOTE_VIEW
+  DOCUMENT_UPLOAD
+  DOCUMENT_VIEW
+  MESSAGE_SENT
+  MESSAGE_READ
+  PROFILE_UPDATE
+  LOGIN
+  LOGOUT
+  PURCHASE
+  POLICY_VIEW
+  CLAIM_SUBMIT
+  SEARCH
+  CUSTOM
+}
+
+// ========================================
+// CDP - CUSTOMER TRAITS & ATTRIBUTES
+// ========================================
+
+model CustomerTrait {
+  id           String   @id @default(uuid())
+  customerId   String
+  traitKey     String
+  traitValue   Json
+  traitType    TraitType
+  source       String   @default("system")
+  computedAt   DateTime?
+  expiresAt    DateTime?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, traitKey])
+  @@index([customerId])
+  @@index([traitKey])
+  @@index([traitType])
+  @@map("customer_traits")
+}
+
+enum TraitType {
+  DEMOGRAPHIC
+  BEHAVIORAL
+  COMPUTED
+  TRANSACTIONAL
+  PREFERENCE
+  ENGAGEMENT
+  RISK
+  LIFECYCLE
+}
+
+// ========================================
+// CDP - SEGMENTATION
+// ========================================
+
+model CustomerSegment {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  segmentType SegmentType
+  rules       Json?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members CustomerSegmentMembership[]
+
+  @@index([segmentType])
+  @@index([isActive])
+  @@map("customer_segments")
+}
+
+enum SegmentType {
+  STATIC
+  DYNAMIC
+  BEHAVIORAL
+  PREDICTIVE
+  LIFECYCLE
+  RFM
+}
+
+model CustomerSegmentMembership {
+  id          String   @id @default(uuid())
+  customerId  String
+  segmentId   String
+  joinedAt    DateTime @default(now())
+  leftAt      DateTime?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  segment  CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, segmentId])
+  @@index([customerId])
+  @@index([segmentId])
+  @@index([isActive])
+  @@map("customer_segment_memberships")
+}
+
+// ========================================
+// CDP - CONSENT & PRIVACY
+// ========================================
+
+model CustomerConsent {
+  id            String   @id @default(uuid())
+  customerId    String
+  consentType   ConsentType
+  granted       Boolean
+  grantedAt     DateTime?
+  revokedAt     DateTime?
+  expiresAt     DateTime?
+  source        String?
+  ipAddress     String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([customerId, consentType])
+  @@index([customerId])
+  @@index([consentType])
+  @@index([granted])
+  @@map("customer_consents")
+}
+
+enum ConsentType {
+  MARKETING_EMAIL
+  MARKETING_SMS
+  MARKETING_PUSH
+  DATA_PROCESSING
+  THIRD_PARTY_SHARING
+  ANALYTICS_TRACKING
+  PERSONALIZATION
+  PROFILING
+}
+
+// ========================================
+// CDP - CUSTOMER 360 & ANALYTICS
+// ========================================
+
+model CustomerJourneyStep {
+  id           String   @id @default(uuid())
+  customerId   String
+  stepName     String
+  stepType     String
+  stepOrder    Int
+  timestamp    DateTime @default(now())
+  duration     Int?
+  completed    Boolean  @default(false)
+  exitPoint    Boolean  @default(false)
+  metadata     Json?
+
+  @@index([customerId])
+  @@index([stepName])
+  @@index([timestamp])
+  @@map("customer_journey_steps")
+}
+
+model CustomerEngagementScore {
+  id              String   @id @default(uuid())
+  customerId      String   @unique
+  overallScore    Float    @default(0)
+  emailScore      Float    @default(0)
+  webScore        Float    @default(0)
+  portalScore     Float    @default(0)
+  recencyScore    Float    @default(0)
+  frequencyScore  Float    @default(0)
+  monetaryScore   Float    @default(0)
+  computedAt      DateTime @default(now())
+  metadata        Json?
+
+  @@index([customerId])
+  @@index([overallScore])
+  @@map("customer_engagement_scores")
+}
+
+model CustomerLifetimeValue {
+  id                 String   @id @default(uuid())
+  customerId         String   @unique
+  currentValue       Float    @default(0)
+  predictedValue     Float    @default(0)
+  totalPurchases     Int      @default(0)
+  averagePurchaseValue Float  @default(0)
+  purchaseFrequency  Float    @default(0)
+  customerTenure     Int      @default(0)
+  churnProbability   Float?
+  computedAt         DateTime @default(now())
+  metadata           Json?
+
+  @@index([customerId])
+  @@index([currentValue])
+  @@index([predictedValue])
+  @@map("customer_lifetime_values")
+}
