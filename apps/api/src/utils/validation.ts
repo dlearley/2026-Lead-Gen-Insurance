@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 export const createNoteSchema = z.object({
   content: z.string().min(1, 'Content is required').max(50000),
+  authorId: z.string().optional(),
   visibility: z.enum(['PRIVATE', 'TEAM', 'PUBLIC']).optional().default('TEAM'),
 });
 
@@ -15,7 +16,7 @@ export const updateNoteSchema = z.object({
 });
 
 export const noteFilterSchema = z.object({
-  authorId: z.string().uuid().optional(),
+  authorId: z.string().optional(),
   visibility: z.enum(['PRIVATE', 'TEAM', 'PUBLIC']).optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),

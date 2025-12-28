@@ -1,80 +1,130 @@
-import express, { Request, Response } from 'express';
-import type { Express } from 'express';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
 import { logger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
-import { reportsRouter } from './routes/reports.routes.js';
-import { alertsRouter } from './routes/alerts.routes.js';
-import { AlertService } from './services/alert-service.js';
+import { EVENT_SUBJECTS, type LeadReceivedEvent } from '@insurance-lead-gen/types';
+
+import { NatsEventBus } from './nats/nats-event-bus.js';
+import { prisma, disconnectPrisma } from './database/prisma.client.js';
+import { createRedisConnection } from './redis/redis-client.js';
+import { createLeadIngestionQueue, startLeadIngestionWorker } from './queues/lead-ingestion.queue.js';
+import { LeadRepository } from './repositories/lead.repository.js';
+import { AnalyticsService } from './analytics.js';
+import { createAnalyticsRoutes } from './routes/analytics.routes.js';
 
 const config = getConfig();
-const PORT = config.ports.dataService || 3001;
+const PORT = config.ports.dataService;
 
-const app: Express = express();
+const start = async (): Promise<void> => {
+  logger.info('Data service starting', { port: PORT });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+  const app = express();
+  app.use(helmet());
+  app.use(cors());
+  app.use(compression());
+  app.use(express.json({ limit: '10mb' }));
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  
-  next();
-});
+  const eventBus = await NatsEventBus.connect(config.nats.url);
+  const redis = createRedisConnection();
 
-app.use((req, res, next) => {
-  logger.debug('Incoming request', {
-    method: req.method,
-    path: req.path,
-    query: req.query,
-  });
-  next();
-});
+  const leadRepository = new LeadRepository(prisma);
+  const analyticsService = new AnalyticsService(prisma);
 
-app.get('/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'healthy',
-    service: 'data-service',
-    timestamp: new Date().toISOString(),
-  });
-});
+  app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
 
-app.use('/api/v1/reports', reportsRouter);
-app.use('/api/v1/alerts', alertsRouter);
-
-app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
-  logger.error('Unhandled error', { error: err, path: req.path });
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-  });
-});
-
-const alertService = new AlertService();
-const alertCheckInterval = setInterval(async () => {
-  try {
-    await alertService.checkMetrics();
-  } catch (error) {
-    logger.error('Alert check failed', { error });
-  }
-}, 5 * 60 * 1000);
-
-export function startServer(): Promise<void> {
-  return new Promise((resolve) => {
-    app.listen(PORT, () => {
-      logger.info('Data service HTTP server started', { port: PORT });
-      resolve();
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'data-service',
+      version: '1.0.0',
     });
   });
-}
 
-export function stopServer(): void {
-  clearInterval(alertCheckInterval);
-  logger.info('Data service HTTP server stopped');
-}
+  const server = app.listen(PORT, () => {
+    logger.info(`Data service API listening on port ${PORT}`);
+  });
 
-export { app };
+  const leadIngestionQueue = createLeadIngestionQueue(redis);
+  const leadIngestionWorker = startLeadIngestionWorker({
+    connection: redis,
+    leadRepository,
+    eventBus,
+  });
+
+  leadIngestionWorker.on('failed', (job, error) => {
+    logger.error('Lead ingestion job failed', { jobId: job?.id, error });
+  });
+
+  const leadReceivedSub = eventBus.subscribe(EVENT_SUBJECTS.LeadReceived);
+  (async () => {
+    for await (const msg of leadReceivedSub) {
+      try {
+        const event = eventBus.decode<LeadReceivedEvent>(msg.data);
+
+        await leadIngestionQueue.add('ingest', {
+          leadId: event.data.leadId,
+          lead: event.data.lead,
+          rawEvent: event,
+        });
+      } catch (error) {
+        logger.error('Failed to enqueue lead ingestion job', { error });
+      }
+    }
+  })().catch((error) => {
+    logger.error('Lead received subscription terminated', { error });
+  });
+
+  const leadGetSub = eventBus.subscribe(EVENT_SUBJECTS.LeadGet);
+  (async () => {
+    for await (const msg of leadGetSub) {
+      try {
+        const { leadId } = eventBus.decode<{ leadId: string }>(msg.data);
+        const lead = await leadRepository.getLeadById(leadId);
+
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { lead });
+        }
+      } catch (error) {
+        logger.error('Failed to handle lead.get request', { error });
+
+        if (msg.reply) {
+          eventBus.publish(msg.reply, { lead: null, error: 'internal_error' });
+        }
+      }
+    }
+  })().catch((error) => {
+    logger.error('Lead get subscription terminated', { error });
+  });
+
+  const shutdown = async (): Promise<void> => {
+    logger.info('Shutting down data service');
+
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await leadIngestionWorker.close();
+    await leadIngestionQueue.close();
+
+    await eventBus.close();
+    await disconnectPrisma();
+    await redis.quit();
+  };
+
+  process.on('SIGTERM', () => {
+    shutdown()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  });
+
+  logger.info('Data service running');
+};
+
+start().catch((error) => {
+  logger.error('Data service failed to start', { error });
+  process.exit(1);
+});
+
+setInterval(() => {
+  logger.debug('Data service heartbeat');
+}, 60000);
