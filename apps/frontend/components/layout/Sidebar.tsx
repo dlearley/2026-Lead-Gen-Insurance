@@ -12,6 +12,7 @@ import {
   Target,
   BarChart3,
   FolderOpen,
+  MapPin,
 } from "lucide-react";
 
 interface NavItem {
@@ -19,6 +20,7 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   badge?: string | number;
+  mobileOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -32,6 +34,12 @@ const navItems: NavItem[] = [
     href: "/leads",
     icon: <Target className="h-5 w-5" />,
     badge: "New",
+  },
+  {
+    label: "Nearby Leads",
+    href: "/leads/nearby",
+    icon: <MapPin className="h-5 w-5" />,
+    mobileOnly: true,
   },
   {
     label: "Analytics",
@@ -102,6 +110,8 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
     );
   };
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+
   return (
     <>
       <aside
@@ -113,9 +123,11 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
         <div className="flex flex-col h-full">
           <div className="flex-1 px-3 py-6 overflow-y-auto">
             <nav className="space-y-1">
-              {navItems.map((item) => (
-                <NavItem key={item.href} item={item} />
-              ))}
+              {navItems
+                .filter(item => !item.mobileOnly || isMobile)
+                .map((item) => (
+                  <NavItem key={item.href} item={item} />
+                ))}
             </nav>
           </div>
 
