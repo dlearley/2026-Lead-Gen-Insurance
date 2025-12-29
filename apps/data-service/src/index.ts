@@ -19,6 +19,7 @@ import { AgentRepository } from './repositories/agent.repository.js';
 import { AssignmentRepository } from './repositories/assignment.repository.js';
 import { AnalyticsService } from './analytics.js';
 import { createAnalyticsRoutes } from './routes/analytics.routes.js';
+import { createBenchmarkRoutes } from './routes/benchmark.routes.js';
 import customersRoutes from './routes/customers.routes.js';
 import { PartnerService } from './services/partner.service.js';
 import { ReferralService } from './services/referral.service.js';
@@ -34,6 +35,7 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { BrokerBenchmarkService } from './services/benchmark.service.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -57,6 +59,7 @@ const start = async (): Promise<void> => {
   const assignmentRepository = new AssignmentRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
   const claimRepository = new ClaimRepository(prisma);
+  const benchmarkService = new BrokerBenchmarkService(prisma);
 
   // Initialize referral services
   const partnerService = new PartnerService();
@@ -66,6 +69,9 @@ const start = async (): Promise<void> => {
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+
+  // Setup benchmark routes
+  app.use('/api/v1/benchmark', createBenchmarkRoutes(benchmarkService));
 
   // Setup referral program routes
   app.use('/api/v1/partners', partnerRoutes);
