@@ -746,3 +746,312 @@ enum Direction {
   INBOUND
   OUTBOUND
 }
+
+// ========================================
+// BROKER EDUCATION & COMPETENCY (Phase 12.3)
+// ========================================
+
+model Course {
+  id              String       @id @default(uuid())
+  title           String
+  description     String       @db.Text
+  category        String
+  level           CompetencyLevel
+  status          CourseStatus @default(DRAFT)
+  thumbnailUrl    String?
+  estimatedHours  Int
+  prerequisites   String[]
+  tags            String[]
+  objectives      String[]
+  instructorName  String?
+  version         Int          @default(1)
+  publishedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  relations       Module[]
+  enrollments     Enrollment[]
+  assessments     Assessment[]
+  certificates    Certificate[]
+
+  @@index([status])
+  @@index([category])
+  @@index([level])
+  @@map("courses")
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  courseId    String
+  title       String
+  description String   @db.Text
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@index([courseId])
+  @@index([order])
+  @@map("modules")
+}
+
+model Lesson {
+  id              String   @id @default(uuid())
+  moduleId        String
+  title           String
+  content         String   @db.Text
+  videoUrl        String?
+  resourcesUrl    String?
+  order           Int
+  durationMinutes Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  module          Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress        LessonProgress[]
+
+  @@index([moduleId])
+  @@index([order])
+  @@map("lessons")
+}
+
+model Assessment {
+  id               String         @id @default(uuid())
+  courseId         String
+  title            String
+  description      String?        @db.Text
+  type             AssessmentType
+  timeLimitMinutes Int?
+  passingScore     Int
+  maxAttempts      Int
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions        Question[]
+  attempts         AssessmentAttempt[]
+  certificates     Certificate[]
+
+  @@index([courseId])
+  @@index([type])
+  @@map("assessments")
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  assessmentId  String
+  type          QuestionType
+  text          String       @db.Text
+  options       String[]
+  correctAnswer String
+  explanation   String?      @db.Text
+  points        Int
+  order         Int
+
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([order])
+  @@map("questions")
+}
+
+model AssessmentAttempt {
+  id            String   @id @default(uuid())
+  assessmentId  String
+  agentId       String
+  attemptNumber Int
+  score         Int
+  passed        Boolean
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  answers       Json
+
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([agentId])
+  @@index([passed])
+  @@map("assessment_attempts")
+}
+
+model Enrollment {
+  id               String         @id @default(uuid())
+  courseId         String
+  agentId          String
+  status           EnrollmentStatus @default(NOT_STARTED)
+  progress         Int            @default(0)
+  currentLessonId  String?
+  enrolledAt       DateTime       @default(now())
+  completedAt      DateTime?
+  lastAccessedAt   DateTime?
+
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress   LessonProgress[]
+
+  @@unique([courseId, agentId])
+  @@index([agentId])
+  @@index([status])
+  @@map("enrollments")
+}
+
+model LessonProgress {
+  id               String   @id @default(uuid())
+  enrollmentId     String
+  lessonId         String
+  completed        Boolean  @default(false)
+  timeSpentMinutes Int      @default(0)
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson           Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([enrollmentId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+model Competency {
+  id          String           @id @default(uuid())
+  name        String
+  description String           @db.Text
+  category    String
+  level       CompetencyLevel
+  skills      String[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  agentCompetencies AgentCompetency[]
+
+  @@index([category])
+  @@index([level])
+  @@map("competencies")
+}
+
+model AgentCompetency {
+  id               String           @id @default(uuid())
+  agentId          String
+  competencyId     String
+  level            CompetencyLevel
+  assessedAt       DateTime         @default(now())
+  evidence         String[]
+  assessmentMethod String?
+
+  competency       Competency       @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, competencyId])
+  @@index([agentId])
+  @@index([competencyId])
+  @@map("agent_competencies")
+}
+
+model LearningPath {
+  id                String         @id @default(uuid())
+  title             String
+  description       String         @db.Text
+  category          String
+  targetRole        String?
+  targetLevel       CompetencyLevel
+  estimatedWeeks    Int
+  requiredCourses   String[]
+  electiveCourses   String[]
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  pathEnrollments   PathEnrollment[]
+
+  @@index([category])
+  @@index([targetRole])
+  @@index([isActive])
+  @@map("learning_paths")
+}
+
+model PathEnrollment {
+  id               String         @id @default(uuid())
+  learningPathId   String
+  agentId          String
+  status           EnrollmentStatus @default(NOT_STARTED)
+  progress         Int            @default(0)
+  enrolledAt       DateTime       @default(now())
+  completedAt      DateTime?
+  completedCourses String[]
+
+  learningPath     LearningPath   @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+
+  @@unique([learningPathId, agentId])
+  @@index([agentId])
+  @@index([status])
+  @@map("path_enrollments")
+}
+
+model Certificate {
+  id               String           @id @default(uuid())
+  agentId          String
+  courseId         String?
+  assessmentId     String?
+  certificateNumber String          @unique
+  title            String
+  description      String          @db.Text
+  issueDate        DateTime         @default(now())
+  expiryDate       DateTime?
+  status           CertificateStatus @default(ACTIVE)
+  verificationUrl  String?
+  credentialId     String?
+
+  course           Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  assessment       Assessment?      @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([certificateNumber])
+  @@index([status])
+  @@map("certificates")
+}
+
+// Enums for Education
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  DROPPED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+}
+
+enum AssessmentType {
+  QUIZ
+  EXAM
+  CERTIFICATION
+}
+
+enum CompetencyLevel {
+  NOVICE
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum CertificateStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
