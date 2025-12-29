@@ -34,6 +34,9 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import mediaSessionsRoutes from './routes/media-sessions.routes.js';
+import mediaRecordingsRoutes from './routes/media-recordings.routes.js';
+import rtcSignalingRoutes from './routes/rtc-signaling.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -88,6 +91,11 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup voice/video routes
+  app.use('/api/v1/media-sessions', mediaSessionsRoutes);
+  app.use('/api/v1/media-recordings', mediaRecordingsRoutes);
+  app.use('/api/v1/rtc-signal', rtcSignalingRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
