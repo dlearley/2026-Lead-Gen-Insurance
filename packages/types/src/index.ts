@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Broker Benchmarking (Phase 12.2)
+export * from './benchmark.js';
