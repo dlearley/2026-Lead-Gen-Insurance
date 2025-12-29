@@ -183,6 +183,153 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
+// Media Session model - tracks voice/video sessions
+model MediaSession {
+  id                   String            @id @default(uuid())
+  sessionId            String            @unique
+  sessionType          MediaSessionType
+  sessionStatus        SessionStatus     @default(SCHEDULED)
+  title                String
+  description          String?
+  createdBy            String
+  maxParticipants      Int?
+  isRecordingEnabled   Boolean           @default(false)
+  isScreenShareEnabled Boolean           @default(true)
+  isWaitingRoomEnabled Boolean           @default(false)
+  isSecure             Boolean           @default(true)
+  encryptionKey        String?
+  roomUrl              String
+  webhookUrl           String?
+  metadata             Json?
+  startTime            DateTime?
+  endTime              DateTime?
+  duration             Int               @default(0)
+  qualityScore         Float?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // Relationships
+  participants         RoomParticipant[]
+  recordings           MediaRecording[]
+  callLogs             CallLog[]
+  signalMessages       SignalMessage[]
+
+  // Indexes
+  @@index([sessionId])
+  @@index([sessionStatus])
+  @@index([sessionType])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+// RoomParticipant model - tracks participants in voice/video sessions
+model RoomParticipant {
+  id                   String            @id @default(uuid())
+  sessionId            String
+  participantId        String
+  userId               String?
+  displayName          String
+  email                String?
+  phone                String?
+  avatarUrl            String?
+  role                 ParticipantRole
+  status               ParticipantStatus @default(INVITED)
+  isAudioEnabled       Boolean           @default(false)
+  isVideoEnabled       Boolean           @default(false)
+  isScreenSharing      Boolean           @default(false)
+  isHandRaised         Boolean           @default(false)
+  hasRecordingConsent  Boolean           @default(false)
+  browserInfo          Json?
+  deviceInfo           Json?
+  networkStats         Json?
+  joinedAt             DateTime          @default(now())
+  leftAt               DateTime?
+  lastSeenAt           DateTime          @updatedAt
+
+  // Relationships
+  session              MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([userId])
+  @@index([status])
+  @@index([joinedAt])
+  @@unique([sessionId, participantId])
+}
+
+// MediaRecording model - tracks voice/video recordings
+model MediaRecording {
+  id                String           @id @default(uuid())
+  recordingId       String           @unique
+  sessionId         String
+  participantId     String?
+  format            RecordingFormat
+  status            RecordingStatus  @default(STARTED)
+  storageUrl        String?
+  fileSize          Int?
+  duration          Int              @default(0)
+  quality           RecordingQuality @default(MEDIUM)
+  isAudioOnly       Boolean          @default(false)
+  isComposite       Boolean          @default(false)
+  startTime         DateTime         @default(now())
+  endTime           DateTime?
+  transcriptionId   String?
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+
+  // Relationships
+  session           MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// CallLog model - tracks call events for analytics
+model CallLog {
+  id          String        @id @default(uuid())
+  sessionId   String
+  participantId String
+  eventType   CallEventType
+  timestamp   DateTime      @default(now())
+  details     Json?
+  qualityMetrics Json?
+
+  // Relationships
+  session     MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+// SignalMessage model - tracks WebRTC signaling messages
+model SignalMessage {
+  id               String     @id @default(uuid())
+  sessionId        String
+  fromParticipantId String
+  toParticipantId  String?
+  messageType      SignalType
+  payload          Json
+  isBroadcast      Boolean    @default(false)
+  timestamp        DateTime   @default(now())
+
+  // Relationships
+  session          MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
+  @@index([fromParticipantId])
+  @@index([toParticipantId])
+  @@index([messageType])
+  @@index([timestamp])
+}
+
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -222,4 +369,104 @@ enum PartnershipStatus {
   SUSPENDED
   TERMINATED
   RENEWAL_NEEDED
+}
+
+// Voice/Video Enums
+enum MediaSessionType {
+  VOICE
+  VIDEO
+  SCREEN_SHARE
+  BROADCAST
+}
+
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  ENDED
+  FAILED
+  CANCELLED
+}
+
+enum ParticipantRole {
+  HOST
+  CO_HOST
+  PARTICIPANT
+  VIEWER
+  MODERATOR
+}
+
+enum ParticipantStatus {
+  INVITED
+  JOINING
+  CONNECTED
+  DISCONNECTED
+  REMOVED
+  ERROR
+}
+
+enum RecordingFormat {
+  MP4
+  WEBM
+  MP3
+  WAV
+  M4A
+}
+
+enum RecordingStatus {
+  STARTED
+  IN_PROGRESS
+  STOPPED
+  COMPLETED
+  FAILED
+  PROCESSING
+  READY
+  DELETED
+}
+
+enum RecordingQuality {
+  LOW
+  MEDIUM
+  HIGH
+  HD
+  FULL_HD
+  _4K
+}
+
+enum CallEventType {
+  SESSION_STARTED
+  SESSION_ENDED
+  PARTICIPANT_JOINED
+  PARTICIPANT_LEFT
+  AUDIO_ENABLED
+  AUDIO_DISABLED
+  VIDEO_ENABLED
+  VIDEO_DISABLED
+  SCREEN_SHARE_STARTED
+  SCREEN_SHARE_STOPPED
+  RECORDING_STARTED
+  RECORDING_STOPPED
+  HAND_RAISED
+  HAND_LOWERED
+  CONNECTION_ESTABLISHED
+  CONNECTION_LOST
+  QUALITY_DEGRADED
+  QUALITY_IMPROVED
+  ERROR
+}
+
+enum SignalType {
+  OFFER
+  ANSWER
+  ICE_CANDIDATE
+  JOIN
+  LEAVE
+  MUTE
+  UNMUTE
+  START_SCREEN_SHARE
+  STOP_SCREEN_SHARE
+  HAND_RAISE
+  MESSAGE
+  CONNECTION_STATE
+  ROOM_UPDATE
+  ERROR
 }

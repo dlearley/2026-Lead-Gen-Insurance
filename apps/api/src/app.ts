@@ -25,6 +25,9 @@ import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
 import { UPLOADS_DIR } from './utils/files.js';
+import mediaSessionsRouter from './routes/media-sessions.js';
+import mediaRecordingsRouter from './routes/media-recordings.js';
+import rtcSignalingRouter from './routes/rtc-signaling.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -66,6 +69,9 @@ export function createApp(): express.Express {
   app.use('/api/v1/vip', vipRouter);
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/claims', claimsRouter);
+  app.use('/api/v1/media-sessions', mediaSessionsRouter);
+  app.use('/api/v1/media-recordings', mediaRecordingsRouter);
+  app.use('/api/v1/rtc-signal', rtcSignalingRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -87,6 +93,9 @@ export function createApp(): express.Express {
   app.use('/api/vip', vipRouter);
   app.use('/api/community', communityRouter);
   app.use('/api/claims', claimsRouter);
+  app.use('/api/media-sessions', mediaSessionsRouter);
+  app.use('/api/media-recordings', mediaRecordingsRouter);
+  app.use('/api/rtc-signal', rtcSignalingRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

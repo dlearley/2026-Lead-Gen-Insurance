@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Voice/Video Core Communication
+export * from './voice-video.js';
