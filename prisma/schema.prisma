@@ -223,3 +223,45 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+// ========================================
+// MARKETPLACE ECOSYSTEM REVENUE (Phase 12.6)
+// ========================================
+
+model EcosystemRevenue {
+  id              String         @id @default(uuid())
+  type            RevenueType
+  amount          Float
+  currency        String         @default("USD")
+  status          RevenueStatus  @default(PENDING)
+  sourceId        String
+  sourceType      String
+  brokerId        String?
+  carrierId       String?
+  metadata        Json?
+  processedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([sourceId])
+  @@index([brokerId])
+  @@index([carrierId])
+  @@index([createdAt])
+  @@map("ecosystem_revenue")
+}
+
+enum RevenueType {
+  PLATFORM_FEE
+  SUBSCRIPTION
+  SERVICE_FEE
+  REFERRAL_COMMISSION
+  MARKET_ACCESS_FEE
+}
+
+enum RevenueStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}

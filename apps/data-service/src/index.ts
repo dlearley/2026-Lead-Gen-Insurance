@@ -34,6 +34,8 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { MarketplaceService } from './services/marketplace.service.js';
+import { createMarketplaceRoutes } from './routes/marketplace.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -63,6 +65,7 @@ const start = async (): Promise<void> => {
   const referralService = new ReferralService();
   const rewardService = new RewardService();
   const advancedAnalyticsService = new AdvancedAnalyticsService();
+  const marketplaceService = new MarketplaceService();
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
@@ -88,6 +91,9 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup marketplace routes
+  app.use('/api/v1/marketplace', createMarketplaceRoutes(marketplaceService));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
