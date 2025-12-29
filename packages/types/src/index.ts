@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Broker Education & Competency
+export * from './broker-education.js';
