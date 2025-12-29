@@ -223,3 +223,191 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// ========================================
+// PHASE 12.4: ATTRIBUTION MODELS
+// ========================================
+
+// Touchpoint - tracks every interaction with a potential customer
+model Touchpoint {
+  id              String        @id @default(uuid())
+  leadId          String
+  sessionId       String?
+  channel         TouchpointType
+  source          String?
+  medium          String?
+  campaign        String?
+  content         String?
+  term            String?
+  referralCode    String?
+  partnerId       String?
+  brokerId        String?
+  timestamp       DateTime      @default(now())
+  metadata        Json?
+  converted       Boolean       @default(false)
+  conversionValue Float?
+  conversionTimestamp DateTime?
+
+  // Indexes
+  @@index([leadId])
+  @@index([sessionId])
+  @@index([channel])
+  @@index([partnerId])
+  @@index([brokerId])
+  @@index([campaign])
+  @@index([timestamp])
+}
+
+// Conversion - tracks when leads become customers
+model Conversion {
+  id               String         @id @default(uuid())
+  leadId           String
+  type             ConversionType
+  value            Float
+  currency         String         @default("USD")
+  policyId         String?
+  policyNumber     String?
+  commissionRate   Float?
+  commissionAmount Float?
+  occurredAt       DateTime       @default(now())
+  metadata         Json?
+
+  // Relationships
+  attributions     AttributionRecord[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([type])
+  @@index([policyId])
+  @@index([occurredAt])
+}
+
+// AttributionRecord - tracks attribution credit for each touchpoint
+model AttributionRecord {
+  id               String            @id @default(uuid())
+  leadId           String
+  conversionId     String?
+  touchpointId     String
+  channel          TouchpointType
+  model            AttributionModel
+  credit           Float
+  percentage       Float
+  revenueAttributed Float?
+  commissionAmount Float?
+  partnerId        String?
+  brokerId         String?
+  campaignId       String?
+  calculatedAt     DateTime          @default(now())
+  status           AttributionStatus @default(PENDING)
+  metadata         Json?
+
+  // Relationships
+  conversion       Conversion?       @relation(fields: [conversionId], references: [id])
+  disputes         AttributionDispute[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([conversionId])
+  @@index([channel])
+  @@index([model])
+  @@index([partnerId])
+  @@index([brokerId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([calculatedAt])
+}
+
+// AttributionModelConfig - stores configuration for attribution models
+model AttributionModelConfig {
+  id                  String         @id @default(uuid())
+  model               AttributionModel
+  positionBasedWeights Json?
+  timeDecayConfig     Json?
+  customWeights       Json?
+  isDefault           Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Indexes
+  @@index([model])
+  @@index([isDefault])
+}
+
+// AttributionDispute - tracks disputes over attribution
+model AttributionDispute {
+  id            String            @id @default(uuid())
+  attributionId String
+  disputedBy    String
+  disputeType   AttributionDisputeType
+  reason        String
+  evidence      Json?
+  status        AttributionDisputeStatus @default(PENDING)
+  resolution    String?
+  resolvedBy    String?
+  resolvedAt    DateTime?
+
+  // Relationships
+  attribution   AttributionRecord @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([attributionId])
+  @@index([status])
+  @@index([disputeType])
+  @@index([createdAt])
+}
+
+// Enums for Attribution
+enum TouchpointType {
+  ORGANIC_SEARCH
+  PAID_SEARCH
+  SOCIAL_MEDIA
+  EMAIL
+  DISPLAY_AD
+  REFERRAL
+  DIRECT
+  PARTNER_REFERRAL
+  BROKER_REFERRAL
+  AFFILIATE
+  WEBINAR
+  EVENT
+  PHONE_CALL
+  CHAT
+  OTHER
+}
+
+enum ConversionType {
+  SALE
+  SIGNUP
+  QUOTE_REQUEST
+  POLICY_BOUND
+  RENEWAL
+}
+
+enum AttributionModel {
+  FIRST_TOUCH
+  LAST_TOUCH
+  LINEAR
+  TIME_DECAY
+  POSITION_BASED
+  DATA_DRIVEN
+}
+
+enum AttributionStatus {
+  PENDING
+  CALCULATED
+  APPROVED
+  DISPUTED
+  PAID
+}
+
+enum AttributionDisputeType {
+  PARTNER
+  BROKER
+  INTERNAL
+}
+
+enum AttributionDisputeStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
