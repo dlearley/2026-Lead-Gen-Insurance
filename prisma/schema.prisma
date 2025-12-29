@@ -223,3 +223,312 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// ========================================
+// Phase 12.6: Marketplace Models
+// ========================================
+
+// MarketplaceVendor model - stores marketplace vendor information
+model MarketplaceVendor {
+  id              String         @id @default(uuid())
+  userId          String
+  businessName    String
+  description     String
+  logo            String?
+  website         String?
+  email           String
+  phone           String
+  address         String
+  city            String
+  state           String
+  zipCode         String
+  country         String
+  status          VendorStatus   @default(PENDING_APPROVAL)
+  tier            VendorTier     @default(BASIC)
+  rating          Float          @default(0.0)
+  reviewCount     Int            @default(0)
+  totalSales      Int            @default(0)
+  totalRevenue    Float          @default(0.0)
+  commissionRate  Float          @default(0.15)
+  verifiedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relationships
+  items           MarketplaceItem[]
+  transactions    MarketplaceTransaction[]
+  reviews         MarketplaceReview[]
+  payouts         VendorPayout[]
+
+  // Indexes
+  @@index([userId])
+  @@index([status])
+  @@index([tier])
+  @@index([createdAt])
+}
+
+// MarketplaceItem model - stores marketplace items/products
+model MarketplaceItem {
+  id              String                @id @default(uuid())
+  vendorId        String
+  title           String
+  description     String
+  type            MarketplaceItemType
+  status          MarketplaceItemStatus @default(DRAFT)
+  price           Float
+  currency        String                @default("USD")
+  images          String[]
+  tags            String[]
+  category        String
+  subcategory     String?
+  specifications  Json?
+  inventory       Int?
+  featured        Boolean               @default(false)
+  views           Int                   @default(0)
+  purchases       Int                   @default(0)
+  rating          Float                 @default(0.0)
+  reviewCount     Int                   @default(0)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Relationships
+  vendor          MarketplaceVendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  transactions    MarketplaceTransaction[]
+  reviews         MarketplaceReview[]
+  wishlistItems   Wishlist[]
+  cartItems       CartItem[]
+
+  // Indexes
+  @@index([vendorId])
+  @@index([type])
+  @@index([status])
+  @@index([category])
+  @@index([featured])
+  @@index([createdAt])
+}
+
+// MarketplaceTransaction model - stores marketplace transactions
+model MarketplaceTransaction {
+  id                String             @id @default(uuid())
+  itemId            String
+  vendorId          String
+  buyerId           String
+  type              TransactionType
+  status            TransactionStatus  @default(PENDING)
+  quantity          Int
+  unitPrice         Float
+  totalAmount       Float
+  currency          String             @default("USD")
+  commissionAmount  Float
+  vendorPayout      Float
+  paymentMethod     String?
+  paymentReference  String?
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  completedAt       DateTime?
+
+  // Relationships
+  item              MarketplaceItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  vendor            MarketplaceVendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  reviews           MarketplaceReview[]
+
+  // Indexes
+  @@index([itemId])
+  @@index([vendorId])
+  @@index([buyerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// MarketplaceReview model - stores marketplace reviews
+model MarketplaceReview {
+  id              String                  @id @default(uuid())
+  itemId          String?
+  vendorId        String?
+  userId          String
+  transactionId   String?
+  rating          Int
+  title           String
+  comment         String
+  pros            String[]
+  cons            String[]
+  verified        Boolean                 @default(false)
+  helpful         Int                     @default(0)
+  reported        Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  // Relationships
+  item            MarketplaceItem?        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  vendor          MarketplaceVendor?      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  transaction     MarketplaceTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([itemId])
+  @@index([vendorId])
+  @@index([userId])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+// MarketplaceCategory model - stores marketplace categories
+model MarketplaceCategory {
+  id              String         @id @default(uuid())
+  name            String
+  slug            String         @unique
+  description     String
+  icon            String?
+  parentId        String?
+  itemCount       Int            @default(0)
+  displayOrder    Int            @default(0)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Self-referential relationship for subcategories
+  parent          MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        MarketplaceCategory[] @relation("CategoryHierarchy")
+
+  // Indexes
+  @@index([slug])
+  @@index([parentId])
+  @@index([isActive])
+}
+
+// Wishlist model - stores user wishlist items
+model Wishlist {
+  id              String         @id @default(uuid())
+  userId          String
+  itemId          String
+  addedAt         DateTime       @default(now())
+
+  // Relationships
+  item            MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Unique constraint
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@index([itemId])
+}
+
+// CartItem model - stores user cart items
+model CartItem {
+  id              String         @id @default(uuid())
+  userId          String
+  itemId          String
+  quantity        Int
+  addedAt         DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relationships
+  item            MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Unique constraint
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@index([itemId])
+}
+
+// CommissionRule model - stores commission rules for marketplace
+model CommissionRule {
+  id              String                @id @default(uuid())
+  vendorTier      VendorTier
+  itemType        MarketplaceItemType
+  commissionRate  Float
+  minimumAmount   Float?
+  maximumAmount   Float?
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Indexes
+  @@index([vendorTier])
+  @@index([itemType])
+  @@index([effectiveFrom])
+  @@index([isActive])
+}
+
+// VendorPayout model - stores vendor payouts
+model VendorPayout {
+  id                String         @id @default(uuid())
+  vendorId          String
+  periodStart       DateTime
+  periodEnd         DateTime
+  totalRevenue      Float
+  commissionAmount  Float
+  payoutAmount      Float
+  transactionCount  Int
+  status            PayoutStatus   @default(PENDING)
+  paymentMethod     String?
+  paymentReference  String?
+  processedAt       DateTime?
+  createdAt         DateTime       @default(now())
+
+  // Relationships
+  vendor            MarketplaceVendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([vendorId])
+  @@index([status])
+  @@index([periodStart])
+  @@index([periodEnd])
+  @@index([createdAt])
+}
+
+// Marketplace Enums
+enum VendorStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+  BLACKLISTED
+}
+
+enum VendorTier {
+  BASIC
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum MarketplaceItemType {
+  INSURANCE_PRODUCT
+  LEAD_PACKAGE
+  SERVICE
+  TRAINING
+  TOOL
+}
+
+enum MarketplaceItemStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum TransactionType {
+  PURCHASE
+  BID
+  SUBSCRIPTION
+  RENTAL
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
