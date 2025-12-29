@@ -828,3 +828,9 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Broker Scale
+export * from './broker-scale.js';
+
+// Attribution (Phase 12.4)
+export * from './attribution.js';
