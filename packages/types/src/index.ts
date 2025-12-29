@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Marketplace (Phase 12.6)
+export * from './marketplace.js';
