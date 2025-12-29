@@ -223,3 +223,177 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+// Phase 13: Advanced AI & Verticals
+// ML model configurations for each insurance vertical
+model VerticalAIConfig {
+  id                  String   @id @default(uuid())
+  insuranceType       InsuranceType
+  mlModelId           String   @unique
+  isActive            Boolean  @default(true)
+  confidenceThreshold Float    @default(0.8)
+  autoTrainEnabled    Boolean  @default(true)
+  lastTrainedAt       DateTime?
+  trainingFrequency   String   // 'daily' | 'weekly' | 'monthly' | 'quarterly'
+  accuracyMetrics     Json     // ModelAccuracyMetrics
+  features            String[] // Feature list for ML model
+  hyperparameters     Json     // ML hyperparameters
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([insuranceType])
+  @@index([mlModelId])
+  @@index([isActive])
+}
+
+// Predictive model results for leads and clients
+model PredictiveModels {
+  id                    String           @id @default(uuid())
+  leadId                String?
+  clientId              String?
+  insuranceType         InsuranceType
+  predictionType        String           // 'conversion' | 'churn' | 'lifetime_value'
+  probability           Float?           // 0-1 for conversion/churn
+  predictedValue        Float?           // USD for LTV
+  confidence            Float            // 0-1
+  primaryFactors        Json             // Factors array
+  timelinePrediction    Json?            // Timeline-based predictions
+  recommendations       Json             // Recommendations array
+  modelAccuracy         Float?           // Actual vs predicted for feedback loop
+  createdAt             DateTime         @default(now())
+  
+  @@index([leadId])
+  @@index([clientId])
+  @@index([predictionType])
+  @@index([insuranceType])
+  @@index([createdAt])
+}
+
+// Document processing results for OCR and AI analysis
+model DocumentProcessingResult {
+  id                    String                @id @default(uuid())
+  documentId            String                @unique
+  documentType          String                // 'LICENSE' | 'REGISTRATION' | 'POLICY' | 'CLAIM_FORM' | 'MEDICAL_RECORD' | 'INSPECTION_REPORT' | 'PHOTO' | 'OTHER'
+  insuranceType         InsuranceType
+  extractedFields       Json                  // Key-value pairs of extracted data
+  confidenceScores      Json                  // Confidence scores per field
+  extractedText         String                @db.Text
+  entities              Json                  // EntityExtraction[]
+  classification        Json                  // DocumentClassification
+  validationResult      Json                  // DocumentValidation
+  ocrQuality            Json                  // OCR quality metrics
+  processingTime        Int                   // milliseconds
+  requiresReview        Boolean               @default(false)
+  reviewerNotes         String[]              @default([])
+  createdAt             DateTime              @default(now())
+  
+  @@index([documentId])
+  @@index([documentType])
+  @@index([insuranceType])
+  @@index([requiresReview])
+  @@index([createdAt])
+}
+
+// Image analysis results for damage assessment and verification
+model ImageAnalysisResult {
+  id                    String                @id @default(uuid())
+  imageId               String                @unique
+  analysisType          String                // 'vehicle_damage' | 'property_damage' | 'document_photo' | 'id_verification' | 'property_inspection'
+  insuranceType         InsuranceType
+  detectedObjects       Json                  // DetectedObject[]
+  classification        Json                  // ImageClassification
+  damageAssessment      Json?                 // DamageAssessment
+  qualityAssessment     Json                  // ImageQualityAssessment
+  confidence            Float                 // 0-1
+  requiresExpertReview  Boolean               @default(false)
+  createdAt             DateTime              @default(now())
+  
+  @@index([imageId])
+  @@index([analysisType])
+  @@index([insuranceType])
+  @@index([requiresExpertReview])
+  @@index([createdAt])
+}
+
+// Voice processing results for call transcripts and analysis
+model VoiceProcessingResult {
+  id                    String                @id @default(uuid())
+  audioId               String                @unique
+  transcript            String                @db.Text
+  confidence            Float                 // 0-1
+  speakerDiarization    Json?                 // SpeakerDiarization[]
+  sentimentAnalysis     Json                  // SentimentAnalysis
+  intentRecognition     Json                  // IntentRecognition
+  callQuality           Json                  // Call quality metrics
+  keywords              String[]              @default([])
+  entities              Json                  // EntityExtraction[]
+  actionItems           String[]              @default([])
+  duration              Int                   // seconds
+  silencePercentage     Float                 // percentage
+  createdAt             DateTime              @default(now())
+  
+  @@index([audioId])
+  @@index([confidence])
+  @@index([createdAt])
+}
+
+// Chatbot conversation storage for training and analysis
+model ChatbotConversation {
+  id                      String                @id @default(uuid())
+  conversationId          String                @unique
+  leadId                  String?
+  agentId                 String?
+  status                  String                // 'active' | 'completed' | 'escalated' | 'abandoned'
+  channel                 String                // 'web' | 'mobile' | 'sms' | 'whatsapp' | 'messenger'
+  startedAt               DateTime              @default(now())
+  endedAt                 DateTime?
+  messages                Json                  // ChatMessage[]
+  summary                 Json                  // ConversationSummary
+  nextActions             Json                  // RecommendedAction[]
+  handoffRequired         Boolean               @default(false)
+  handoffReason           String?
+  createdAt               DateTime              @default(now())
+  
+  @@index([leadId])
+  @@index([status])
+  @@index([channel])
+  @@index([handoffRequired])
+  @@index([startedAt])
+  @@index([endedAt])
+}
+
+// AI analytics and model performance tracking
+model AIAnalytics {
+  id                      String                @id @default(uuid())
+  analyticsType           String                // 'MODEL_PERFORMANCE' | 'PREDICTION_ACCURACY' | 'PROCESSING_STATISTICS' | 'BUSINESS_IMPACT'
+  modelId                 String?
+  insuranceType           InsuranceType?
+  metrics                 Json                  // Performance metrics object
+  timeframeStart          DateTime
+  timeframeEnd            DateTime
+  createdAt               DateTime              @default(now())
+  
+  @@index([analyticsType])
+  @@index([modelId])
+  @@index([insuranceType])
+  @@index([timeframeStart])
+  @@index([timeframeEnd])
+  @@index([createdAt])
+}
+
+// Compliance and regulatory check results
+model ComplianceCheck {
+  id                      String                @id @default(uuid())
+  insuranceType           InsuranceType
+  regulationType          String
+  isCompliant             Boolean
+  violations              Json                  // ComplianceViolation[]
+  warnings                Json                  // ComplianceWarning[]
+  recommendations         String[]              @default([])
+  riskLevel               String                // 'low' | 'medium' | 'high' | 'critical'
+  checkedAt               DateTime              @default(now())
+  
+  @@index([insuranceType])
+  @@index([isCompliant])
+  @@index([riskLevel])
+  @@index([checkedAt])
+}
