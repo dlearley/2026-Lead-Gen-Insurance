@@ -9,11 +9,19 @@ export class ApiClientService {
   private readonly defaultTimeout = 30000; // 30 seconds
   private readonly maxRetries = 3;
   private readonly retryDelay = 1000; // 1 second
+  private circuitBreakerService: any = null;
+
+  /**
+   * Set circuit breaker service instance
+   */
+  setCircuitBreakerService(service: any): void {
+    this.circuitBreakerService = service;
+  }
 
   /**
    * Execute an HTTP request to an external API
    */
-  async request<T = unknown>(options: ApiRequestOptions): Promise<ApiResponse<T>> {
+  async request<T = unknown>(options: ApiRequestOptions, serviceId?: string): Promise<ApiResponse<T>> {
     const startTime = Date.now();
     let lastError: Error | null = null;
 
@@ -77,7 +85,23 @@ export class ApiClientService {
   /**
    * Execute a single HTTP request
    */
-  private async executeRequest<T>(options: ApiRequestOptions): Promise<ApiResponse<T>> {
+  private async executeRequest<T>(options: ApiRequestOptions, serviceId?: string): Promise<ApiResponse<T>> {
+    const requestFn = async () => {
+      return this.doExecuteRequest<T>(options);
+    };
+
+    // Use circuit breaker if serviceId is provided
+    if (serviceId && this.circuitBreakerService) {
+      return this.circuitBreakerService.executeWithCircuitBreaker(serviceId, requestFn);
+    }
+
+    return requestFn();
+  }
+
+  /**
+   * Do the actual HTTP request
+   */
+  private async doExecuteRequest<T>(options: ApiRequestOptions): Promise<ApiResponse<T>> {
     const timeout = options.timeout || this.defaultTimeout;
 
     const url = this.buildUrl(options.url, options.query);
