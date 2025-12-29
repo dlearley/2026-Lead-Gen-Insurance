@@ -454,7 +454,29 @@ model Agent {
   updatedAt           DateTime    @updatedAt
 
   // Relations
-  assignments LeadAssignment[]
+  assignments         LeadAssignment[]
+
+  // Phase 9.6c: VIP & Community
+  vipStatus           AgentVIPStatus?
+  communityPosts      CommunityPost[]
+  communityComments   CommunityComment[]
+  communityLikes      CommunityLike[]
+
+  // Phase 12.5: Groups, Events, Badges, Profiles, Connections, Mentorship
+  createdGroups       CommunityGroup[]        @relation("GroupCreator")
+  groupMemberships    CommunityGroupMember[]
+
+  hostedEvents        CommunityEvent[]        @relation("EventHost")
+  eventAttendances    CommunityEventAttendee[]
+
+  badges              AgentBadge[]
+  profile             AgentProfile?
+
+  followingConnections AgentConnection[]      @relation("Follower")
+  followerConnections  AgentConnection[]      @relation("Following")
+
+  mentorshipAsMentor  MentorshipRelationship[] @relation("Mentor")
+  mentorshipAsMentee  MentorshipRelationship[] @relation("Mentee")
 
   @@index([email])
   @@index([isActive])
@@ -745,4 +767,364 @@ enum IntegrationAction {
 enum Direction {
   INBOUND
   OUTBOUND
+}
+
+// ========================================
+// PHASE 9.6c & 12.5: COMMUNITY & VIP PROGRAM
+// ========================================
+
+// VIP Program Models
+model AgentVIPStatus {
+  id        String   @id @default(uuid())
+  agentId   String   @unique
+  points    Int      @default(0)
+  tier      VIPTier  @default(SILVER)
+  tierSince DateTime @default(now())
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([points])
+  @@index([tier])
+  @@map("agent_vip_status")
+}
+
+enum VIPTier {
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+// Community Models
+model CommunityPost {
+  id          String        @id @default(uuid())
+  authorId    String
+  title       String
+  content     String        @db.Text
+  category    PostCategory  @default(GENERAL)
+  isPinned    Boolean       @default(false)
+  isFeatured  Boolean       @default(false)
+  viewCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  author      Agent              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments    CommunityComment[]
+  likes       CommunityLike[]
+  
+  // Phase 12.5: Group posts
+  groupId     String?
+  group       CommunityGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([authorId])
+  @@index([category])
+  @@index([isPinned])
+  @@index([isFeatured])
+  @@index([createdAt])
+  @@index([groupId])
+  @@map("community_posts")
+}
+
+enum PostCategory {
+  GENERAL
+  SUCCESS_STORY
+  TIP
+  QUESTION
+  ANNOUNCEMENT
+  TRAINING
+  RESOURCES
+  EVENT
+}
+
+model CommunityComment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  post      CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    Agent          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes     CommunityLike[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("community_comments")
+}
+
+model CommunityLike {
+  id        String   @id @default(uuid())
+  agentId   String
+  postId    String?
+  commentId String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  agent     Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  post      CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, postId])
+  @@unique([agentId, commentId])
+  @@index([agentId])
+  @@index([postId])
+  @@index([commentId])
+  @@map("community_likes")
+}
+
+// ========================================
+// PHASE 12.5: ENHANCED COMMUNITY FEATURES
+// ========================================
+
+// Community Groups / Forums
+model CommunityGroup {
+  id          String   @id @default(uuid())
+  name        String
+  description String   @db.Text
+  category    String
+  isPrivate   Boolean  @default(false)
+  coverImage  String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  createdBy   Agent              @relation("GroupCreator", fields: [createdById], references: [id])
+  members     CommunityGroupMember[]
+  posts       CommunityPost[]
+
+  @@index([category])
+  @@index([isPrivate])
+  @@index([createdAt])
+  @@map("community_groups")
+}
+
+model CommunityGroupMember {
+  id        String               @id @default(uuid())
+  groupId   String
+  agentId   String
+  role      GroupMemberRole      @default(MEMBER)
+  joinedAt  DateTime             @default(now())
+
+  // Relations
+  group     CommunityGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  agent     Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, agentId])
+  @@index([groupId])
+  @@index([agentId])
+  @@map("community_group_members")
+}
+
+enum GroupMemberRole {
+  MEMBER
+  MODERATOR
+  ADMIN
+}
+
+// Badges & Achievements
+model AgentBadge {
+  id          String   @id @default(uuid())
+  agentId     String
+  badgeType   BadgeType
+  earnedAt    DateTime @default(now())
+  metadata    Json?
+
+  // Relations
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, badgeType])
+  @@index([agentId])
+  @@index([badgeType])
+  @@map("agent_badges")
+}
+
+enum BadgeType {
+  FIRST_POST
+  FIRST_COMMENT
+  TOP_CONTRIBUTOR
+  HELPFUL_ANSWER
+  EXPERT_ADVISOR
+  MENTOR
+  COMMUNITY_LEADER
+  EARLY_ADOPTER
+  PERFECT_ATTENDANCE
+  MILESTONE_10_LEADS
+  MILESTONE_50_LEADS
+  MILESTONE_100_LEADS
+  MILESTONE_500_LEADS
+  HIGH_CONVERSION_RATE
+}
+
+// Community Events
+model CommunityEvent {
+  id           String              @id @default(uuid())
+  title        String
+  description  String              @db.Text
+  eventType    CommunityEventType
+  startTime    DateTime
+  endTime      DateTime
+  location     String?
+  isVirtual    Boolean             @default(true)
+  meetingLink  String?
+  maxAttendees Int?
+  coverImage   String?
+  hostId       String
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  // Relations
+  host         Agent               @relation("EventHost", fields: [hostId], references: [id])
+  attendees    CommunityEventAttendee[]
+
+  @@index([eventType])
+  @@index([startTime])
+  @@index([hostId])
+  @@map("community_events")
+}
+
+enum CommunityEventType {
+  WEBINAR
+  WORKSHOP
+  TRAINING
+  NETWORKING
+  Q_AND_A
+  MEETUP
+}
+
+model CommunityEventAttendee {
+  id        String               @id @default(uuid())
+  eventId   String
+  agentId   String
+  status    EventAttendeeStatus  @default(REGISTERED)
+  joinedAt  DateTime?
+  createdAt DateTime             @default(now())
+
+  // Relations
+  event     CommunityEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  agent     Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, agentId])
+  @@index([eventId])
+  @@index([agentId])
+  @@map("community_event_attendees")
+}
+
+enum EventAttendeeStatus {
+  REGISTERED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+}
+
+// Mentorship Program
+model MentorshipRelationship {
+  id          String              @id @default(uuid())
+  mentorId    String
+  menteeId    String
+  status      MentorshipStatus    @default(PENDING)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  notes       String?             @db.Text
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  // Relations
+  mentor      Agent               @relation("Mentor", fields: [mentorId], references: [id])
+  mentee      Agent               @relation("Mentee", fields: [menteeId], references: [id])
+  sessions    MentorshipSession[]
+
+  @@unique([mentorId, menteeId])
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([status])
+  @@map("mentorship_relationships")
+}
+
+enum MentorshipStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model MentorshipSession {
+  id             String                  @id @default(uuid())
+  relationshipId String
+  scheduledAt    DateTime
+  duration       Int                     // minutes
+  topic          String?
+  notes          String?                 @db.Text
+  status         MentorshipSessionStatus @default(SCHEDULED)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  // Relations
+  relationship   MentorshipRelationship  @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@index([relationshipId])
+  @@index([scheduledAt])
+  @@map("mentorship_sessions")
+}
+
+enum MentorshipSessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// Agent Profile Extensions
+model AgentProfile {
+  id          String   @id @default(uuid())
+  agentId     String   @unique
+  bio         String?  @db.Text
+  avatar      String?
+  coverImage  String?
+  specialties String[]
+  interests   String[]
+  website     String?
+  linkedin    String?
+  twitter     String?
+  facebook    String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
+}
+
+// Social Connections
+model AgentConnection {
+  id         String              @id @default(uuid())
+  followerId String
+  followingId String
+  status     ConnectionStatus    @default(PENDING)
+  createdAt  DateTime            @default(now())
+
+  // Relations
+  follower   Agent               @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following  Agent               @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("agent_connections")
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
 }
