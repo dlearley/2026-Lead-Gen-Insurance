@@ -2,7 +2,6 @@
 // This schema defines the relational data model for PostgreSQL
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -33,6 +32,7 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
+  attributions    Attribution[]
 
   // Indexes for performance
   @@index([email])
@@ -183,6 +183,134 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
+// MarketingSource model - tracks different marketing sources and channels
+model MarketingSource {
+  id          String     @id @default(uuid())
+  name        String
+  type        MarketingSourceType
+  description String?
+  costPerLead Float?     @default(0.0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relationships
+  campaigns   Campaign[]
+  attributions Attribution[]
+  metrics      MarketingSourceMetric[]
+
+  // Indexes
+  @@index([name])
+  @@index([type])
+  @@index([isActive])
+}
+
+// Campaign model - tracks marketing campaigns
+model Campaign {
+  id              String     @id @default(uuid())
+  name            String
+  description     String?
+  sourceId        String
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Float      @default(0.0)
+  status          CampaignStatus @default(DRAFT)
+  objective       String?
+  targetAudience  String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relationships
+  source          MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  attributions    Attribution[]
+  metrics         CampaignMetric[]
+
+  // Indexes
+  @@index([name])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+}
+
+// Attribution model - tracks attribution data for leads
+model Attribution {
+  id              String     @id @default(uuid())
+  leadId          String
+  sourceId        String
+  campaignId      String?
+  attributionType AttributionType @default(FIRST_TOUCH)
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmTerm         String?
+  utmContent      String?
+  referralSource  String?
+  referringDomain String?
+  landingPage     String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relationships
+  lead             Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  source           MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  campaign         Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([leadId])
+  @@index([sourceId])
+  @@index([campaignId])
+  @@index([attributionType])
+  @@index([createdAt])
+}
+
+// CampaignMetric model - tracks campaign performance metrics
+model CampaignMetric {
+  id                    String     @id @default(uuid())
+  campaignId            String
+  date                  DateTime   @default(now())
+  leadsGenerated        Int        @default(0)
+  leadsQualified        Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  costPerLead           Float      @default(0.0)
+  costPerConversion     Float      @default(0.0)
+  revenueGenerated      Float      @default(0.0)
+  roi                   Float      @default(0.0)
+  clickThroughRate      Float      @default(0.0)
+  engagementScore       Float      @default(0.0)
+
+  // Relationships
+  campaign              Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([campaignId])
+  @@index([date])
+  @@unique([campaignId, date])
+}
+
+// MarketingSourceMetric model - tracks source-level performance
+model MarketingSourceMetric {
+  id                    String     @id @default(uuid())
+  sourceId              String
+  date                  DateTime   @default(now())
+  leadsGenerated        Int        @default(0)
+  leadsQualified        Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  costPerLead           Float      @default(0.0)
+  costPerConversion     Float      @default(0.0)
+  revenueGenerated      Float      @default(0.0)
+  roi                   Float      @default(0.0)
+
+  // Relationships
+  source                MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([sourceId])
+  @@index([date])
+  @@unique([sourceId, date])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -222,4 +350,35 @@ enum PartnershipStatus {
   SUSPENDED
   TERMINATED
   RENEWAL_NEEDED
+}
+
+enum MarketingSourceType {
+  ORGANIC_SEARCH
+  PAID_SEARCH
+  SOCIAL_MEDIA
+  EMAIL
+  REFERRAL
+  DIRECT
+  AFFILIATE
+  CONTENT_MARKETING
+  EVENT
+  OTHER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum AttributionType {
+  FIRST_TOUCH
+  LAST_TOUCH
+  MULTI_TOUCH
+  LINEAR
+  TIME_DECAY
+  POSITION_BASED
 }

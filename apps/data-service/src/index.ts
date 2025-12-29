@@ -89,6 +89,10 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
+  // Setup attribution routes
+  import attributionRoutes from './routes/attribution.routes.js';
+  app.use('/api/v1/attribution', attributionRoutes);
+
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({
