@@ -7,6 +7,7 @@ export type { TracingConfig } from './monitoring/tracing.js';
 export * from './cache/index.js';
 export * from './middleware/index.js';
 export * from './database/index.js';
+export * from './pagination/index.js';
 
 // Security exports
 export * from './security/index.js';

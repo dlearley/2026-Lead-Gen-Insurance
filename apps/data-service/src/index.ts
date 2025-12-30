@@ -34,6 +34,8 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { createPerformanceRoutes } from './routes/performance.routes.js';
+import { CacheManager, createCacheManager } from '@insurance-lead-gen/core';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -51,6 +53,7 @@ const start = async (): Promise<void> => {
   // Initialize services
   const eventBus = await NatsEventBus.connect(config.nats.url);
   const redis = createRedisConnection();
+  const cacheManager = createCacheManager(redis, { prefix: 'app:' });
 
   const leadRepository = new LeadRepository(prisma);
   const agentRepository = new AgentRepository(prisma);
@@ -88,6 +91,9 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup performance optimization routes
+  app.use('/api/v1/performance', createPerformanceRoutes(prisma, cacheManager));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
