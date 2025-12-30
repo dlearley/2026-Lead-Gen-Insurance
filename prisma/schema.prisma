@@ -10,9 +10,194 @@ generator client {
   output   = "../node_modules/@prisma/client"
 }
 
+// Organization model - stores company/broker information
+model Organization {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  slug              String   @unique
+  domain            String?
+  logoUrl           String?
+  primaryColor      String?  @default("#3B82F6")
+  secondaryColor    String?  @default("#10B981")
+  
+  // Company Info
+  companySize       String?  // '1-10', '11-50', '51-200', '201-500', '500+'
+  industry          String?  // 'health', 'life', 'property', 'casualty', 'commercial', 'auto'
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  country           String?
+  phone             String?
+  
+  // Status & Configuration
+  status            OrganizationStatus @default(PENDING)
+  isActive          Boolean @default(false)
+  setupComplete     Boolean @default(false)
+  verifiedAt        DateTime?
+  
+  // Subscription
+  subscriptionId    String?
+  subscriptionStatus SubscriptionStatus @default(PENDING)
+  subscriptionPlan  String?  // 'free', 'starter', 'professional', 'enterprise'
+  
+  // API & Security
+  apiKeyHash        String?
+  webhookUrl        String?
+  
+  // Metadata
+  preferences       Json?    // Custom notification settings, etc.
+  customFields      Json?    // Dynamic schema fields
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  users                 User[]
+  teamInvitations       TeamInvitation[]
+  auditLogs             AuditLog[]
+  
+  // Indexes
+  @@index([slug])
+  @@index([status])
+  @@index([isActive])
+  @@index([subscriptionStatus])
+  @@index([createdAt])
+}
+
+// User model - enhanced with organization support
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  firstName         String?
+  lastName          String?
+  passwordHash      String?
+  
+  // Organization membership
+  organizationId    String?
+  role              UserRole @default(USER)
+  permissions       Json?    // Custom permissions for fine-grained access control
+  
+  // Authentication
+  isActive          Boolean  @default(false)  // Account is active
+  emailVerified     Boolean  @default(false)  // Email verified
+  lastLoginAt       DateTime?
+  failedLoginCount  Int      @default(0)
+  lockoutUntil      DateTime?
+  
+  // Profile
+  avatarUrl         String?
+  phone             String?
+  jobTitle          String?
+  department        String?
+  
+  // Social Auth
+  googleId          String?  @unique
+  microsoftId       String?  @unique
+  
+  // Onboarding & Preferences
+  onboardingStep    Int?     @default(0)  // Current step in onboarding wizard
+  preferences       Json?    // User preferences (notifications, theme, etc.)
+  
+  // Security & Tokens
+  resetPasswordToken String?  @unique
+  resetPasswordExpires DateTime?
+  emailVerificationToken String? @unique
+  emailVerificationExpires DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  auditLogs         AuditLog[]
+  sentInvitations   TeamInvitation[] @relation("inviter")
+  receivedInvitations TeamInvitation[] @relation("invitee")
+  
+  // Indexes
+  @@index([email])
+  @@index([organizationId])
+  @@index([role])
+  @@index([isActive])
+  @@index([emailVerified])
+  @@index([lastLoginAt])
+  @@index([createdAt])
+}
+
+// TeamInvitation model - for inviting team members
+model TeamInvitation {
+  id              String   @id @default(uuid())
+
+  email           String   // Email of the invited user
+  organizationId  String
+  role            UserRole @default(USER)  // Role they will have in the organization
+  permissions     Json?    // Custom permissions for this invitation
+  
+  status          InvitationStatus @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  
+  // Inviter info
+  inviterId       String   // Who sent the invitation
+  
+  // Token for accepting invitation
+  token           String   @unique
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter         User @relation("inviter", fields: [inviterId], references: [id])
+  invitee         User? @relation("invitee", fields: [email], references: [email])
+  
+  // Indexes
+  @@index([email])
+  @@index([organizationId])
+  @@index([status])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// AuditLog model - comprehensive audit trail for all actions
+model AuditLog {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  userId          String?
+  
+  entityType      String?  // 'user', 'lead', 'policy', etc.
+  entityId        String?
+  action          String   // 'create', 'update', 'delete', 'login', etc.
+  
+  // What changed
+  oldValues       Json?    // Previous values (for updates)
+  newValues       Json?    // New values
+  
+  // Additional context
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?    // Additional context
+  
+  createdAt       DateTime @default(now())
+
+  // Relationships
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User? @relation(fields: [userId], references: [id])
+  
+  // Indexes
+  @@index([organizationId])
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
 // Lead model - stores all lead information
 model Lead {
   id              String     @id @default(uuid())
+  organizationId  String?    // Optional: null for global/leads before organization assignment
+  
   source          String
   email           String?
   phone           String?
@@ -33,17 +218,26 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
+  
+  // Organization relationship
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Indexes for performance
   @@index([email])
   @@index([phone])
   @@index([status])
+  @@index([organizationId])
   @@index([createdAt])
 }
 
 // Agent model - stores insurance agent information
 model Agent {
   id                  String     @id @default(uuid())
+  
+  // Organization & User relationship
+  userId              String?    @unique      // Links to User if agent is also a platform user
+  organizationId      String?                 // Organization this agent belongs to
+  
   firstName           String
   lastName            String
   email               String     @unique
@@ -64,13 +258,141 @@ model Agent {
 
   // Relationships
   assignments         LeadAssignment[]
+  user                User? @relation(fields: [userId], references: [id])
+  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Indexes
   @@index([email])
   @@index([licenseNumber])
   @@index([isActive])
+  @@index([organizationId])
   @@index([city])
   @@index([state])
+} 
+
+// LeadAssignment model - tracks lead to agent assignments
+model LeadAssignment {
+  id            String      @id @default(uuid())
+  organizationId String?
+  leadId        String
+  agentId       String
+  assignedAt    DateTime   @default(now())
+  status        AssignmentStatus @default(PENDING)
+  acceptedAt    DateTime?
+  notes         String?
+  assignedBy    String?    // User who assigned this lead
+
+  // Relationships
+  lead          Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent         Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([organizationId])
+  @@index([assignedAt])
+}
+
+// Event model - event sourcing for all system events
+model Event {
+  id          String    @id @default(uuid())
+  type        String
+  source      String
+  entityType  String
+  entityId    String
+  organizationId String?  // Optional: organization context for events
+  data        Json
+  timestamp   DateTime @default(now())
+  metadata    Json?
+
+  // Relationships
+  lead        Lead?     @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([type])
+  @@index([source])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([organizationId])
+  @@index([timestamp])
+}
+
+// Carrier model - stores insurance carrier information and partnership details
+model Carrier {
+  id                  String     @id @default(uuid())
+  
+  organizationId      String?    // Optional: carrier specific to organization
+  
+  name                String
+  description         String?
+  website             String?
+  contactEmail        String
+  contactPhone        String
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  country             String?
+  partnershipTier     PartnershipTier @default(BASIC)
+  partnershipStatus   PartnershipStatus @default(ACTIVE)
+  contractStartDate   DateTime
+  contractEndDate     DateTime?
+  commissionRate      Float      @default(0.0)
+  isActive            Boolean    @default(true)
+  integrationEnabled  Boolean    @default(false)
+  apiEndpoint         String?
+  apiKey              String?
+  performanceScore    Float      @default(0.0)
+  conversionRate      Float      @default(0.0)
+  averageResponseTime Float      @default(0.0)
+  totalLeadsReceived  Int        @default(0)
+  totalLeadsConverted Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relationships
+  performanceMetrics CarrierPerformanceMetric[]
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([name])
+  @@index([partnershipStatus])
+  @@index([partnershipTier])
+  @@index([isActive])
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+// CarrierPerformanceMetric model - tracks carrier performance over time
+model CarrierPerformanceMetric {
+  id                    String     @id @default(uuid())
+  carrierId             String
+  organizationId        String?    // Optional: org-specific metrics
+  month                 Int
+  year                  Int
+  leadsReceived         Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  averageResponseTime   Float      @default(0.0)
+  averageQuoteValue     Float      @default(0.0)
+  customerSatisfaction  Float      @default(0.0)
+  onTimeDeliveryRate    Float      @default(0.0)
+  createdAt             DateTime   @default(now())
+
+  // Relationships
+  carrier               Carrier    @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  organization          Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([carrierId])
+  @@index([organizationId])
+  @@index([year])
+  @@index([month])
+  @@index([createdAt])
+  @@unique([carrierId, organizationId, year, month])
 }
 
 // LeadAssignment model - tracks lead to agent assignments
@@ -222,4 +544,39 @@ enum PartnershipStatus {
   SUSPENDED
   TERMINATED
   RENEWAL_NEEDED
+}
+
+// New Enums for Organization Management
+enum OrganizationStatus {
+  PENDING       // Just created, not yet activated
+  ACTIVE        // Fully active
+  SUSPENDED     // Temporarily disabled
+  CANCELLED     // Permanently closed
+}
+
+enum SubscriptionStatus {
+  PENDING       // Subscription not started
+  ACTIVE        // Active subscription
+  PAST_DUE      // Payment failed
+  CANCELLED     // Cancelled
+  EXPIRED       // Trial/period ended
+}
+
+// Enhanced User Role system
+enum UserRole {
+  USER          // Basic user
+  AGENT         // Insurance agent (can view/leads)
+  MANAGER       // Team manager (can manage agents)
+  ADMIN         // Organization admin
+  SUPER_ADMIN   // Platform admin
+  VIEWER        // Read-only access
+}
+
+// Team Invitation Status
+enum InvitationStatus {
+  PENDING       // Sent but not accepted
+  ACCEPTED      // Accepted and processed
+  DECLINED      // Explicitly declined
+  EXPIRED       // Token expired
+  REVOKED       // Revoked by admin
 }
