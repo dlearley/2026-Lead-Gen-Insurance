@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
 import { logger } from '@insurance-lead-gen/core';
+import swaggerUi from 'swagger-ui-express';
+import { apiAnalyticsMiddleware } from './middleware/analytics.js';
+import { generateOpenApiSpec } from './openapi.js';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -34,8 +37,15 @@ export function createApp(): express.Express {
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(apiAnalyticsMiddleware);
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
+
+  const openApiSpec = generateOpenApiSpec();
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+  app.get('/openapi.json', (req, res) => {
+    res.json(openApiSpec);
+  });
 
   app.get('/health', (req, res) => {
     res.json({
@@ -92,6 +102,7 @@ export function createApp(): express.Express {
     res.status(404).json({ error: 'Not found' });
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.error('Unhandled error', { error: err });
     res.status(500).json({ error: 'Internal server error' });
