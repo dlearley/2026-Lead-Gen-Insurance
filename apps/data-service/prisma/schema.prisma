@@ -89,6 +89,7 @@ model Lead {
   tasks         Task[]
   assignments   LeadAssignment[]
   events        LeadEvent[]
+  importRecords DataImportRecord[]
 
   @@index([status])
   @@index([email])
@@ -745,4 +746,233 @@ enum IntegrationAction {
 enum Direction {
   INBOUND
   OUTBOUND
+}
+
+// ========================================
+// CRM INTEGRATION (Phase 15.1.2)
+// ========================================
+
+model CrmIntegration {
+  id                  String              @id @default(uuid())
+  name                String
+  provider            CrmProvider
+  isActive            Boolean             @default(true)
+  isConnected         Boolean             @default(false)
+  accessToken         String?
+  refreshToken        String?
+  tokenExpiresAt      DateTime?
+  instanceUrl         String?
+  apiKey              String?
+  apiSecret           String?
+  webhookSecret       String?
+  lastSyncAt          DateTime?
+  syncStatus          SyncStatus          @default(IDLE)
+  syncDirection       SyncDirection       @default(BIDIRECTIONAL)
+  syncFrequency       Int                 @default(3600)
+  autoSync            Boolean             @default(true)
+  errorCount          Int                 @default(0)
+  lastError           String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  fieldMappings       CrmFieldMapping[]
+  syncLogs            CrmSyncLog[]
+  importJobs          DataImportJob[]
+
+  @@index([provider])
+  @@index([isActive])
+  @@index([isConnected])
+  @@index([syncStatus])
+  @@index([createdAt])
+  @@map("crm_integrations")
+}
+
+model CrmFieldMapping {
+  id                  String              @id @default(uuid())
+  integrationId       String
+  sourceField         String
+  targetField         String
+  fieldType           FieldType
+  isRequired          Boolean             @default(false)
+  defaultValue        String?
+  transformFunction   String?
+  validationRules     Json?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([sourceField])
+  @@index([targetField])
+  @@unique([integrationId, sourceField, targetField])
+  @@map("crm_field_mappings")
+}
+
+model CrmSyncLog {
+  id                  String              @id @default(uuid())
+  integrationId       String
+  syncType            SyncType
+  direction           SyncDirection
+  status              SyncLogStatus
+  recordsProcessed    Int                 @default(0)
+  recordsSuccess      Int                 @default(0)
+  recordsFailed       Int                 @default(0)
+  recordsSkipped      Int                 @default(0)
+  startedAt           DateTime            @default(now())
+  completedAt         DateTime?
+  duration            Int?
+  errorMessage        String?
+  errorDetails        Json?
+  metadata            Json?
+
+  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([syncType])
+  @@index([status])
+  @@index([startedAt])
+  @@index([completedAt])
+  @@map("crm_sync_logs")
+}
+
+model DataImportJob {
+  id                  String              @id @default(uuid())
+  integrationId       String?
+  name                String
+  importType          ImportType
+  status              ImportStatus
+  fileName            String?
+  fileUrl             String?
+  fileMimeType        String?
+  fileSize            Int?
+  totalRows           Int                 @default(0)
+  processedRows       Int                 @default(0)
+  successRows         Int                 @default(0)
+  failedRows          Int                 @default(0)
+  skippedRows         Int                 @default(0)
+  duplicateRows       Int                 @default(0)
+  validationErrors    Json?
+  fieldMapping        Json?
+  options             Json?
+  scheduledFor        DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  duration            Int?
+  errorMessage        String?
+  createdBy           String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  integration         CrmIntegration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  importRecords       DataImportRecord[]
+
+  @@index([integrationId])
+  @@index([importType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([startedAt])
+  @@index([completedAt])
+  @@map("data_import_jobs")
+}
+
+model DataImportRecord {
+  id                  String              @id @default(uuid())
+  importJobId         String
+  rowNumber           Int
+  status              ImportRecordStatus
+  leadId              String?
+  sourceData          Json
+  transformedData     Json?
+  validationErrors    Json?
+  errorMessage        String?
+  isDuplicate         Boolean             @default(false)
+  duplicateOfId       String?
+  createdAt           DateTime            @default(now())
+
+  importJob           DataImportJob       @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  lead                Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([importJobId])
+  @@index([status])
+  @@index([leadId])
+  @@index([isDuplicate])
+  @@map("data_import_records")
+}
+
+enum CrmProvider {
+  SALESFORCE
+  HUBSPOT
+  PIPEDRIVE
+  ZOHO
+  MICROSOFT_DYNAMICS
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  ERROR
+  PAUSED
+}
+
+enum SyncDirection {
+  INBOUND
+  OUTBOUND
+  BIDIRECTIONAL
+}
+
+enum SyncType {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum SyncLogStatus {
+  STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum FieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  DATETIME
+  EMAIL
+  PHONE
+  URL
+  JSON
+}
+
+enum ImportType {
+  CSV
+  EXCEL
+  JSON
+  CRM_SYNC
+  API
+}
+
+enum ImportStatus {
+  PENDING
+  VALIDATING
+  VALIDATED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ImportRecordStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+  DUPLICATE
 }

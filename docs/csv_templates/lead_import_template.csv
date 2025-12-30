@@ -1,0 +1,6 @@
+firstName,lastName,email,phone,street,city,state,zipCode,country,insuranceType,currentProvider,policyExpiryDate,dateOfBirth,urgency
+John,Doe,john.doe@example.com,+1-555-0100,123 Main St,Springfield,IL,62701,USA,AUTO,State Farm,2025-12-31,1985-05-15,MEDIUM
+Jane,Smith,jane.smith@example.com,+1-555-0101,456 Oak Ave,Chicago,IL,60601,USA,HOME,Allstate,2025-06-30,1990-08-22,HIGH
+Mike,Johnson,mike.j@example.com,+1-555-0102,789 Pine Rd,Rockford,IL,61101,USA,LIFE,Prudential,2026-03-15,1978-12-10,LOW
+Sarah,Williams,sarah.w@example.com,+1-555-0103,321 Elm St,Peoria,IL,61602,USA,HEALTH,Blue Cross,2025-11-20,1982-03-25,MEDIUM
+Robert,Brown,robert.brown@example.com,+1-555-0104,654 Maple Dr,Naperville,IL,60540,USA,COMMERCIAL,Travelers,2025-09-15,1975-07-18,HIGH
