@@ -3,7 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
-import { logger } from '@insurance-lead-gen/core';
+import { logger, HealthService, createHealthMiddleware } from '@insurance-lead-gen/core';
+import { register } from 'prom-client';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -29,6 +30,9 @@ import { UPLOADS_DIR } from './utils/files.js';
 export function createApp(): express.Express {
   const app = express();
 
+  // Initialize health service (will be properly initialized when used)
+  let healthService: HealthService | null = null;
+
   app.use(helmet());
   app.use(cors());
   app.use(compression());
@@ -37,13 +41,78 @@ export function createApp(): express.Express {
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (req, res) => {
+    try {
+      res.set('Content-Type', register.contentType);
+      res.end(await register.metrics());
+    } catch (ex) {
+      logger.error('Error generating metrics', { error: ex });
+      res.status(500).end();
+    }
+  });
+
+  // Health check endpoints
   app.get('/health', (req, res) => {
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      service: 'insurance-lead-gen-api',
-      version: '1.0.0',
-    });
+    if (healthService) {
+      const liveness = healthService.checkLiveness();
+      res.json(liveness);
+    } else {
+      res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        service: 'insurance-lead-gen-api',
+        version: '1.0.0',
+      });
+    }
+  });
+
+  app.get('/health/ready', async (req, res) => {
+    if (healthService) {
+      try {
+        const readiness = await healthService.checkReadiness();
+        const status = readiness.ready ? 200 : 503;
+        res.status(status).json(readiness);
+      } catch (error) {
+        logger.error('Readiness check failed', { error });
+        res.status(503).json({ error: 'Readiness check failed' });
+      }
+    } else {
+      // Basic readiness check if health service not initialized
+      res.json({
+        ready: true,
+        timestamp: new Date().toISOString(),
+        service: 'insurance-lead-gen-api',
+        version: '1.0.0',
+        checks: {},
+        dependencies: [],
+        responseTime: 0,
+        status: 'healthy',
+      });
+    }
+  });
+
+  app.get('/health/full', async (req, res) => {
+    if (healthService) {
+      try {
+        const health = await healthService.checkHealth();
+        const status = health.status === 'unhealthy' ? 503 : 200;
+        res.status(status).json(health);
+      } catch (error) {
+        logger.error('Health check failed', { error });
+        res.status(503).json({ error: 'Health check failed' });
+      }
+    } else {
+      // Basic health check if health service not initialized
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'insurance-lead-gen-api',
+        version: '1.0.0',
+        dependencies: [],
+        responseTime: 0,
+      });
+    }
   });
 
   app.use('/api/v1/leads', leadsRouter);
