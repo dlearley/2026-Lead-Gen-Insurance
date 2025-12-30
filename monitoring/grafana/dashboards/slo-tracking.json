@@ -1,0 +1,367 @@
+{
+  "dashboard": {
+    "title": "Insurance Lead Gen - SLO Tracking & Error Budgets",
+    "uid": "slo-tracking",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "1m",
+    "tags": ["slo", "error-budget", "reliability"],
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall SLO Compliance",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "avg(slo_availability_percentage) / 100",
+            "legendFormat": "Overall Compliance"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.999, "color": "green"},
+                {"value": 0.99, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active SLO Violations",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_availability_percentage < 99.9)",
+            "legendFormat": "Active Violations"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "orange"},
+                {"value": 3, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Critical Error Budget Depletion",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_error_budget_remaining < 10)",
+            "legendFormat": "Critical Budgets"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "orange"},
+                {"value": 2, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Warning Error Budget Depletion",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_error_budget_remaining > 10 and slo_error_budget_remaining < 30)",
+            "legendFormat": "Warning Budgets"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 3, "color": "orange"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "SLO Compliance by Service",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_availability_percentage",
+            "legendFormat": "{{service}} - {{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 99.9, "color": "green"},
+                {"value": 99, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Error Budget Remaining by Service",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_error_budget_remaining",
+            "legendFormat": "{{service}} - {{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 50, "color": "green"},
+                {"value": 30, "color": "orange"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Error Budget Burn Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_error_budget_burn_rate",
+            "legendFormat": "{{service}} - {{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "orange"},
+                {"value": 1.5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "SLO Violation Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(slo_violations_total[5m])",
+            "legendFormat": "{{service}} - {{slo_name}} - {{severity}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "SLO Compliance Heatmap",
+        "type": "heatmap",
+        "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_availability_percentage",
+            "legendFormat": "{{service}} - {{slo_name}}",
+            "format": "heatmap"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Error Budget Consumption Over Time",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "100 - slo_error_budget_remaining",
+            "legendFormat": "{{service}} - {{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "SLO Latency Distribution",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(slo_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{service}} - {{slo_name}} - P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(slo_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{service}} - {{slo_name}} - P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "SLO Status Table",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_availability_percentage",
+            "legendFormat": "{{service}} - {{slo_name}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "title": "Active SLO Alerts",
+        "type": "alertlist",
+        "gridPos": {"x": 0, "y": 36, "w": 12, "h": 8},
+        "options": {
+          "showOptions": "current",
+          "maxItems": 20,
+          "sortOrder": 1,
+          "filter": "slo_"
+        }
+      },
+      {
+        "id": 14,
+        "title": "Error Budget Forecast",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 36, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_error_budget_remaining - (slo_error_budget_burn_rate * 1440)",
+            "legendFormat": "{{service}} - {{slo_name}} - 24h Forecast"
+          },
+          {
+            "expr": "slo_error_budget_remaining - (slo_error_budget_burn_rate * 10080)",
+            "legendFormat": "{{service}} - {{slo_name}} - 7d Forecast"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 15,
+        "title": "SLO Compliance Trends (7 Days)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 44, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_availability_percentage[7d]",
+            "legendFormat": "{{service}} - {{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 16,
+        "title": "Error Budget Trends (7 Days)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 44, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_error_budget_remaining[7d]",
+            "legendFormat": "{{service}} - {{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(slo_availability_percentage, service)",
+          "allValue": ".*",
+          "includeAll": true,
+          "label": "Service"
+        },
+        {
+          "name": "slo_name",
+          "type": "query",
+          "query": "label_values(slo_availability_percentage{service=~\"$service\"}, slo_name)",
+          "allValue": ".*",
+          "includeAll": true,
+          "label": "SLO Name"
+        }
+      ]
+    }
+  }
+}

@@ -4,11 +4,15 @@
 
 1. [Daily Operations](#daily-operations)
 2. [Incident Response](#incident-response)
-3. [Deployment Procedures](#deployment-procedures)
-4. [Scaling Operations](#scaling-operations)
-5. [Database Operations](#database-operations)
-6. [Monitoring & Alerts](#monitoring--alerts)
-7. [Maintenance Tasks](#maintenance-tasks)
+3. [SLO & Error Budget Management](#slo--error-budget-management)
+4. [Deployment Procedures](#deployment-procedures)
+5. [Scaling Operations](#scaling-operations)
+6. [Database Operations](#database-operations)
+7. [Monitoring & Alerts](#monitoring--alerts)
+8. [Maintenance Tasks](#maintenance-tasks)
+9. [Change Management](#change-management)
+10. [Post-Incident Review Process](#post-incident-review-process)
+11. [Compliance & Auditing](#compliance--auditing)
 
 ---
 
@@ -62,8 +66,423 @@ echo "=== Health Check Complete ==="
 - [ ] Review and rotate secrets if needed
 - [ ] Check for Kubernetes version updates
 - [ ] Review cost optimization opportunities
+- [ ] Check SLO compliance status
+- [ ] Review error budget consumption
+- [ ] Update SLO tracking dashboards
 
 ---
+
+## SLO & Error Budget Management
+
+### SLO Monitoring Procedure
+
+```bash
+# Check current SLO compliance
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+# Open browser to http://localhost:3000/d/slo-tracking
+
+# Check SLO metrics via Prometheus
+kubectl port-forward -n monitoring svc/prometheus 9090:9090
+# Query: slo_availability_percentage
+
+# Check error budget status
+# Query: slo_error_budget_remaining
+```
+
+### Error Budget Depletion Response
+
+#### Critical Error Budget Depletion (SLOViolationCritical)
+
+```bash
+# 1. Acknowledge alert
+# Notify SRE team via #sre-oncall
+
+# 2. Assess impact
+kubectl get pods -n production -o wide
+kubectl get events -n production --sort-by='.lastTimestamp'
+
+# 3. Check current error budget status
+curl -s http://localhost:9090/api/v1/query?query=slo_error_budget_remaining | jq
+
+# 4. Identify root cause
+kubectl logs -n production -l app=api --tail=200 | grep ERROR
+
+# 5. Implement mitigation
+# Option A: Scale up service
+kubectl scale deployment/api -n production --replicas=6
+
+# Option B: Enable feature flags to reduce load
+kubectl exec -n production <api-pod> -- curl -X POST http://localhost:3000/api/feature-flags -d '{"feature": "ai_scoring", "enabled": false}'
+
+# Option C: Implement rate limiting
+kubectl exec -n production <api-pod> -- curl -X POST http://localhost:3000/api/rate-limits -d '{"endpoint": "/leads", "limit": 50}'
+
+# 6. Monitor recovery
+kubectl logs -f -n production -l app=api
+
+# 7. Communicate with stakeholders
+# Post update in #incidents channel
+```
+
+#### Error Budget Depletion Decision Matrix
+
+| Remaining Budget | Action Required | Approval Needed |
+|------------------|-----------------|------------------|
+| > 50% | Monitor | None |
+| 30-50% | Optimize | Team Lead |
+| 10-30% | Mitigate | Engineering Manager |
+| < 10% | Feature Freeze | CTO |
+
+### SLO Violation Response
+
+#### Critical SLO Violation (SLOViolationCritical)
+
+```bash
+# 1. Trigger incident response
+./scripts/trigger-incident.sh SEV-2 "SLO Violation - {{slo_name}}"
+
+# 2. Check SLO metrics
+curl -s http://localhost:9090/api/v1/query?query=slo_availability_percentage\{slo_name\="{{slo_name}}"\} | jq
+
+# 3. Check related service health
+kubectl get pods -n production -l app={{service}}
+
+# 4. Check error logs
+kubectl logs -n production -l app={{service}} --tail=100 | grep -i error
+
+# 5. Check dependencies
+# Database
+kubectl get pods -n production -l app=postgres
+# Redis
+kubectl get pods -n production -l app=redis
+
+# 6. Implement immediate fixes
+# Restart service
+kubectl rollout restart deployment/{{service}} -n production
+
+# 7. Monitor SLO recovery
+watch -n 10 'curl -s http://localhost:9090/api/v1/query?query=slo_availability_percentage\{slo_name\="{{slo_name}}"\} | jq .data.result[0].value[1]'
+
+# 8. Escalate if not resolved
+./scripts/escalate-incident.sh SEV-1 "SLO Violation Persisting"
+```
+
+### Error Budget Forecasting
+
+```bash
+# Calculate time to exhaustion
+kubectl exec -n production <api-pod> -- node -e \
+"const budget = require('./slo-manager').getErrorBudgetStatus('api_availability', 'api-service');\nconsole.log('Time to exhaustion:', budget.remainingBudget / budget.burnRate, 'minutes');"
+
+# Check burn rate trends
+curl -s http://localhost:9090/api/v1/query_range?query=slo_error_budget_burn_rate[1d]\&step=1h | jq
+
+# Forecast 24-hour budget consumption
+kubectl exec -n production <api-pod> -- node -e \
+"const budget = require('./slo-manager').getErrorBudgetStatus('api_availability', 'api-service');\nconsole.log('24h forecast:', budget.remainingBudget - (budget.burnRate * 1440), '% remaining');"
+```
+
+### SLO Reset Procedure
+
+```bash
+# Reset error budgets at start of new SLO window
+kubectl exec -n production <api-pod> -- node -e \
+"require('./slo-manager').resetErrorBudgets();\nconsole.log('Error budgets reset successfully');"
+
+# Verify reset
+curl -s http://localhost:9090/api/v1/query?query=slo_error_budget_remaining | jq
+
+# Update dashboards
+kubectl exec -n monitoring <grafana-pod> -- curl -X POST http://localhost:3000/api/dashboards/db/slo-tracking/refresh
+```
+
+---
+
+## Change Management
+
+### Change Advisory Board (CAB) Process
+
+```bash
+# 1. Submit change request
+./scripts/submit-change-request.sh \
+  --title "API Service Scaling" \
+  --description "Increase API replicas from 3 to 5" \
+  --service "api-service" \
+  --change-type "infrastructure" \
+  --risk-level "low" \
+  --impact-analysis "Minimal impact, gradual scale up" \
+  --rollback-plan "Scale back down if issues occur"
+
+# 2. Review change request
+kubectl get changerequests -n governance
+
+# 3. Approve change (CAB member)
+./scripts/approve-change-request.sh --id CR-2023-001 --approved-by "john.doe@insurance-lead-gen.com"
+
+# 4. Schedule deployment window
+./scripts/schedule-deployment.sh \
+  --change-id CR-2023-001 \
+  --window "2023-12-15T02:00:00Z" \
+  --duration "1h"
+
+# 5. Execute change
+kubectl scale deployment/api -n production --replicas=5
+
+# 6. Monitor post-change
+kubectl logs -f -n production -l app=api
+
+# 7. Verify SLO compliance
+curl -s http://localhost:9090/api/v1/query?query=slo_availability_percentage{service="api-service"} | jq
+```
+
+### Change Impact Assessment
+
+```bash
+# Check current SLO status before change
+./scripts/check-slo-status.sh --service api-service
+
+# Check error budget status
+./scripts/check-error-budget.sh --service api-service
+
+# Simulate change impact
+./scripts/simulate-change-impact.sh \
+  --service api-service \
+  --change-type scaling \
+  --replicas 5
+
+# Check historical performance
+curl -s http://localhost:9090/api/v1/query_range?query=slo_availability_percentage{service="api-service"}[7d]\&step=1h | jq
+```
+
+### Change Rollback Procedure
+
+```bash
+# 1. Detect change failure
+kubectl get events -n production --sort-by='.lastTimestamp' | grep -i error
+
+# 2. Check SLO impact
+curl -s http://localhost:9090/api/v1/query?query=slo_availability_percentage{service="api-service"} | jq
+
+# 3. Execute rollback
+./scripts/rollback-change.sh --change-id CR-2023-001
+
+# 4. Verify rollback
+kubectl get pods -n production -l app=api
+
+# 5. Check SLO recovery
+watch -n 10 'curl -s http://localhost:9090/api/v1/query?query=slo_availability_percentage{service="api-service"} | jq .data.result[0].value[1]'
+
+# 6. Document rollback in change request
+./scripts/update-change-request.sh \
+  --id CR-2023-001 \
+  --status rolled_back \
+  --notes "Rollback completed due to SLO violation"
+```
+
+---
+
+## Post-Incident Review Process
+
+### PIR Creation Procedure
+
+```bash
+# 1. Create PIR document
+./scripts/create-pir.sh \
+  --incident-id INC-2023-001 \
+  --title "SLO Violation - API Service" \
+  --start-time "2023-12-14T14:30:00Z" \
+  --end-time "2023-12-14T15:45:00Z" \
+  --severity SEV-2 \
+  --root-cause "Database connection pool exhaustion" \
+  --impact "45 minutes of degraded API performance"
+
+# 2. Add timeline events
+./scripts/add-pir-timeline.sh \
+  --pir-id PIR-2023-001 \
+  --time "2023-12-14T14:30:00Z" \
+  --description "Alert triggered - HighAPIErrorRate" \
+  --type detection \
+  --responsible "monitoring-system"
+
+./scripts/add-pir-timeline.sh \
+  --pir-id PIR-2023-001 \
+  --time "2023-12-14T14:35:00Z" \
+  --description "SRE team acknowledged incident" \
+  --type response \
+  --responsible "john.doe@insurance-lead-gen.com"
+
+# 3. Add action items
+./scripts/add-pir-action-item.sh \
+  --pir-id PIR-2023-001 \
+  --description "Increase database connection pool size" \
+  --owner "database-team@insurance-lead-gen.com" \
+  --due-date "2023-12-21" \
+  --priority high
+
+./scripts/add-pir-action-item.sh \
+  --pir-id PIR-2023-001 \
+  --description "Add connection pool monitoring to dashboards" \
+  --owner "monitoring-team@insurance-lead-gen.com" \
+  --due-date "2023-12-18" \
+  --priority medium
+
+# 4. Add lessons learned
+./scripts/update-pir.sh \
+  --id PIR-2023-001 \
+  --lessons-learned "Need better connection pool monitoring and auto-scaling"
+
+# 5. Publish PIR
+./scripts/publish-pir.sh --id PIR-2023-001
+```
+
+### PIR Review Meeting
+
+```bash
+# 1. Prepare PIR presentation
+./scripts/generate-pir-report.sh --id PIR-2023-001 --format pdf
+
+# 2. Schedule review meeting
+./scripts/schedule-pir-review.sh \
+  --pir-id PIR-2023-001 \
+  --date "2023-12-15T10:00:00Z" \
+  --attendees "sre-team@insurance-lead-gen.com,engineering@insurance-lead-gen.com"
+
+# 3. Conduct meeting (manual process)
+# - Review timeline
+# - Discuss root cause
+# - Validate action items
+# - Identify process improvements
+
+# 4. Update PIR with meeting notes
+./scripts/update-pir.sh \
+  --id PIR-2023-001 \
+  --notes "PIR review meeting conducted. All action items validated. Additional monitoring to be implemented."
+```
+
+### Action Item Tracking
+
+```bash
+# Check action item status
+./scripts/check-action-items.sh --pir-id PIR-2023-001
+
+# Update action item status
+./scripts/update-action-item.sh \
+  --id AI-2023-001 \
+  --status completed \
+  --notes "Database connection pool increased from 50 to 100 connections"
+
+# Generate action item report
+./scripts/generate-action-item-report.sh --status open --due-within 7d
+
+# Escalate overdue action items
+./scripts/escalate-action-items.sh --overdue 3d
+```
+
+---
+
+## Compliance & Auditing
+
+### Compliance Audit Procedure
+
+```bash
+# 1. Generate compliance report
+./scripts/generate-compliance-report.sh \
+  --period "2023-12-01" \
+  --format pdf
+
+# 2. Check SLO compliance
+curl -s http://localhost:9090/api/v1/query?query=avg(slo_availability_percentage) | jq
+
+# 3. Check error budget compliance
+curl -s http://localhost:9090/api/v1/query?query=avg(slo_error_budget_remaining) | jq
+
+# 4. Generate audit trail
+./scripts/generate-audit-trail.sh \
+  --period "2023-12-01" \
+  --format csv
+
+# 5. Check change management compliance
+./scripts/check-change-compliance.sh \
+  --period "2023-12-01" \
+  --require-approval true
+```
+
+### Regulatory Compliance Checklist
+
+```bash
+# 1. Data Protection Compliance
+./scripts/check-data-protection.sh \
+  --regulation GDPR \
+  --check-encryption true \
+  --check-access-controls true
+
+# 2. Service Availability Compliance
+./scripts/check-availability-compliance.sh \
+  --slo-target 99.9 \
+  --period 28d
+
+# 3. Incident Response Compliance
+./scripts/check-incident-response.sh \
+  --max-response-time "15m" \
+  --severity SEV-1
+
+# 4. Change Management Compliance
+./scripts/check-change-management.sh \
+  --require-cab-approval true \
+  --require-rollback-plan true
+```
+
+### Audit Evidence Collection
+
+```bash
+# 1. Collect SLO metrics evidence
+./scripts/collect-slo-evidence.sh \
+  --period "2023-12-01" \
+  --output-dir ./audit-evidence/slo-metrics
+
+# 2. Collect change management evidence
+./scripts/collect-change-evidence.sh \
+  --period "2023-12-01" \
+  --output-dir ./audit-evidence/change-management
+
+# 3. Collect incident response evidence
+./scripts/collect-incident-evidence.sh \
+  --period "2023-12-01" \
+  --output-dir ./audit-evidence/incident-response
+
+# 4. Generate compliance certificate
+./scripts/generate-compliance-certificate.sh \
+  --period "2023-12-01" \
+  --regulation "ISO-27001" \
+  --output ./audit-evidence/compliance-certificate.pdf
+```
+
+### Compliance Reporting
+
+```bash
+# 1. Generate executive compliance report
+./scripts/generate-executive-report.sh \
+  --period "2023-12-01" \
+  --format pptx \
+  --output ./reports/executive-compliance-report.pptx
+
+# 2. Generate technical compliance report
+./scripts/generate-technical-report.sh \
+  --period "2023-12-01" \
+  --format pdf \
+  --output ./reports/technical-compliance-report.pdf
+
+# 3. Generate compliance dashboard
+./scripts/generate-compliance-dashboard.sh \
+  --period "2023-12-01" \
+  --output ./reports/compliance-dashboard.html
+
+# 4. Send compliance reports
+./scripts/send-compliance-reports.sh \
+  --to "compliance@insurance-lead-gen.com,executive-team@insurance-lead-gen.com" \
+  --subject "December 2023 Compliance Report" \
+  --attachments "./reports/executive-compliance-report.pptx,./reports/technical-compliance-report.pdf"
+```
 
 ## Incident Response
 

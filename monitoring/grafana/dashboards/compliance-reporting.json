@@ -1,0 +1,368 @@
+{
+  "dashboard": {
+    "title": "Insurance Lead Gen - Compliance & Audit Reporting",
+    "uid": "compliance-reporting",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "5m",
+    "tags": ["compliance", "audit", "regulatory"],
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall Compliance Score",
+        "type": "gauge",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 6},
+        "targets": [
+          {
+            "expr": "avg(slo_availability_percentage) / 100",
+            "legendFormat": "Compliance Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.999, "color": "green"},
+                {"value": 0.99, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            },
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Regulatory Compliance Status",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 6},
+        "targets": [
+          {
+            "expr": "count(slo_availability_percentage >= 99.9) / count(slo_availability_percentage)",
+            "legendFormat": "Regulatory Compliance"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.95, "color": "green"},
+                {"value": 0.8, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Audit Trail Activity",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "sum(rate(slo_violations_total[5m])) by (severity)",
+            "legendFormat": "{{severity}}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Compliance by Service Category",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 6, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(slo_availability_percentage) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 99.9, "color": "green"},
+                {"value": 99, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Budget Compliance",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 6, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(slo_error_budget_remaining) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 50, "color": "green"},
+                {"value": 30, "color": "orange"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Compliance Trends (30 Days)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 14, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(slo_availability_percentage) by (service)[30d]",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Error Budget Trends (30 Days)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 14, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(slo_error_budget_remaining) by (service)[30d]",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "SLO Violation Breakdown",
+        "type": "piechart",
+        "gridPos": {"x": 0, "y": 22, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(slo_violations_total) by (severity)",
+            "legendFormat": "{{severity}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Compliance by SLO Type",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 22, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "avg(slo_availability_percentage) by (slo_name)",
+            "legendFormat": "{{slo_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Regulatory Compliance Matrix",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 30, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "slo_availability_percentage",
+            "legendFormat": "{{service}} - {{slo_name}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Value",
+              "desc": true
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "title": "Audit Log Summary",
+        "type": "logs",
+        "gridPos": {"x": 12, "y": 30, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "{job=~\"varlogs\"} |= \"SLO\" | json | line_format `{{.timestamp}} {{.message}}`",
+            "legendFormat": "Audit Logs"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true
+        }
+      },
+      {
+        "id": 12,
+        "title": "Compliance Health Scorecard",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 38, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_availability_percentage >= 99.95) / count(slo_availability_percentage)",
+            "legendFormat": "Gold Standard"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.9, "color": "green"},
+                {"value": 0.7, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Compliance Health Scorecard",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 38, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_availability_percentage >= 99.9) / count(slo_availability_percentage)",
+            "legendFormat": "Silver Standard"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.9, "color": "green"},
+                {"value": 0.7, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "Compliance Health Scorecard",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 38, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_availability_percentage >= 99) / count(slo_availability_percentage)",
+            "legendFormat": "Bronze Standard"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.9, "color": "green"},
+                {"value": 0.7, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 15,
+        "title": "Compliance Health Scorecard",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 38, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "count(slo_availability_percentage < 99) / count(slo_availability_percentage)",
+            "legendFormat": "Non-Compliant"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0.1, "color": "green"},
+                {"value": 0.2, "color": "orange"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 16,
+        "title": "Active Compliance Alerts",
+        "type": "alertlist",
+        "gridPos": {"x": 0, "y": 42, "w": 24, "h": 8},
+        "options": {
+          "showOptions": "current",
+          "maxItems": 20,
+          "sortOrder": 1
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "compliance_period",
+          "type": "custom",
+          "query": "1d,7d,30d,90d",
+          "allValue": "7d",
+          "includeAll": true,
+          "label": "Compliance Period"
+        },
+        {
+          "name": "service_filter",
+          "type": "query",
+          "query": "label_values(slo_availability_percentage, service)",
+          "allValue": ".*",
+          "includeAll": true,
+          "label": "Service Filter"
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { Counter, Histogram, Gauge, register, Registry } from 'prom-client';
 import { Request, Response, NextFunction } from 'express';
+import { updateSLOMetrics } from './slos';
 
 export class MetricsCollector {
   private readonly registry: Registry;
@@ -56,7 +57,7 @@ export class MetricsCollector {
       // Hook into response finish event
       res.on('finish', () => {
         const duration = (Date.now() - start) / 1000;
-        
+
         // Decrement in-progress counter
         this.httpRequestsInProgress.labels(req.method, req.path, this.serviceName).dec();
 
@@ -74,6 +75,15 @@ export class MetricsCollector {
           res.statusCode.toString(),
           this.serviceName
         ).observe(duration);
+
+        // Update SLO metrics
+        const success = res.statusCode < 500;
+        try {
+          updateSLOMetrics('api_availability', this.serviceName, success ? 1 : 0, duration * 1000);
+          updateSLOMetrics('api_latency_p95', this.serviceName, success ? 1 : 0, duration * 1000);
+        } catch (error) {
+          console.error('Error updating SLO metrics:', error);
+        }
       });
 
       next();
@@ -178,6 +188,14 @@ export class LeadMetrics {
 
   recordLeadProcessed(status: string, source: string, service: string): void {
     this.leadsProcessed.labels(status, source, service).inc();
+
+    // Update SLO metrics for lead processing
+    try {
+      const success = status === 'success' || status === 'completed';
+      updateSLOMetrics('lead_processing_success_rate', service, success ? 1 : 0);
+    } catch (error) {
+      console.error('Error updating lead processing SLO metrics:', error);
+    }
   }
 
   setQueueDepth(queue: string, service: string, depth: number): void {
@@ -186,10 +204,25 @@ export class LeadMetrics {
 
   recordProcessingDuration(status: string, service: string, duration: number): void {
     this.leadProcessingDuration.labels(status, service).observe(duration);
+
+    // Update latency SLO metrics
+    try {
+      updateSLOMetrics('orchestrator_latency_p95', service, status === 'success' ? 1 : 0, duration * 1000);
+    } catch (error) {
+      console.error('Error updating orchestrator latency SLO metrics:', error);
+    }
   }
 
   recordScoringDuration(model: string, service: string, duration: number): void {
     this.leadScoringDuration.labels(model, service).observe(duration);
+
+    // Update AI model SLO metrics
+    try {
+      updateSLOMetrics('ai_model_latency_p95', service, 1, duration * 1000);
+      updateSLOMetrics('ai_model_success_rate', service, 1);
+    } catch (error) {
+      console.error('Error updating AI model SLO metrics:', error);
+    }
   }
 }
 
@@ -233,14 +266,36 @@ export class AIMetrics {
 
   recordModelCall(model: string, status: string, service: string): void {
     this.aiModelCalls.labels(model, status, service).inc();
+
+    // Update AI model SLO metrics
+    try {
+      const success = status === 'success' || status === 'completed';
+      updateSLOMetrics('ai_model_success_rate', service, success ? 1 : 0);
+    } catch (error) {
+      console.error('Error updating AI model success SLO metrics:', error);
+    }
   }
 
   recordModelLatency(model: string, service: string, latency: number): void {
     this.aiModelLatency.labels(model, service).observe(latency);
+
+    // Update AI latency SLO metrics
+    try {
+      updateSLOMetrics('ai_model_latency_p95', service, 1, latency * 1000);
+    } catch (error) {
+      console.error('Error updating AI model latency SLO metrics:', error);
+    }
   }
 
   recordModelError(model: string, errorType: string, service: string): void {
     this.aiModelErrors.labels(model, errorType, service).inc();
+
+    // Update AI model SLO metrics for errors
+    try {
+      updateSLOMetrics('ai_model_success_rate', service, 0);
+    } catch (error) {
+      console.error('Error updating AI model error SLO metrics:', error);
+    }
   }
 
   recordAPICost(model: string, service: string, cost: number): void {

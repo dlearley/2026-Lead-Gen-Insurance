@@ -199,19 +199,35 @@ pagerduty_configs:
    - Response times
    - Resource usage
 
-2. **Lead Processing** - Business metrics
+2. **SLO Tracking** - Service Level Objectives monitoring
+   - Overall SLO compliance
+   - Error budget status
+   - Burn rate monitoring
+   - Violation trends
+   - Service breakdown
+   - Forecasting
+
+3. **Compliance Reporting** - Regulatory compliance monitoring
+   - Compliance score
+   - Audit trail activity
+   - Compliance by service
+   - Error budget compliance
+   - Compliance trends
+   - Regulatory compliance matrix
+
+4. **Lead Processing** - Business metrics
    - Lead processing rate
    - Queue depths
    - Processing times
    - Success/failure rates
 
-3. **AI Models** - AI/ML performance
+5. **AI Models** - AI/ML performance
    - Model latency
    - API costs
    - Error rates
    - Usage patterns
 
-4. **Infrastructure** - System resources
+6. **Infrastructure** - System resources
    - CPU usage
    - Memory usage
    - Disk usage
@@ -227,6 +243,38 @@ pagerduty_configs:
 5. Write PromQL query
 6. Configure visualization
 7. Save dashboard
+
+### SLO-Specific Dashboard Queries
+
+**SLO Compliance by Service:**
+```promql
+avg(slo_availability_percentage) by (service)
+```
+
+**Error Budget Remaining:**
+```promql
+slo_error_budget_remaining
+```
+
+**Error Budget Burn Rate:**
+```promql
+slo_error_budget_burn_rate > 1
+```
+
+**SLO Violation Rate:**
+```promql
+rate(slo_violations_total[5m])
+```
+
+**Time to Error Budget Exhaustion:**
+```promql
+slo_error_budget_remaining / slo_error_budget_burn_rate
+```
+
+**SLO Compliance Trends:**
+```promql
+slo_availability_percentage[7d]
+```
 
 ## Distributed Tracing
 

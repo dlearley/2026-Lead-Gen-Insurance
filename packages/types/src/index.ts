@@ -440,6 +440,12 @@ export interface NotificationFilterParams {
 }
 
 // ========================================
+// OBSERVABILITY & SLO TYPES
+// ========================================
+
+export * from './observability';
+
+// ========================================
 // CARRIER TYPES
 // ========================================
 
