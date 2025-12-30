@@ -153,10 +153,76 @@ groups:
 
       # AI Model Errors
       - alert: AIModelErrors
-        expr: rate(ai_model_errors_total[5m]) > 0.05
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High rate of AI model errors"
-          description: "AI model error rate is above 0.05 per second."
+       expr: rate(ai_model_errors_total[5m]) > 0.05
+       for: 5m
+       labels:
+         severity: warning
+       annotations:
+         summary: "High rate of AI model errors"
+         description: "AI model error rate is above 0.05 per second."
+
+      - name: slo_alerts
+      interval: 1m
+      rules:
+      # SLO Violation Alerts
+      - alert: SLOViolationCritical
+       expr: slo_availability_percentage < 95
+       for: 5m
+       labels:
+         severity: critical
+       annotations:
+         summary: "Critical SLO violation detected"
+         description: "SLO {{ $labels.slo_name }} for service {{ $labels.service }} is critically violated ({{ $value }}% availability)."
+         runbook_url: "https://docs.insurance-lead-gen.com/runbooks/slo-violation"
+
+      - alert: SLOViolationWarning
+       expr: slo_availability_percentage > 95 and slo_availability_percentage < 99
+       for: 15m
+       labels:
+         severity: warning
+       annotations:
+         summary: "SLO violation warning"
+         description: "SLO {{ $labels.slo_name }} for service {{ $labels.service }} is approaching violation ({{ $value }}% availability)."
+         runbook_url: "https://docs.insurance-lead-gen.com/runbooks/slo-violation"
+
+      # Error Budget Alerts
+      - alert: ErrorBudgetCritical
+       expr: slo_error_budget_remaining < 10
+       for: 1m
+       labels:
+         severity: critical
+       annotations:
+         summary: "Critical error budget depletion"
+         description: "Error budget for SLO {{ $labels.slo_name }} (service {{ $labels.service }}) is critically low ({{ $value }}% remaining)."
+         runbook_url: "https://docs.insurance-lead-gen.com/runbooks/error-budget-depletion"
+
+      - alert: ErrorBudgetWarning
+       expr: slo_error_budget_remaining > 10 and slo_error_budget_remaining < 30
+       for: 5m
+       labels:
+         severity: warning
+       annotations:
+         summary: "Error budget depletion warning"
+         description: "Error budget for SLO {{ $labels.slo_name }} (service {{ $labels.service }}) is getting low ({{ $value }}% remaining)."
+         runbook_url: "https://docs.insurance-lead-gen.com/runbooks/error-budget-depletion"
+
+      - alert: HighErrorBudgetBurnRate
+       expr: slo_error_budget_burn_rate > 1.5
+       for: 5m
+       labels:
+         severity: warning
+       annotations:
+         summary: "High error budget burn rate"
+         description: "Error budget for SLO {{ $labels.slo_name }} (service {{ $labels.service }}) is burning at {{ $value }}x normal rate."
+         runbook_url: "https://docs.insurance-lead-gen.com/runbooks/high-burn-rate"
+
+      # Latency SLO Alerts
+      - alert: SLOLatencyViolation
+       expr: histogram_quantile(0.95, rate(slo_latency_seconds_bucket[5m])) > 2
+       for: 5m
+       labels:
+         severity: warning
+       annotations:
+         summary: "SLO latency violation"
+         description: "Latency for SLO {{ $labels.slo_name }} (service {{ $labels.service }}) exceeds threshold ({{ $value }}s)."
+         runbook_url: "https://docs.insurance-lead-gen.com/runbooks/latency-violation"
