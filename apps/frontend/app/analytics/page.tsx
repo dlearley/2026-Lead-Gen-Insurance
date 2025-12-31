@@ -76,7 +76,7 @@ function AnalyticsDashboardContent() {
           <h2 className="text-2xl font-bold text-secondary-900">Analytics Dashboard</h2>
           <p className="text-secondary-600">Track performance and insights across your platform</p>
         </div>
-        <div className="w-48">
+        <div data-tour="analytics-time-range" className="w-48">
           <Select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value as TimeRange)}

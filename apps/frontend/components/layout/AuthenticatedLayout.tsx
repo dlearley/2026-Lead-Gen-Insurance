@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { Breadcrumb } from "./Breadcrumb";
+import { HelpCenterModal } from "@/components/help/HelpCenterModal";
+import { ProductTourOverlay } from "@/components/onboarding/ProductTourOverlay";
+import { useAuthStore } from "@/stores/auth.store";
+import { useOnboardingStore } from "@/stores/onboarding.store";
+import { normalizeOnboardingRole } from "@/lib/onboarding/tours";
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -12,6 +18,25 @@ interface AuthenticatedLayoutProps {
 
 export function AuthenticatedLayout({ children, title }: AuthenticatedLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const role = useMemo(() => normalizeOnboardingRole(user?.role), [user?.role]);
+
+  const { activeTour, startTour, tourCompletedAtByRole, tourSkippedAtByRole } = useOnboardingStore();
+
+  useEffect(() => {
+    if (!user) return;
+    if (pathname !== "/dashboard") return;
+    if (activeTour) return;
+
+    const completedAt = tourCompletedAtByRole[role];
+    const skippedAt = tourSkippedAtByRole[role];
+    if (completedAt || skippedAt) return;
+
+    const timer = window.setTimeout(() => startTour(role), 800);
+    return () => window.clearTimeout(timer);
+  }, [user, pathname, activeTour, role, startTour, tourCompletedAtByRole, tourSkippedAtByRole]);
 
   const handleMobileMenuToggle = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -40,6 +65,9 @@ export function AuthenticatedLayout({ children, title }: AuthenticatedLayoutProp
           </div>
         </main>
       </div>
+
+      <HelpCenterModal />
+      <ProductTourOverlay />
     </div>
   );
 }

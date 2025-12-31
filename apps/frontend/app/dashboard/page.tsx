@@ -44,18 +44,18 @@ function DashboardContent() {
           <h2 className="text-2xl font-bold text-secondary-900">Dashboard</h2>
           <p className="text-secondary-600">Welcome back! Here's what's happening today.</p>
         </div>
-        <Button>
+        <Button data-tour="dashboard-add-lead">
           <Link href="/leads/new">Add New Lead</Link>
         </Button>
       </div>
 
       {isMobile && (
-        <div className="lg:hidden">
+        <div data-tour="dashboard-fieldwork" className="lg:hidden">
           <FieldWorkWidget compact />
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div data-tour="dashboard-metrics" className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total Leads"
           value={formatNumber(dashboard?.leads.total || 0)}
@@ -89,7 +89,7 @@ function DashboardContent() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <div className="lg:col-span-1 xl:col-span-1 hidden lg:block">
+        <div data-tour="dashboard-fieldwork" className="lg:col-span-1 xl:col-span-1 hidden lg:block">
           <FieldWorkWidget />
         </div>
 

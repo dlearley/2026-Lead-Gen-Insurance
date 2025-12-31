@@ -122,6 +122,7 @@ export function LeadList({
               placeholder="Search leads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              data-tour="leads-search"
               className={cn(
                 "w-full pl-10 pr-4 py-2.5 rounded-xl border border-secondary-200",
                 "text-sm placeholder:text-secondary-400",
@@ -132,6 +133,8 @@ export function LeadList({
 
           {showFilters && (
             <button
+              type="button"
+              data-tour="leads-filters"
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className={cn(
                 "p-2.5 rounded-xl border transition-colors",
@@ -172,7 +175,7 @@ export function LeadList({
           )}
 
           {showAddButton && (
-            <Button onClick={onAddLead}>
+            <Button data-tour="leads-add" onClick={onAddLead}>
               <Plus className="h-5 w-5 mr-1" />
               Add Lead
             </Button>
