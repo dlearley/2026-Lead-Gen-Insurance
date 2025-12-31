@@ -247,3 +247,168 @@ export class AIMetrics {
     this.aiAPICost.labels(model, service).inc(cost);
   }
 }
+
+// Onboarding & activation metrics
+export class OnboardingMetrics {
+  private readonly sessionsStarted: Counter<string>;
+  private readonly stepCompleted: Counter<string>;
+  private readonly stepDurationSeconds: Histogram<string>;
+  private readonly timeToFirstLeadDays: Histogram<string>;
+  private readonly timeToCompletionHours: Histogram<string>;
+  private readonly sessionsByStatus: Gauge<string>;
+  private readonly funnelReached: Gauge<string>;
+  private readonly abandonedSignups: Gauge<string>;
+  private readonly atRiskByLevel: Gauge<string>;
+  private readonly averageCompletionPct: Gauge<string>;
+  private readonly feedbackSubmitted: Counter<string>;
+  private readonly npsScore: Gauge<string>;
+  private readonly feedbackResponseRate: Gauge<string>;
+
+  constructor(registry: Registry, serviceName: string) {
+    this.sessionsStarted = new Counter({
+      name: 'onboarding_sessions_started_total',
+      help: 'Total number of onboarding sessions started',
+      labelNames: ['service'],
+      registers: [registry],
+    });
+
+    this.stepCompleted = new Counter({
+      name: 'onboarding_step_completed_total',
+      help: 'Total number of onboarding steps completed',
+      labelNames: ['step', 'service'],
+      registers: [registry],
+    });
+
+    this.stepDurationSeconds = new Histogram({
+      name: 'onboarding_step_duration_seconds',
+      help: 'Time spent in onboarding step (seconds)',
+      labelNames: ['step', 'service'],
+      buckets: [1, 5, 10, 30, 60, 180, 600, 1800, 3600, 7200, 14400],
+      registers: [registry],
+    });
+
+    this.timeToFirstLeadDays = new Histogram({
+      name: 'onboarding_time_to_first_lead_days',
+      help: 'Time from signup to first lead (days)',
+      labelNames: ['service'],
+      buckets: [0.25, 0.5, 1, 2, 3, 5, 7, 14, 30],
+      registers: [registry],
+    });
+
+    this.timeToCompletionHours = new Histogram({
+      name: 'onboarding_time_to_completion_hours',
+      help: 'Time from signup to onboarding completion (hours)',
+      labelNames: ['service'],
+      buckets: [1, 6, 12, 24, 48, 72, 168, 336],
+      registers: [registry],
+    });
+
+    this.sessionsByStatus = new Gauge({
+      name: 'onboarding_sessions_total',
+      help: 'Number of onboarding sessions by status',
+      labelNames: ['status', 'service'],
+      registers: [registry],
+    });
+
+    this.funnelReached = new Gauge({
+      name: 'onboarding_funnel_reached_total',
+      help: 'Number of sessions that have reached each step',
+      labelNames: ['step', 'service'],
+      registers: [registry],
+    });
+
+    this.abandonedSignups = new Gauge({
+      name: 'onboarding_abandoned_signups_total',
+      help: 'Number of signups considered abandoned (no progress within SLA)',
+      labelNames: ['service'],
+      registers: [registry],
+    });
+
+    this.atRiskByLevel = new Gauge({
+      name: 'onboarding_at_risk_total',
+      help: 'Number of onboarding sessions at risk by risk level',
+      labelNames: ['level', 'service'],
+      registers: [registry],
+    });
+
+    this.averageCompletionPct = new Gauge({
+      name: 'onboarding_completion_percentage_average',
+      help: 'Average onboarding completion percentage across active sessions',
+      labelNames: ['service'],
+      registers: [registry],
+    });
+
+    this.feedbackSubmitted = new Counter({
+      name: 'onboarding_feedback_submitted_total',
+      help: 'Total number of onboarding feedback submissions',
+      labelNames: ['nps_category', 'sentiment', 'service'],
+      registers: [registry],
+    });
+
+    this.npsScore = new Gauge({
+      name: 'onboarding_nps_score',
+      help: 'Net Promoter Score for onboarding (promoters% - detractors%)',
+      labelNames: ['service'],
+      registers: [registry],
+    });
+
+    this.feedbackResponseRate = new Gauge({
+      name: 'onboarding_feedback_response_rate',
+      help: 'Feedback response rate (responses / completed sessions)',
+      labelNames: ['service'],
+      registers: [registry],
+    });
+  }
+
+  recordSessionStarted(service: string): void {
+    this.sessionsStarted.labels(service).inc();
+  }
+
+  recordStepCompleted(step: string, service: string): void {
+    this.stepCompleted.labels(step, service).inc();
+  }
+
+  recordStepDuration(step: string, service: string, durationSeconds: number): void {
+    this.stepDurationSeconds.labels(step, service).observe(durationSeconds);
+  }
+
+  recordTimeToFirstLead(service: string, days: number): void {
+    this.timeToFirstLeadDays.labels(service).observe(days);
+  }
+
+  recordTimeToCompletion(service: string, hours: number): void {
+    this.timeToCompletionHours.labels(service).observe(hours);
+  }
+
+  setSessionsByStatus(service: string, status: string, count: number): void {
+    this.sessionsByStatus.labels(status, service).set(count);
+  }
+
+  setFunnelReached(service: string, step: string, count: number): void {
+    this.funnelReached.labels(step, service).set(count);
+  }
+
+  setAbandonedSignups(service: string, count: number): void {
+    this.abandonedSignups.labels(service).set(count);
+  }
+
+  setAtRiskByLevel(service: string, level: string, count: number): void {
+    this.atRiskByLevel.labels(level, service).set(count);
+  }
+
+  setAverageCompletionPercentage(service: string, pct: number): void {
+    this.averageCompletionPct.labels(service).set(pct);
+  }
+
+  recordFeedbackSubmitted(service: string, npsCategory: string, sentiment: string): void {
+    this.feedbackSubmitted.labels(npsCategory, sentiment, service).inc();
+  }
+
+  setNpsScore(service: string, score: number): void {
+    this.npsScore.labels(service).set(score);
+  }
+
+  setFeedbackResponseRate(service: string, rate: number): void {
+    this.feedbackResponseRate.labels(service).set(rate);
+  }
+}
