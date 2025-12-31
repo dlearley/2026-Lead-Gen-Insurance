@@ -13,6 +13,10 @@ import {
   BarChart3,
   FolderOpen,
   MapPin,
+  ClipboardList,
+  GraduationCap,
+  BookOpen,
+  LifeBuoy,
 } from "lucide-react";
 
 interface NavItem {
@@ -71,6 +75,26 @@ const navItems: NavItem[] = [
     href: "/settings",
     icon: <Settings className="h-5 w-5" />,
   },
+  {
+    label: "Onboarding",
+    href: "/onboarding",
+    icon: <ClipboardList className="h-5 w-5" />,
+  },
+  {
+    label: "Training",
+    href: "/training",
+    icon: <GraduationCap className="h-5 w-5" />,
+  },
+  {
+    label: "Guides",
+    href: "/guides",
+    icon: <BookOpen className="h-5 w-5" />,
+  },
+  {
+    label: "Help Center",
+    href: "/help",
+    icon: <LifeBuoy className="h-5 w-5" />,
+  },
 ];
 
 interface SidebarProps {
@@ -83,10 +107,12 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
 
   const NavItem = ({ item }: { item: NavItem }) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-    
+    const tourId = `nav-${item.href.replace(/\//g, "-").slice(1)}`;
+
     return (
       <Link
         href={item.href}
+        data-tour={tourId}
         onClick={onCloseMobile}
         className={cn(
           "flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors",
@@ -115,6 +141,7 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
   return (
     <>
       <aside
+        data-tour="sidebar"
         className={cn(
           "fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-secondary-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -139,9 +166,13 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
               <p className="text-xs text-secondary-600 mb-3">
                 Check our documentation or contact support.
               </p>
-              <button className="w-full text-xs font-medium text-primary-600 hover:text-primary-700">
+              <Link
+                href="/help"
+                onClick={onCloseMobile}
+                className="block w-full text-xs font-medium text-primary-600 hover:text-primary-700"
+              >
                 View Documentation →
-              </button>
+              </Link>
             </div>
           </div>
         </div>

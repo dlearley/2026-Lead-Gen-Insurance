@@ -152,7 +152,7 @@ function ReportsContent() {
           <h2 className="text-2xl font-bold text-secondary-900">Reports</h2>
           <p className="text-secondary-600">Generate and manage performance reports</p>
         </div>
-        <Button onClick={() => setIsGenerateModalOpen(true)}>
+        <Button data-tour="reports-generate" onClick={() => setIsGenerateModalOpen(true)}>
           <FileDown className="h-4 w-4 mr-2" />
           Generate Report
         </Button>

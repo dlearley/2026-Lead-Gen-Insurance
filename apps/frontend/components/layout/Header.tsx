@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Menu, X, LogOut, User, Bell, Search } from "lucide-react";
+import { Menu, X, LogOut, User, Bell, Search, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/utils/cn";
+import { useOnboardingStore } from "@/stores/onboarding.store";
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
@@ -14,8 +13,8 @@ interface HeaderProps {
 }
 
 export function Header({ onMobileMenuToggle, isMobileMenuOpen = false }: HeaderProps) {
-  const router = useRouter();
   const { user, logout } = useAuth();
+  const { openHelpCenter } = useOnboardingStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = async () => {
@@ -42,7 +41,7 @@ export function Header({ onMobileMenuToggle, isMobileMenuOpen = false }: HeaderP
                 <Menu className="h-6 w-6" />
               )}
             </button>
-            <Link href="/dashboard" className="flex items-center space-x-2">
+            <Link href="/dashboard" className="flex items-center space-x-2" data-tour="header-logo">
               <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">IL</span>
               </div>
@@ -58,6 +57,7 @@ export function Header({ onMobileMenuToggle, isMobileMenuOpen = false }: HeaderP
                 <input
                   type="text"
                   placeholder="Search..."
+                  data-tour="header-search"
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-secondary-200 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                 />
                 <Search className="absolute left-3 top-2.5 h-5 w-5 text-secondary-400" />
@@ -66,13 +66,30 @@ export function Header({ onMobileMenuToggle, isMobileMenuOpen = false }: HeaderP
           </div>
 
           <div className="flex items-center space-x-4">
-            <button className="p-2 rounded-full text-secondary-400 hover:text-secondary-500 hover:bg-secondary-100 relative">
+            <button
+              data-tour="header-help"
+              onClick={() => openHelpCenter()}
+              className="p-2 rounded-full text-secondary-400 hover:text-secondary-500 hover:bg-secondary-100"
+              aria-label="Open help center"
+              type="button"
+            >
+              <LifeBuoy className="h-5 w-5" />
+            </button>
+
+            <button
+              data-tour="header-notifications"
+              className="p-2 rounded-full text-secondary-400 hover:text-secondary-500 hover:bg-secondary-100 relative"
+              type="button"
+              aria-label="Notifications"
+            >
               <Bell className="h-5 w-5" />
               <span className="absolute top-1 right-1 h-2 w-2 bg-error-500 rounded-full"></span>
             </button>
 
             <div className="relative">
               <button
+                type="button"
+                data-tour="header-user-menu"
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex items-center space-x-2 p-2 rounded-lg hover:bg-secondary-100 transition-colors"
               >
