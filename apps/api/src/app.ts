@@ -3,7 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
-import { logger } from '@insurance-lead-gen/core';
+import { register } from 'prom-client';
+import { logger, MetricsCollector, OnboardingMetrics } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -24,16 +25,25 @@ import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
+import onboardingRouter from './routes/onboarding.js';
+import { onboardingTracker } from './telemetry/onboarding-tracker.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
   const app = express();
+
+  const serviceName = 'api';
+  const metricsCollector = new MetricsCollector(serviceName);
+  const onboardingMetrics = new OnboardingMetrics(register, serviceName);
+  onboardingTracker.initialize(onboardingMetrics, serviceName);
 
   app.use(helmet());
   app.use(cors());
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+
+  app.use(metricsCollector.middleware());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
@@ -44,6 +54,11 @@ export function createApp(): express.Express {
       service: 'insurance-lead-gen-api',
       version: '1.0.0',
     });
+  });
+
+  app.get('/metrics', async (req, res) => {
+    res.setHeader('Content-Type', metricsCollector.getContentType());
+    res.end(await metricsCollector.getMetrics());
   });
 
   app.use('/api/v1/leads', leadsRouter);
@@ -66,6 +81,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/vip', vipRouter);
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/claims', claimsRouter);
+  app.use('/api/v1/onboarding', onboardingRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -87,6 +103,7 @@ export function createApp(): express.Express {
   app.use('/api/vip', vipRouter);
   app.use('/api/community', communityRouter);
   app.use('/api/claims', claimsRouter);
+  app.use('/api/onboarding', onboardingRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

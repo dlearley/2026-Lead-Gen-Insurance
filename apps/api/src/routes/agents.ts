@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '@insurance-lead-gen/core';
 import { generateId, store } from '../storage/in-memory.js';
+import { onboardingTracker } from '../telemetry/onboarding-tracker.js';
 import type { Agent } from '@insurance-lead-gen/types';
 
 const router = Router();
@@ -62,6 +63,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     };
 
     store.agents.set(agent.id, agent);
+    onboardingTracker.recordAgentSignup(agent);
 
     logger.info('Agent created', { agentId: agent.id, email: agent.email });
 

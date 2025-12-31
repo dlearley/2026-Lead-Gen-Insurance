@@ -1,5 +1,18 @@
 import { randomUUID } from 'crypto';
-import type { ActivityLog, Agent, Email, Lead, LeadAssignment, Note, Notification, Policy, Task, User } from '@insurance-lead-gen/types';
+import type {
+  ActivityLog,
+  Agent,
+  Email,
+  Lead,
+  LeadAssignment,
+  Note,
+  Notification,
+  OnboardingFeedbackResponse,
+  OnboardingSession,
+  Policy,
+  Task,
+  User,
+} from '@insurance-lead-gen/types';
 
 export interface EmailTemplateRecord {
   id: string;
@@ -23,6 +36,8 @@ export interface InMemoryStore {
   emails: Map<string, Email>;
   activities: Map<string, ActivityLog>;
   notifications: Map<string, Notification>;
+  onboardingSessions: Map<string, OnboardingSession>;
+  onboardingFeedback: Map<string, OnboardingFeedbackResponse>;
   emailTemplates: Map<string, EmailTemplateRecord>;
   policies: Map<string, Policy>;
 }
@@ -53,6 +68,8 @@ export const store: InMemoryStore = {
   emails: new Map(),
   activities: new Map(),
   notifications: new Map(),
+  onboardingSessions: new Map(),
+  onboardingFeedback: new Map(),
   policies: new Map(),
   emailTemplates: new Map([
     [
@@ -94,5 +111,7 @@ export function resetStore(): void {
   store.emails.clear();
   store.activities.clear();
   store.notifications.clear();
+  store.onboardingSessions.clear();
+  store.onboardingFeedback.clear();
   store.policies.clear();
 }
