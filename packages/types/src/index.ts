@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Personalization (Phase 16.3.7)
+export * from './personalization.js';
