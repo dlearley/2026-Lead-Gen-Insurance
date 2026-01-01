@@ -10,3 +10,6 @@ export * from './database/index.js';
 
 // Security exports
 export * from './security/index.js';
+
+// Orchestration exports
+export * from './orchestration/index.js';

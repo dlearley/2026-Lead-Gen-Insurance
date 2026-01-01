@@ -10,6 +10,12 @@ import { NatsEventBus } from './nats/nats-event-bus.js';
 import { RankingService } from './services/ranking.service.js';
 import { RoutingService } from './services/routing.service.js';
 import { LeadRoutingWorkflow } from './services/lead-routing-workflow.js';
+import prisma from './db/prisma.js';
+import {
+  CampaignOrchestrationService,
+  MultiChannelMessagingService,
+  LeadStateService,
+} from '@insurance-lead-gen/core';
 
 const config = getConfig();
 const PORT = config.ports.orchestrator;
@@ -61,6 +67,24 @@ const start = async (): Promise<void> => {
     routingService
   );
 
+  // Initialize Orchestration services
+  const messagingService = new MultiChannelMessagingService(prisma);
+  const leadStateService = new LeadStateService(prisma);
+  const campaignOrchestrationService = new CampaignOrchestrationService(
+    prisma,
+    messagingService,
+    leadStateService
+  );
+
+  // Start campaign processing loop
+  const campaignInterval = setInterval(async () => {
+    try {
+      await campaignOrchestrationService.processCampaigns();
+    } catch (error) {
+      logger.error('Error processing campaigns', { error });
+    }
+  }, 60000); // Process every minute
+
   // Start workflow
   routingWorkflow.start().catch((error) => {
     logger.error('Lead routing workflow failed to start', { error });
@@ -69,6 +93,7 @@ const start = async (): Promise<void> => {
   const shutdown = async (): Promise<void> => {
     logger.info('Shutting down orchestrator service');
 
+    clearInterval(campaignInterval);
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await eventBus.close();
   };
