@@ -824,6 +824,7 @@ export * from './integrations.js';
 
 // Retention Types
 export * from './retention.js';
+export * from './intent.js';
 
 // VIP & Community
 export * from './vip.js';
