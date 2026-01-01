@@ -809,6 +809,9 @@ export * from './analytics.js';
 // Customer Types
 export * from './customers.js';
 
+// Customer Success Types
+export * from './customer-success.js';
+
 // Report Types
 export * from './reports.js';
 
