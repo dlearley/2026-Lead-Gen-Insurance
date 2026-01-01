@@ -531,6 +531,219 @@ model SystemConfig {
 }
 
 // ========================================
+// PARTNER MANAGEMENT (Phase 15.2)
+// ========================================
+
+model Partner {
+  id                String               @id @default(uuid())
+  name              String
+  code              String               @unique
+  website           String?
+  logoUrl           String?
+  contactEmail      String?
+  contactPhone      String?
+
+  // Partner details
+  businessType      PartnerType          @default(AGENCY)
+  licenseNumber     String?
+  ein               String?
+  businessAddress   Json?
+  billingAddress    Json?
+
+  // Partnership details
+  partnershipTier   PartnershipTier      @default(BASIC)
+  partnershipStatus PartnershipStatus    @default(ACTIVE)
+  contractStartDate DateTime
+  contractEndDate   DateTime?
+  commissionRate    Float                @default(0.0)
+
+  // Integration details
+  integrationType   IntegrationType      @default(REST_API)
+  apiKey            String?
+  apiSecret         String?
+  apiVersion        String?
+  webhookUrl        String?
+
+  // Configuration
+  isActive          Boolean              @default(true)
+  priority          Int                  @default(0)
+
+  // Performance metrics
+  performanceScore    Float               @default(0.0)
+  conversionRate      Float               @default(0.0)
+  averageResponseTime Float               @default(0.0)
+  totalLeadsReceived  Int                 @default(0)
+  totalLeadsConverted Int                 @default(0)
+
+  // Rate limiting
+  rateLimit         Int                  @default(100)
+  rateLimitWindow   Int                  @default(60)
+
+  // Metadata
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  users             PartnerUser[]
+  trainingProgress  PartnerTrainingProgress[]
+  certifications    PartnerCertification[]
+  performanceMetrics PartnerPerformanceMetric[]
+  supportTickets    PartnerSupportTicket[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([partnershipStatus])
+  @@index([partnershipTier])
+  @@map("partners")
+}
+
+model PartnerUser {
+  id                String               @id @default(uuid())
+  partnerId         String
+  firstName         String
+  lastName          String
+  email             String               @unique
+  phone             String?
+  role              PartnerUserRole      @default(USER)
+  status            PartnerUserStatus    @default(ACTIVE)
+  lastLoginAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  partner           Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  trainingProgress  PartnerTrainingProgress[]
+  certifications    PartnerCertification[]
+
+  @@index([partnerId])
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("partner_users")
+}
+
+model PartnerTrainingProgress {
+  id                String               @id @default(uuid())
+  partnerId         String
+  userId            String
+  trainingModuleId  String
+  status            TrainingStatus       @default(NOT_STARTED)
+  progress          Float                @default(0.0)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  score             Float?
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  partner           Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user              PartnerUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([userId])
+  @@index([trainingModuleId])
+  @@index([status])
+  @@map("partner_training_progress")
+}
+
+model PartnerCertification {
+  id                String               @id @default(uuid())
+  partnerId         String
+  userId            String
+  certificationType CertificationType    @default(BASIC)
+  status            CertificationStatus  @default(NOT_STARTED)
+  examScore         Float?
+  certifiedAt       DateTime?
+  expiresAt         DateTime?
+  renewalRequired   Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  partner           Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user              PartnerUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([userId])
+  @@index([certificationType])
+  @@index([status])
+  @@map("partner_certifications")
+}
+
+model PartnerPerformanceMetric {
+  id                    String               @id @default(uuid())
+  partnerId             String
+  month                 Int
+  year                  Int
+  leadsReceived         Int                  @default(0)
+  leadsConverted        Int                  @default(0)
+  conversionRate        Float                @default(0.0)
+  averageResponseTime   Float                @default(0.0)
+  averageQuoteValue     Float                @default(0.0)
+  customerSatisfaction  Float                @default(0.0)
+  onTimeDeliveryRate    Float                @default(0.0)
+  createdAt             DateTime             @default(now())
+
+  // Relations
+  partner              Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([year])
+  @@index([month])
+  @@index([createdAt])
+  @@unique([partnerId, year, month])
+  @@map("partner_performance_metrics")
+}
+
+model PartnerSupportTicket {
+  id                String               @id @default(uuid())
+  partnerId         String
+  userId            String?
+  title             String
+  description       String                @db.Text
+  status            SupportTicketStatus   @default(OPEN)
+  priority          SupportTicketPriority @default(MEDIUM)
+  category          SupportTicketCategory @default(GENERAL)
+  assignedTo        String?
+  resolutionNotes   String?               @db.Text
+  resolvedAt        DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  partner           Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user              PartnerUser?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@map("partner_support_tickets")
+}
+
+model TrainingModule {
+  id                String               @id @default(uuid())
+  title             String
+  description       String                @db.Text
+  moduleType        TrainingModuleType    @default(FUNDAMENTALS)
+  contentUrl        String?
+  videoUrl          String?
+  durationMinutes   Int                  @default(30)
+  isActive          Boolean              @default(true)
+  order             Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([moduleType])
+  @@index([isActive])
+  @@index([order])
+  @@map("training_modules")
+}
+
+// ========================================
 // INSURANCE CARRIER & BROKER INTEGRATIONS (Phase 8.6)
 // ========================================
 
@@ -694,6 +907,106 @@ model IntegrationLog {
   @@index([success])
   @@index([createdAt])
   @@map("integration_logs")
+}
+
+// Enums for partner management
+
+enum PartnerType {
+  AGENCY
+  BROKERAGE
+  INDEPENDENT_AGENT
+  MGU
+  MGA
+  WHOLSALE_BROKER
+  REINSURANCE_BROKER
+}
+
+enum PartnershipTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ELITE
+  STRATEGIC
+}
+
+enum PartnershipStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  TERMINATED
+  RENEWAL_NEEDED
+}
+
+enum PartnerUserRole {
+  USER
+  MANAGER
+  ADMIN
+  EXECUTIVE
+  TRAINING_ADMIN
+  SUPPORT_CONTACT
+}
+
+enum PartnerUserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum TrainingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum CertificationType {
+  BASIC
+  ADVANCED
+  EXPERT
+  PLATFORM_PROFESSIONAL
+  INTEGRATION_SPECIALIST
+}
+
+enum CertificationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  REVOKED
+}
+
+enum TrainingModuleType {
+  FUNDAMENTALS
+  LEAD_MANAGEMENT
+  INTEGRATION
+  ADVANCED_FEATURES
+  COMPLIANCE
+  BEST_PRACTICES
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketCategory {
+  GENERAL
+  TECHNICAL
+  TRAINING
+  BILLING
+  INTEGRATION
+  PERFORMANCE
 }
 
 // Enums for integrations
