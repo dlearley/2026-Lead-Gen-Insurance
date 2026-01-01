@@ -34,6 +34,7 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { createFeatureRoutes } from './routes/feature.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
