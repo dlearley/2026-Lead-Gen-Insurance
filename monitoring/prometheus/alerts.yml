@@ -160,3 +160,46 @@ groups:
         annotations:
           summary: "High rate of AI model errors"
           description: "AI model error rate is above 0.05 per second."
+
+  - name: optimization_alerts
+    interval: 1m
+    rules:
+      # Low Cache Hit Rate
+      - alert: LowCacheHitRate
+        expr: rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate detected"
+          description: "Cache hit rate is below 70% for the last 10 minutes."
+
+      # Slow Database Queries
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.99, rate(database_query_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries detected"
+          description: "99th percentile database query duration is above 500ms."
+
+      # Sudden Drop in Lead Volume
+      - alert: LeadVolumeDrop
+        expr: rate(leads_processed_total[15m]) < (rate(leads_processed_total[15m] offset 1h) * 0.5)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Sudden drop in lead volume"
+          description: "Lead volume has dropped by more than 50% compared to one hour ago."
+
+      # Low Lead Conversion Rate
+      - alert: LowLeadConversionRate
+        expr: rate(leads_converted_total[1h]) / rate(leads_processed_total[1h]) < 0.05
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low lead conversion rate"
+          description: "Lead conversion rate is below 5% for the last 2 hours."

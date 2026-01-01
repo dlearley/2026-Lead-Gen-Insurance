@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { logger } from '@insurance-lead-gen/core';
 import { config } from '@insurance-lead-gen/config';
+import { aiMetrics } from '../monitoring.js';
 
 export class OpenAIClient {
   private client: OpenAI | null = null;
@@ -39,6 +40,7 @@ export class OpenAIClient {
 
       // Create prompt for lead qualification
       const prompt = this.createQualificationPrompt(leadData);
+      const startTime = Date.now();
 
       const response = await this.client.chat.completions.create({
         model: config.openaiModel,
@@ -55,6 +57,21 @@ export class OpenAIClient {
         response_format: { type: 'json_object' },
       });
 
+      const latency = (Date.now() - startTime) / 1000;
+      const model = config.openaiModel;
+
+      // Record AI metrics
+      aiMetrics.recordModelCall(model, 'success', 'orchestrator');
+      aiMetrics.recordModelLatency(model, 'orchestrator', latency);
+
+      // Estimate cost (very rough estimate)
+      const usage = response.usage;
+      if (usage) {
+        const inputCost = (usage.prompt_tokens / 1000) * 0.005; // GPT-4o input
+        const outputCost = (usage.completion_tokens / 1000) * 0.015; // GPT-4o output
+        aiMetrics.recordAPICost(model, 'orchestrator', inputCost + outputCost);
+      }
+
       const result = JSON.parse(response.choices[0].message.content || '{}');
 
       logger.info('Lead qualified by OpenAI', {
@@ -65,6 +82,8 @@ export class OpenAIClient {
 
       return result;
     } catch (error) {
+      aiMetrics.recordModelCall(config.openaiModel, 'error', 'orchestrator');
+      aiMetrics.recordModelError(config.openaiModel, error instanceof Error ? error.name : 'UnknownError', 'orchestrator');
       logger.error('Failed to qualify lead with OpenAI', { error, leadId: leadData.id });
       // Fallback to mock response
       return this.generateMockQualification(leadData);

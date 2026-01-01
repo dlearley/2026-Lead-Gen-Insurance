@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
-import { logger } from '@insurance-lead-gen/core';
+import { logger, MetricsCollector } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -28,12 +28,16 @@ import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
   const app = express();
+  const metrics = new MetricsCollector('api-service');
 
   app.use(helmet());
   app.use(cors());
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+
+  // Metrics middleware
+  app.use(metrics.middleware());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
@@ -44,6 +48,15 @@ export function createApp(): express.Express {
       service: 'insurance-lead-gen-api',
       version: '1.0.0',
     });
+  });
+
+  app.get('/metrics', async (req, res) => {
+    try {
+      res.set('Content-Type', metrics.getContentType());
+      res.end(await metrics.getMetrics());
+    } catch (error) {
+      res.status(500).end(error);
+    }
   });
 
   app.use('/api/v1/leads', leadsRouter);

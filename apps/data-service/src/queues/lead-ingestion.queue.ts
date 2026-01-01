@@ -1,6 +1,7 @@
 import { Queue, Worker } from 'bullmq';
 
 import { logger } from '@insurance-lead-gen/core';
+import { leadMetrics } from '../monitoring.js';
 import {
   EVENT_SUBJECTS,
   type LeadCreatePayload,
@@ -45,18 +46,28 @@ export const startLeadIngestionWorker = (params: {
     LEAD_INGESTION_QUEUE_NAME,
     async (job) => {
       const { leadId, lead } = job.data;
+      const startTime = Date.now();
 
       logger.info('Ingesting lead', { leadId });
 
-      await leadRepository.createLead(leadId, lead);
+      try {
+        await leadRepository.createLead(leadId, lead);
 
-      eventBus.publish(EVENT_SUBJECTS.LeadProcessed, {
-        id: `evt_${Date.now()}`,
-        type: EVENT_SUBJECTS.LeadProcessed,
-        source: 'data-service',
-        data: { leadId },
-        timestamp: new Date().toISOString(),
-      });
+        const duration = (Date.now() - startTime) / 1000;
+        leadMetrics.recordLeadProcessed('success', lead.source, 'data-service');
+        leadMetrics.recordProcessingDuration('success', 'data-service', duration);
+
+        eventBus.publish(EVENT_SUBJECTS.LeadProcessed, {
+          id: `evt_${Date.now()}`,
+          type: EVENT_SUBJECTS.LeadProcessed,
+          source: 'data-service',
+          data: { leadId },
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        leadMetrics.recordLeadProcessed('error', lead.source || 'unknown', 'data-service');
+        throw error;
+      }
     },
     { connection }
   );
