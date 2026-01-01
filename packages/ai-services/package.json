@@ -1,0 +1,22 @@
+{
+  "name": "@insurance-lead-gen/ai-services",
+  "version": "2.0.0",
+  "description": "AI and ML services for lead scoring and intelligence",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@insurance-lead-gen/core": "workspace:*",
+    "@insurance-lead-gen/types": "workspace:*",
+    "onnxruntime-node": "^1.16.0",
+    "axios": "^1.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0",
+    "typescript": "^5.2.0"
+  }
+}

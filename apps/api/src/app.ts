@@ -16,6 +16,8 @@ import policiesRouter from './routes/policies.js';
 import reportsRouter from './routes/reports.js';
 import alertsRouter from './routes/alerts.js';
 import scoringRouter from './routes/scoring.js';
+import leadScoringMLRouter from './routes/lead-scoring-ml.js';
+import abTestingRouter from './routes/ab-testing.js';
 import carriersRouter from './routes/carriers.js';
 import brokersRouter from './routes/brokers.js';
 import integrationsRouter from './routes/integrations.js';
@@ -59,6 +61,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/alerts', alertsRouter);
   app.use('/api/v1/scoring', scoringRouter);
+  app.use('/api/v1/lead-scoring-ml', leadScoringMLRouter);
+  app.use('/api/v1/ab-testing', abTestingRouter);
   app.use('/api/v1/carriers', carriersRouter);
   app.use('/api/v1/brokers', brokersRouter);
   app.use('/api/v1/integrations', integrationsRouter);
@@ -80,6 +84,8 @@ export function createApp(): express.Express {
   app.use('/api/reports', reportsRouter);
   app.use('/api/alerts', alertsRouter);
   app.use('/api/scoring', scoringRouter);
+  app.use('/api/lead-scoring-ml', leadScoringMLRouter);
+  app.use('/api/ab-testing', abTestingRouter);
   app.use('/api/carriers', carriersRouter);
   app.use('/api/brokers', brokersRouter);
   app.use('/api/integrations', integrationsRouter);

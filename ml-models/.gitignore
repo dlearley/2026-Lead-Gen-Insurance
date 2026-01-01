@@ -1,0 +1,52 @@
+# Data files
+data/*.parquet
+data/*.csv
+data/*.json
+
+# Model files
+models/**/*.pkl
+models/**/*.joblib
+models/**/*.onnx
+models/**/*.h5
+models/**/*.pb
+models/**/*.pth
+models/**/*.pt
+
+# Plots and visualizations
+models/**/plots/*.png
+models/**/plots/*.jpg
+models/**/plots/*.pdf
+
+# Python virtual environment
+venv/
+env/
+.env
+
+# Jupyter notebooks checkpoints
+notebooks/.ipynb_checkpoints/
+notebooks/**/.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
