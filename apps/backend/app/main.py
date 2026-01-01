@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import leads_router, lead_sources_router, campaigns_router
+from app.api.v1.ml import ml_router
 
 
 def create_app() -> FastAPI:
@@ -27,9 +27,7 @@ def create_app() -> FastAPI:
     )
     
     # Include routers
-    app.include_router(leads_router, prefix=settings.api_v1_prefix)
-    app.include_router(lead_sources_router, prefix=settings.api_v1_prefix)
-    app.include_router(campaigns_router, prefix=settings.api_v1_prefix)
+    app.include_router(ml_router, prefix=f"{settings.api_v1_prefix}/ml")
     
     # Health check endpoint
     @app.get("/health")
