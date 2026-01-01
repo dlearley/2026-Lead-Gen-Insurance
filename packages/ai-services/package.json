@@ -1,0 +1,25 @@
+{
+  "name": "@insurance-lead-gen/ai-services",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@insurance-lead-gen/core": "workspace:*",
+    "@insurance-lead-gen/types": "workspace:*",
+    "@prisma/client": "^5.8.0",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "prisma": "^5.8.0",
+    "@types/lodash": "^4.14.202"
+  }
+}
