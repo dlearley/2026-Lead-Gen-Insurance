@@ -1,4 +1,5 @@
 import { Redis } from 'ioredis';
+import { register, Counter } from 'prom-client';
 import { logger } from '../logger.js';
 
 export interface CacheOptions {
@@ -17,6 +18,7 @@ export class CacheManager {
   private prefix: string;
   private localCache: Map<string, CacheEntry<any>>;
   private localCacheEnabled: boolean;
+  private serviceName: string;
 
   constructor(redis: Redis, options: CacheOptions = {}) {
     this.redis = redis;
@@ -24,8 +26,20 @@ export class CacheManager {
     this.prefix = options.prefix || 'cache:';
     this.localCache = new Map();
     this.localCacheEnabled = true;
+    this.serviceName = process.env.APP_NAME || 'unknown-service';
 
     this.startLocalCacheCleaner();
+  }
+
+  private recordMetric(name: string, type: string): void {
+    try {
+      const metric = register.getSingleMetric(name);
+      if (metric instanceof Counter) {
+        metric.labels(type, this.serviceName).inc();
+      }
+    } catch (error) {
+      // Ignore if metric not found
+    }
   }
 
   async get<T>(key: string): Promise<T | null> {
@@ -35,6 +49,7 @@ export class CacheManager {
       const localEntry = this.localCache.get(fullKey);
       if (localEntry && localEntry.expiresAt > Date.now()) {
         logger.debug(`Cache hit (local): ${fullKey}`);
+        this.recordMetric('cache_hits_total', 'local');
         return localEntry.value as T;
       }
       if (localEntry) {
@@ -46,6 +61,7 @@ export class CacheManager {
       const value = await this.redis.get(fullKey);
       if (value) {
         logger.debug(`Cache hit (redis): ${fullKey}`);
+        this.recordMetric('cache_hits_total', 'redis');
         const parsed = JSON.parse(value) as T;
         
         if (this.localCacheEnabled) {
@@ -59,6 +75,7 @@ export class CacheManager {
       }
       
       logger.debug(`Cache miss: ${fullKey}`);
+      this.recordMetric('cache_misses_total', 'redis');
       return null;
     } catch (error) {
       logger.error(`Cache get error: ${fullKey}`, { error });

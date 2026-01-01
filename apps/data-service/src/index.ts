@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { logger } from '@insurance-lead-gen/core';
+import { logger, MetricsCollector, initializeTracing } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadReceivedEvent } from '@insurance-lead-gen/types';
 
@@ -34,19 +34,30 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { leadMetrics } from './monitoring.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
+
+// Initialize tracing
+initializeTracing({
+  serviceName: 'data-service',
+});
 
 const start = async (): Promise<void> => {
   logger.info('Data service starting', { port: PORT });
 
   // Initialize Express app for analytics API
   const app = express();
+  const metrics = new MetricsCollector('data-service');
+
   app.use(helmet());
   app.use(cors());
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
+
+  // Metrics middleware
+  app.use(metrics.middleware());
 
   // Initialize services
   const eventBus = await NatsEventBus.connect(config.nats.url);
@@ -90,13 +101,44 @@ const start = async (): Promise<void> => {
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
   // Health check endpoint
-  app.get('/health', (req, res) => {
-    res.json({
-      status: 'ok',
+  app.get('/health', async (req, res) => {
+    let dbStatus = 'ok';
+    let redisStatus = 'ok';
+
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (e) {
+      dbStatus = 'error';
+    }
+
+    try {
+      await redis.ping();
+    } catch (e) {
+      redisStatus = 'error';
+    }
+
+    const status = dbStatus === 'ok' && redisStatus === 'ok' ? 'ok' : 'degraded';
+    
+    res.status(status === 'ok' ? 200 : 503).json({
+      status,
       timestamp: new Date().toISOString(),
       service: 'data-service',
       version: '1.0.0',
+      checks: {
+        database: dbStatus,
+        redis: redisStatus,
+      },
     });
+  });
+
+  // Metrics endpoint
+  app.get('/metrics', async (req, res) => {
+    try {
+      res.set('Content-Type', metrics.getContentType());
+      res.end(await metrics.getMetrics());
+    } catch (error) {
+      res.status(500).end(error);
+    }
   });
 
   // Start Express server
@@ -111,6 +153,16 @@ const start = async (): Promise<void> => {
     leadRepository,
     eventBus,
   });
+
+  // Record queue depth periodically
+  setInterval(async () => {
+    try {
+      const depth = await leadIngestionQueue.count();
+      leadMetrics.setQueueDepth('lead-ingestion', 'data-service', depth);
+    } catch (error) {
+      logger.error('Failed to update queue depth metric', { error });
+    }
+  }, 15000);
 
   leadIngestionWorker.on('failed', (job, error) => {
     logger.error('Lead ingestion job failed', { jobId: job?.id, error });
