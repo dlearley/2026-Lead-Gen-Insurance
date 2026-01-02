@@ -10,3 +10,12 @@ export * from './database/index.js';
 
 // Security exports
 export * from './security/index.js';
+
+// Performance and optimization exports
+export * from './performance/index.js';
+export * from './scaling/index.js';
+export * from './cost/index.js';
+export * from './operations/index.js';
+export * from './customer-success/index.js';
+export * from './reporting/index.js';
+export * from './optimization/index.js';

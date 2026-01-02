@@ -1,0 +1,2 @@
+export { CustomerSuccessManager } from './customer-success-manager.js';
+export type { CustomerMetrics, FeatureAdoption, CustomerSegment, CustomerSuccessAction, AdoptionInsight } from './customer-success-manager.js';
