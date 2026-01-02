@@ -24,6 +24,7 @@ import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
+import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -67,6 +68,10 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/claims', claimsRouter);
 
+  // Phase 19.5: Post-Launch Optimization & Operations API routes
+  const optimizationAPI = new OptimizationAPI();
+  app.use('/api/v1/optimization', optimizationAPI.getRouter());
+
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
   app.use('/api/leads/:leadId/activity', activityRouter);
@@ -87,6 +92,9 @@ export function createApp(): express.Express {
   app.use('/api/vip', vipRouter);
   app.use('/api/community', communityRouter);
   app.use('/api/claims', claimsRouter);
+
+  // Phase 19.5: Post-Launch Optimization & Operations API routes (legacy)
+  app.use('/api/optimization', optimizationAPI.getRouter());
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

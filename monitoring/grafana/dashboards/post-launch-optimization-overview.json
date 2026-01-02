@@ -1,0 +1,257 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Post-Launch Optimization Overview",
+    "description": "Executive dashboard for post-launch optimization and operations",
+    "tags": ["post-launch", "optimization", "operations", "executive"],
+    "timezone": "UTC",
+    "refresh": "30s",
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(slo_compliance_percent)",
+            "legendFormat": "SLO Compliance",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(up{job=\"api-service\"}) * 100",
+            "legendFormat": "API Uptime",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(incidents_total{severity=\"critical\"})",
+            "legendFormat": "Critical Incidents",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 95
+                },
+                {
+                  "color": "green",
+                  "value": 99
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Performance Trends",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) * 1000",
+            "legendFormat": "P95 Response Time (ms)",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) * 1000",
+            "legendFormat": "P99 Response Time (ms)",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 3,
+        "title": "Customer Success Metrics",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg(customer_engagement_score)",
+            "legendFormat": "Average Engagement Score",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(customer_health_score)",
+            "legendFormat": "Average Health Score",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(customer_churn_risk_score)",
+            "legendFormat": "Average Churn Risk",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Cost Optimization",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(cost_monthly_usd)",
+            "legendFormat": "Total Monthly Cost ($)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(cost_optimization_savings_usd)",
+            "legendFormat": "Optimization Savings ($)",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(cost_monthly_usd{category=\"observability\"}) / sum(cost_monthly_usd) * 100",
+            "legendFormat": "Observability Cost Ratio (%)",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 5,
+        "title": "Auto-Scaling Activity",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "scaling_replica_count",
+            "legendFormat": "{{service}} - Replicas",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(scaling_events_total[1h])",
+            "legendFormat": "{{service}} - Scaling Events (1h)",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "Feature Adoption",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "feature_adoption_rate_percent",
+            "legendFormat": "{{feature_name}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 7,
+        "title": "Incident Timeline",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "increase(incidents_total[30d])",
+            "legendFormat": "",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "Time"
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "title": "SLA/SLO Compliance",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "slo_compliance_percent",
+            "legendFormat": "{{slo_name}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "custom",
+          "options": [
+            {
+              "text": "api-service",
+              "value": "api-service",
+              "selected": false
+            },
+            {
+              "text": "data-service",
+              "value": "data-service",
+              "selected": false
+            },
+            {
+              "text": "orchestrator",
+              "value": "orchestrator",
+              "selected": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
