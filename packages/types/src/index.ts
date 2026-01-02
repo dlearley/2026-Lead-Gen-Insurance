@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Copilot Types (Phase 17)
+export * from './copilot.js';
