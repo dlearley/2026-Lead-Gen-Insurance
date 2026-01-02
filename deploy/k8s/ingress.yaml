@@ -1,0 +1,450 @@
+# ============================================
+# Production Ingress Controller Configuration
+# Insurance Lead Generation Platform - Phase 19.2
+# ============================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: insurance-lead-gen-ingress
+  namespace: default
+  annotations:
+    # NGINX Ingress Controller
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-burst: "20"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Permissions-Policy: geolocation=(), microphone=(), camera=()";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https:; frame-src 'none';";
+    
+    # Proxy Configuration
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout invalid_header http_500 http_502 http_503 http_504"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "10"
+    
+    # Load Balancing
+    nginx.ingress.kubernetes.io/load-balance: "least_conn"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://your-production-domain.com,https://www.your-production-domain.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    
+    # Session Affinity
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "balanced"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    
+    # Connection and Keepalive
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "60"
+    nginx.ingress.kubernetes.io/upstream-keepalive-requests: "100"
+    
+    # Logging
+    nginx.ingress.kubernetes.io/log-format-upstream: '{"time": "$time_iso8601", "remote_addr": "$remote_addr", "x_forwarded_for": "$proxy_add_x_forwarded_for", "request_id": "$req_id", "remote_user": "$remote_user", "bytes_sent": $bytes_sent, "request_time": $request_time, "status": $status, "vhost": "$host", "request_proto": "$server_protocol", "path": "$uri", "request_query": "$args", "request_length": $request_length, "duration": $request_time, "method": "$request_method", "http_referrer": "$http_referer", "http_user_agent": "$http_user_agent", "upstream_addr": "$upstream_addr", "upstream_bytes_sent": $upstream_bytes_sent, "upstream_response_time": $upstream_response_time, "upstream_status": $upstream_status}'
+    
+    # Backend Protocol
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    
+    # WebSocket Support
+    nginx.ingress.kubernetes.io/ws-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/ws-send-timeout: "3600"
+    
+    # Connection Pooling
+    nginx.ingress.kubernetes.io/http2-max-field-size: "16k"
+    nginx.ingress.kubernetes.io/http2-max-header-size: "32k"
+    
+    # Timeout Configuration
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    
+    # Buffer Configuration
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"
+    
+    # Health Check
+    nginx.ingress.kubernetes.io/health-check: "true"
+    nginx.ingress.kubernetes.io/health-check-path: "/health"
+    nginx.ingress.kubernetes.io/health-check-port: "10254"
+    
+    # SSL/TLS
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS"
+    nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"
+    
+    # Certificate Manager
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    
+    # Monitoring
+    nginx.ingress.kubernetes.io/enable-metrics: "true"
+    nginx.ingress.kubernetes.io/metrics-path: "/metrics"
+    nginx.ingress.kubernetes.io/metrics-port: "10254"
+
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - your-production-domain.com
+        - www.your-production-domain.com
+        - api.your-production-domain.com
+        - monitoring.your-production-domain.com
+      secretName: insurance-lead-gen-tls
+    - hosts:
+        - grafana.your-production-domain.com
+        - prometheus.your-production-domain.com
+        - jaeger.your-production-domain.com
+        - alertmanager.your-production-domain.com
+      secretName: monitoring-tls
+  rules:
+    # API Routes
+    - host: api.your-production-domain.com
+      http:
+        paths:
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 3000
+          - path: /auth/
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 3000
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 3000
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 3000
+    
+    # Backend API Routes
+    - host: api.your-production-domain.com
+      http:
+        paths:
+          - path: /backend/
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 8000
+    
+    # Data Service (Internal Only)
+    - host: internal.your-production-domain.com
+      http:
+        paths:
+          - path: /data-service/
+            pathType: Prefix
+            backend:
+              service:
+                name: data-service
+                port:
+                  number: 3001
+    
+    # Orchestrator (Internal Only)
+    - host: internal.your-production-domain.com
+      http:
+        paths:
+          - path: /orchestrator/
+            pathType: Prefix
+            backend:
+              service:
+                name: orchestrator-service
+                port:
+                  number: 3002
+    
+    # Frontend
+    - host: your-production-domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
+    
+    - host: www.your-production-domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
+    
+    # Monitoring Dashboard (Internal)
+    - host: monitoring.your-production-domain.com
+      http:
+        paths:
+          - path: /grafana/
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+          - path: /prometheus/
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-service
+                port:
+                  number: 9090
+          - path: /jaeger/
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger-service
+                port:
+                  number: 16686
+          - path: /alertmanager/
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager-service
+                port:
+                  number: 9093
+
+---
+# ============================================
+# NGINX Ingress Controller Service
+# ============================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ingress-controller
+  namespace: ingress-nginx
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "10254"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/healthz"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "3"
+    service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-xxxxxxxxx"
+    service.beta.kubernetes.io/aws-load-balancer-subnets: "subnet-xxxxxxxxx,subnet-yyyyyyyyy,subnet-zzzzzzzzz"
+    service.beta.kubernetes.io/aws-load-balancer-attributes: "load_balancing.cross_zone.enabled=true"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+    - name: metrics
+      port: 10254
+      protocol: TCP
+      targetPort: 10254
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/component: controller
+
+---
+# ============================================
+# Ingress Controller ConfigMap
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ingress-controller-config
+  namespace: ingress-nginx
+data:
+  # Enable real IP from AWS NLB
+  use-forwarded-headers: "true"
+  compute-full-forwarded-for: "true"
+  
+  # Performance tuning
+  worker-processes: "auto"
+  max-worker-connections: "16384"
+  worker-rlimit-nofile: "65535"
+  
+  # SSL/TLS
+  ssl-protocols: "TLSv1.2 TLSv1.3"
+  ssl-ciphers: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS"
+  ssl-prefer-server-ciphers: "true"
+  ssl-session-cache: "shared:SSL:50m"
+  ssl-session-timeout: "1d"
+  
+  # HTTP/2
+  use-http2: "true"
+  http2-max-field-size: "16k"
+  http2-max-header-size: "32k"
+  
+  # Proxy settings
+  proxy-connect-timeout: "5"
+  proxy-send-timeout: "60"
+  proxy-read-timeout: "60"
+  proxy-body-size: "16m"
+  proxy-buffer-size: "8k"
+  proxy-buffers-number: "4"
+  proxy-busy-buffers-size: "16k"
+  
+  # Keepalive
+  upstream-keepalive-timeout: "60"
+  upstream-keepalive-requests: "100"
+  
+  # Gzip compression
+  enable-gzip: "true"
+  gzip-level: "6"
+  gzip-types: "text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/atom+xml image/svg+xml"
+  
+  # Rate limiting
+  rate-limit-requests-per-second: "100"
+  rate-limit-burst-per-second: "20"
+  
+  # Logging
+  log-format-upstream: '{"time": "$time_iso8601", "remote_addr": "$remote_addr", "x_forwarded_for": "$proxy_add_x_forwarded_for", "request_id": "$req_id", "remote_user": "$remote_user", "bytes_sent": $bytes_sent, "request_time": $request_time, "status": $status, "vhost": "$host", "request_proto": "$server_protocol", "path": "$uri", "request_query": "$args", "request_length": $request_length, "duration": $request_time, "method": "$request_method", "http_referrer": "$http_referer", "http_user_agent": "$http_user_agent", "upstream_addr": "$upstream_addr", "upstream_bytes_sent": $upstream_bytes_sent, "upstream_response_time": $upstream_response_time, "upstream_status": $upstream_status}'
+  
+  # Custom errors
+  custom-http-errors: "503"
+  error-log-level: "warn"
+  
+  # Health check
+  health-check: "true"
+  health-check-path: "/healthz"
+  health-check-port: "10254"
+  
+  # Metrics
+  enable-metrics: "true"
+  metrics-path: "/metrics"
+  metrics-port: "10254"
+  
+  # Load balancing
+  load-balance: "least_conn"
+  
+  # Session affinity
+  affinity: "cookie"
+  session-cookie-name: "route"
+  session-cookie-max-age: "172800"
+  session-cookie-expires: "172800"
+  session-cookie-path: "/"
+
+---
+# ============================================
+# Certificate Manager ClusterIssuer
+# ============================================
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ops-team@your-production-domain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+            podTemplate:
+              spec:
+                nodeSelector:
+                  "kubernetes.io/os": linux
+        - dns01:
+            route53:
+              region: us-east-1
+              secretAccessKeySecretRef:
+                name: cert-manager-route53
+                key: secret-access-key
+
+---
+# ============================================
+# Certificate Manager Staging Issuer (for testing)
+# ============================================
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: ops-team@your-production-domain.com
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+
+---
+# ============================================
+# TLS Secret for Custom Certificates
+# ============================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: insurance-lead-gen-tls
+  namespace: default
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t... # Base64 encoded certificate
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t... # Base64 encoded private key
+
+---
+# ============================================
+# Monitoring TLS Secret
+# ============================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-tls
+  namespace: default
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t... # Base64 encoded certificate
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t... # Base64 encoded private key
