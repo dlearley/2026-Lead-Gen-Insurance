@@ -1,0 +1,35 @@
+{{- if .Values.alertmanager.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.alertmanager.service.type }}
+  ports:
+    - name: web
+      port: {{ .Values.alertmanager.service.port }}
+      targetPort: web
+      protocol: TCP
+    - name: cluster
+      port: 9094
+      targetPort: cluster
+      protocol: TCP
+  selector:
+    {{- include "monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: server
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/name: alertmanager
+{{- end }}
