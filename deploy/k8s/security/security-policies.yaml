@@ -1,0 +1,781 @@
+# ============================================
+# Security Policies and RBAC Configuration
+# Insurance Lead Generation Platform - Phase 19.2
+# ============================================
+
+# Namespace Security Policy
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+
+---
+# ClusterRole for API Service
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: api-service-role
+  labels:
+    app: api-service
+    component: api
+    environment: production
+rules:
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+- apiGroups: ["custom.metrics.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding for API Service
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: api-service-rolebinding
+  labels:
+    app: api-service
+    component: api
+    environment: production
+subjects:
+- kind: ServiceAccount
+  name: api-service
+  namespace: production
+roleRef:
+  kind: ClusterRole
+  name: api-service-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Role for Secret Reading
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: production
+  name: secret-reader
+  labels:
+    app: api-service
+    component: api
+    environment: production
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+  resourceNames: ["api-service-secrets"]
+
+---
+# RoleBinding for Secret Reader
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-reader-binding
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+subjects:
+- kind: ServiceAccount
+  name: api-service
+  namespace: production
+roleRef:
+  kind: Role
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# SecurityContextConstraints for Restricted Access
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: restricted
+  labels:
+    app: insurance-lead-gen
+    environment: production
+annotations:
+  kubernetes.io/description: "Restricted access security context"
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 1000
+    max: 1000
+readOnlyRootFilesystem: true
+requiredDropCapabilities:
+- ALL
+runAsUser:
+  type: MustRunAsNonRoot
+  uid: 1000
+  uidRangeMin: 1000
+  uidRangeMax: 1000
+seccompProfiles:
+- runtime/default
+volumes:
+- configMap
+- emptyDir
+- projected
+- secret
+- downwardAPI
+
+---
+# Pod Security Policy (for Kubernetes < 1.25)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: restricted
+  labels:
+    app: insurance-lead-gen
+    environment: production
+annotations:
+  kubernetes.io/description: "Restricted policy for production workloads"
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 1000
+  readOnlyRootFilesystem: true
+
+---
+# Network Policies for API Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-service-network-policy
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: api-service
+      component: api
+      environment: production
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from NGINX Ingress Controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: api-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: backend-service
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+  egress:
+  # Allow egress to data service
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: data-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: orchestrator-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: backend-service
+    # Allow DNS resolution
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    # Allow HTTPS for external APIs
+    - namespaceSelector: {}
+      podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 5432
+
+---
+# Network Policies for Data Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-service-network-policy
+  namespace: production
+  labels:
+    app: data-service
+    component: data
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: data-service
+      component: data
+      environment: production
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress only from internal services
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: api-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: orchestrator-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: backend-service
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+  egress:
+  # Allow egress to databases only
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    # Allow external database connections
+    - namespaceSelector: {}
+      podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 7687
+    - protocol: TCP
+      port: 6333
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+# Network Policies for Orchestrator Service
+apiVersions.io/v1: networking.k8
+kind: NetworkPolicy
+metadata:
+  name: orchestrator-service-network-policy
+  namespace: production
+  labels:
+    app: orchestrator-service
+    component: orchestrator
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: orchestrator-service
+      component: orchestrator
+      environment: production
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress only from internal services
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: api-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: data-service
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 3002
+  egress:
+  # Allow egress to data service and external APIs
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: data-service
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    # Allow external API calls (OpenAI, etc.)
+    - namespaceSelector: {}
+      podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+# Network Policies for Backend Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-service-network-policy
+  namespace: production
+  labels:
+    app: backend-service
+    component: backend
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-service
+      component: backend
+      environment: production
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from NGINX and internal services
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: api-service
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  # Allow egress to data service and databases
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: data-service
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    # Allow external database connections
+    - namespaceSelector: {}
+      podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+# Network Policies for Frontend Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-service-network-policy
+  namespace: production
+  labels:
+    app: frontend-service
+    component: frontend
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend-service
+      component: frontend
+      environment: production
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from NGINX Ingress Controller only
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow egress to API service and DNS only
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: api-service
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+# Default Deny All Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: production
+  labels:
+    app: insurance-lead-gen
+    environment: production
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# CIS Benchmark Security Constraints
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-constraints
+  namespace: production
+  labels:
+    app: insurance-lead-gen
+    environment: production
+data:
+  # Container security settings
+  container_security: |
+    # Run as non-root user
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    
+    # Drop all capabilities
+    capabilities:
+      drop:
+      - ALL
+      add:
+      - NET_BIND_SERVICE
+    
+    # Read-only root filesystem
+    readOnlyRootFilesystem: true
+    
+    # Security contexts
+    securityContext:
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+    
+    # Resource limits
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  
+  # Network security settings
+  network_security: |
+    # Default deny all
+    defaultDenyIngress: true
+    defaultDenyEgress: true
+    
+    # Required network policies
+    requiredPolicies:
+    - api-service-network-policy
+    - data-service-network-policy
+    - orchestrator-service-network-policy
+    - backend-service-network-policy
+    - frontend-service-network-policy
+  
+  # Pod security settings
+  pod_security: |
+    # Pod security standards
+    enforce: restricted
+    audit: restricted
+    warn: restricted
+    
+    # Security contexts
+    securityContext:
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    
+    # Required security policies
+    securityPolicies:
+    - restricted
+    
+  # Resource security settings
+  resource_security: |
+    # CPU and memory limits
+    cpuLimit: "500m"
+    memoryLimit: "1Gi"
+    cpuRequest: "250m"
+    memoryRequest: "512Mi"
+    
+    # Storage security
+    persistentVolume:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "gp3"
+    
+    # Volume security
+    volumes:
+    - name: tmp
+      emptyDir: {}
+    - name: cache
+      emptyDir:
+        sizeLimit: "256Mi"
+    - name: secrets-store
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+
+---
+# Security Audit Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-policy
+  namespace: production
+  labels:
+    app: insurance-lead-gen
+    environment: production
+data:
+  audit-policy.yaml: |
+    # Kubernetes Audit Policy
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+    # Log all Secret access at RequestResponse level
+    - level: RequestResponse
+      resources:
+      - group: ""
+        resources: ["secrets"]
+    
+    # Log configmap access at Metadata level
+    - level: Metadata
+      resources:
+      - group: ""
+        resources: ["configmaps"]
+    
+    # Log deployment and service access
+    - level: RequestResponse
+      resources:
+      - group: "apps"
+        resources: ["deployments", "services"]
+      - group: ""
+        resources: ["services", "endpoints"]
+    
+    # Log namespace creation and deletion
+    - level: Write
+      resources:
+      - group: ""
+        resources: ["namespaces"]
+    
+    # Log all pod lifecycle events
+    - level: Request
+      resources:
+      - group: ""
+        resources: ["pods", "pods/log", "pods/exec"]
+    
+    # Log authentication and authorization events
+    - level: Metadata
+      omitStages:
+      - RequestReceived
+      resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+      - group: "authentication.k8s.io"
+        resources: ["tokenreviews"]
+      - group: "authorization.k8s.io"
+        resources: ["subjectaccessreviews"]
+
+---
+# Security Scanning Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-scanning-policy
+  namespace: production
+  labels:
+    app: insurance-lead-gen
+    environment: production
+data:
+  scanning-policy.yaml: |
+    # Container Image Security Scanning Policy
+    imageScanning:
+      enabled: true
+      failOnSeverity: "HIGH"
+      failOnUnapproved: true
+      
+      checks:
+      - name: "vulnerability-scan"
+        enabled: true
+        severity: ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        
+      - name: "license-scan"
+        enabled: true
+        prohibitedLicenses:
+        - "GPL-3.0"
+        - "AGPL-3.0"
+        - "SSPL-1.0"
+        
+      - name: "secret-scan"
+        enabled: true
+        patterns:
+        - "password"
+        - "secret"
+        - "api_key"
+        - "token"
+        
+      - name: "configuration-scan"
+        enabled: true
+        checks:
+        - "runAsNonRoot"
+        - "readOnlyRootFilesystem"
+        - "capabilitiesDropped"
+        - "noPrivileged"
+        
+  infrastructureScanning:
+    enabled: true
+    
+    checks:
+    - name: "network-policy-check"
+      enabled: true
+      required: true
+      
+    - name: "pod-security-policy-check"
+      enabled: true
+      required: true
+      
+    - name: "rbac-policy-check"
+      enabled: true
+      required: true
+      
+    - name: "resource-limits-check"
+      enabled: true
+      required: true
+      
+    - name: "security-context-check"
+      enabled: true
+      required: true
