@@ -502,6 +502,46 @@ All services expose metrics at `/metrics`:
 
 See [Monitoring Guide](./docs/MONITORING.md) for detailed documentation.
 
+## 🛡️ Disaster Recovery & Business Continuity
+
+Comprehensive disaster recovery and business continuity testing framework:
+
+- **Backup Strategy**: Automated backups for all databases and services
+- **Recovery Procedures**: Validated recovery runbooks for all failure scenarios
+- **RTO/RPO Validation**: Automated testing of recovery objectives
+- **Testing Framework**: Comprehensive DR testing with detailed reporting
+- **Documentation**: Complete runbooks and procedures
+
+### Key Features
+
+- **Automated Backups**: Daily backups of PostgreSQL, Neo4j, Redis, Qdrant, NATS
+- **Recovery Scripts**: Full automation for backup and recovery operations
+- **Testing Framework**: Validated recovery procedures with metrics tracking
+- **RTO/RPO Validation**: Automated validation of recovery objectives
+- **Comprehensive Documentation**: Runbooks, procedures, and test results
+
+### Quick Start
+
+```bash
+# Run full backup
+./disaster-recovery/scripts/full-backup.sh
+
+# Test recovery procedures
+./disaster-recovery/tests/run-dr-test.sh
+
+# Validate RTO/RPO targets
+./disaster-recovery/tests/validate-rto-rpo.sh
+```
+
+### Recovery Objectives
+
+- **RTO (Recovery Time Objective)**: <1 hour
+- **RPO (Recovery Point Objective)**: <15 minutes
+- **Backup Success Rate**: >99.9%
+- **Test Coverage**: 100% of critical scenarios
+
+See [Disaster Recovery Testing Documentation](docs/DISASTER_RECOVERY_TESTING.md) for complete details.
+
 ## 🐛 Troubleshooting
 
 ### Database Connection Issues
