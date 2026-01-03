@@ -7,6 +7,7 @@ import {
   type DataDeletionRequest,
 } from '@insurance-lead-gen/core';
 import { z } from 'zod';
+import { requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -228,8 +229,7 @@ router.get('/notice', (req: Request, res: Response): void => {
 });
 
 // GET /api/v1/privacy/report - Get GDPR compliance report (Admin only)
-router.get('/report', (req: Request, res: Response): void => {
-  // TODO: Add admin authentication middleware
+router.get('/report', requireRole(['ADMIN', 'SUPER_ADMIN']), (req: Request, res: Response): void => {
   const report = dataPrivacyService.generateGDPRReport();
 
   res.status(200).json({

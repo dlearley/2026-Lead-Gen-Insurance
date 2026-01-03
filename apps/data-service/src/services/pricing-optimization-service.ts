@@ -87,7 +87,7 @@ export class PricingOptimizationService {
     const marketAnalysis = await this.competitiveAnalysisService.getCompetitiveAnalysis(
       quote.insuranceType,
       quote.coverageTier,
-      { state: 'CA' } // TODO: Get actual location from quote
+      { state: quote.lead?.state || 'CA' }
     );
     
     // Calculate optimization factors
@@ -386,10 +386,9 @@ export class PricingOptimizationService {
   }
   
   /**
-   * Get quote details (stub - would integrate with quote system)
+   * Get quote details from database
    */
   private async getQuoteDetails(quoteId: string): Promise<Quote> {
-    // TODO: Integrate with actual quote system
     const quote = await db.quote.findUnique({
       where: { id: quoteId },
       include: {
