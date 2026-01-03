@@ -160,3 +160,36 @@ groups:
         annotations:
           summary: "High rate of AI model errors"
           description: "AI model error rate is above 0.05 per second."
+
+  - name: operational_sustainability_alerts
+    interval: 1m
+    rules:
+      # High Cost per Lead
+      - alert: HighCostPerLead
+        expr: (sum(rate(cloud_provider_cost_total[24h])) / sum(rate(leads_processed_total[24h]))) > 0.10
+        for: 1d
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cost per lead is above threshold"
+          description: "Average cost per lead has exceeded $0.10 over the last 24 hours."
+
+      # Under-utilized Resources (Waste)
+      - alert: UnderUtilizedResources
+        expr: avg_over_time(container_cpu_usage_seconds_total[7d]) / container_spec_cpu_quota < 0.1
+        for: 7d
+        labels:
+          severity: info
+        annotations:
+          summary: "Under-utilized resources detected"
+          description: "Container {{ $labels.container }} in {{ $labels.pod }} has been using less than 10% of its CPU quota for 7 days."
+
+      # Backup Failure Alert
+      - alert: BackupFailure
+        expr: time() - last_backup_timestamp > 86400
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup is stale"
+          description: "No successful backup has been recorded in the last 24 hours."

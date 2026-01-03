@@ -9,6 +9,7 @@
 5. [Database Operations](#database-operations)
 6. [Monitoring & Alerts](#monitoring--alerts)
 7. [Maintenance Tasks](#maintenance-tasks)
+8. [Strategic & Operational Frameworks](#strategic--operational-frameworks)
 
 ---
 
@@ -509,3 +510,26 @@ kubectl top pods -n production --sort-by=memory --all-namespaces
 - **AlertManager**: https://alertmanager.insurance-lead-gen.com
 - **Jaeger**: https://jaeger.insurance-lead-gen.com
 - **API Documentation**: https://api.insurance-lead-gen.com/docs
+
+---
+
+## Strategic & Operational Frameworks
+
+For long-term platform health and sustainability, refer to the following strategic documents:
+
+### 1. Business Continuity & Disaster Recovery
+- **[Business Continuity Plan (BCP)](./BUSINESS_CONTINUITY_PLAN.md):** Critical business functions, RTO/RPO targets, and communication plans.
+- **[Disaster Recovery Plan (DRP)](./DISASTER_RECOVERY.md):** Detailed technical recovery procedures for all system components.
+- **[Incident Communication Templates](./INCIDENT_COMMUNICATION_TEMPLATES.md):** Standardized messaging for internal and external stakeholders.
+
+### 2. Performance & Capacity
+- **[Performance Monitoring & Optimization Program](./PERFORMANCE_PROGRAM.md):** Baselines, optimization workflows, and SLAs.
+- **[Capacity & Resource Management](./CAPACITY_MANAGEMENT.md):** Growth forecasting, scaling procedures, and cost allocation.
+
+### 3. Operational Excellence
+- **[Operational Review & Continuous Improvement](./OPERATIONAL_REVIEW_FRAMEWORK.md):** Framework for regular reviews, RCAs, and improvement backlogs.
+- **[Resilience & Reliability Engineering](./RESILIENCE_RELIABILITY.md):** Chaos engineering, reliability standards, and load shedding strategies.
+- **[Cost Management & Optimization](./COST_MANAGEMENT.md):** Cost tracking, optimization levers, and spending policies.
+
+### 4. Future Roadmap
+- **[Platform Evolution Strategy](./PLATFORM_EVOLUTION_STRATEGY.md):** Technology refresh cycles, technical debt management, and 2024-2025 roadmap.
