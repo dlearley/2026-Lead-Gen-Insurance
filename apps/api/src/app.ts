@@ -2,8 +2,22 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import path from 'path';
-import { logger } from '@insurance-lead-gen/core';
+import { 
+  logger, 
+  createInputSanitizer, 
+  createSecurityHeaders, 
+  createSecurityRateLimiter, 
+  rateLimitPresets, 
+  securityHeaderPresets 
+} from '@insurance-lead-gen/core';
+import { authMiddleware } from './middleware/auth.js';
+import { csrfProtection, getCsrfToken } from './middleware/csrf.js';
+import { enforceHttps } from './middleware/https.js';
+import { userRateLimiter } from './middleware/user-rate-limit.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
+import authRouter from './routes/auth.js';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -29,11 +43,48 @@ import { UPLOADS_DIR } from './utils/files.js';
 export function createApp(): express.Express {
   const app = express();
 
-  app.use(helmet());
-  app.use(cors());
+  // Request ID
+  app.use(requestIdMiddleware);
+
+  // HTTPS Enforcement
+  app.use(enforceHttps);
+
+  // Security Headers (replaces app.use(helmet()))
+  app.use(createSecurityHeaders(securityHeaderPresets.moderate));
+  
+  // Basic Helmet for remaining headers
+  app.use(helmet({
+    contentSecurityPolicy: false, // Handled by createSecurityHeaders
+  }));
+
+  // CORS Hardening
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+  app.use(cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    credentials: true,
+    maxAge: 86400, // 24 hours
+  }));
+
   app.use(compression());
+  app.use(cookieParser());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+
+  // Global Rate Limiting
+  const globalRateLimiter = createSecurityRateLimiter({
+    ...rateLimitPresets.api,
+    redis: process.env.REDIS_HOST ? {
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+      password: process.env.REDIS_PASSWORD,
+    } : undefined,
+  });
+  app.use('/api', globalRateLimiter);
+
+  // Input Sanitization
+  app.use(createInputSanitizer());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
@@ -44,6 +95,23 @@ export function createApp(): express.Express {
       service: 'insurance-lead-gen-api',
       version: '1.0.0',
     });
+  });
+
+  // CSRF Token Endpoint (public)
+  app.get('/api/csrf-token', getCsrfToken);
+
+  // Public Auth Routes
+  app.use('/api/auth', authRouter);
+
+  // Auth & CSRF protection for all API routes
+  app.use('/api', authMiddleware);
+  app.use('/api', userRateLimiter);
+  app.use('/api', (req, res, next) => {
+    // Only apply CSRF to state-changing requests
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      return csrfProtection(req, res, next);
+    }
+    next();
   });
 
   app.use('/api/v1/leads', leadsRouter);
@@ -92,9 +160,20 @@ export function createApp(): express.Express {
     res.status(404).json({ error: 'Not found' });
   });
 
-  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    logger.error('Unhandled error', { error: err });
-    res.status(500).json({ error: 'Internal server error' });
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.error('Unhandled error', { 
+      error: err instanceof Error ? err.message : err,
+      stack: err instanceof Error ? err.stack : undefined,
+      path: req.path,
+      method: req.method
+    });
+    
+    const statusCode = err.status || err.statusCode || 500;
+    const message = process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : err.message || 'Internal server error';
+
+    res.status(statusCode).json({ error: message });
   });
 
   return app;

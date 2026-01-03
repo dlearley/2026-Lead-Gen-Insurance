@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { loadEnv } from './env.js';
+import { getSecretsManager } from '@insurance-lead-gen/core';
 
 export function getConfig() {
   const env = loadEnv();
@@ -33,6 +34,36 @@ export function getConfig() {
     jwt: {
       secret: env.JWT_SECRET,
       expiresIn: env.JWT_EXPIRES_IN,
+    },
+  };
+}
+
+export async function getAsyncConfig() {
+  const baseConfig = getConfig();
+  const secretsManager = getSecretsManager();
+
+  // Load sensitive values from Secrets Manager with env fallbacks
+  const dbUrl = await secretsManager.getSecret('DATABASE_URL') || process.env.DATABASE_URL;
+  const openaiApiKey = await secretsManager.getSecret('OPENAI_API_KEY') || baseConfig.ai.openaiApiKey;
+  const jwtSecret = await secretsManager.getSecret('JWT_SECRET') || baseConfig.jwt.secret;
+  const redisPassword = await secretsManager.getSecret('REDIS_PASSWORD') || baseConfig.redis.password;
+
+  return {
+    ...baseConfig,
+    database: {
+      url: dbUrl,
+    },
+    ai: {
+      ...baseConfig.ai,
+      openaiApiKey,
+    },
+    jwt: {
+      ...baseConfig.jwt,
+      secret: jwtSecret,
+    },
+    redis: {
+      ...baseConfig.redis,
+      password: redisPassword,
     },
   };
 }
