@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Compliance Types (Phase 19.9)
+export * from './compliance.js';
