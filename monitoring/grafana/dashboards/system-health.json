@@ -1,0 +1,184 @@
+{
+  "dashboard": {
+    "title": "System Health & Infrastructure",
+    "tags": ["system", "infrastructure", "health"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Uptime",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "up{job=~\"api-service|data-service|orchestrator\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 4, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "yaxes": [{ "format": "reqps" }]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_errors_total[5m])",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 4,
+        "title": "P95 Response Time",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_response_time_seconds_bucket[5m]))",
+            "legendFormat": "{{route}}"
+          }
+        ],
+        "yaxes": [{ "format": "s" }]
+      },
+      {
+        "id": 5,
+        "title": "Database Connections",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
+        "targets": [
+          {
+            "expr": "database_connections{state=\"active\"}",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "database_connections{state=\"idle\"}",
+            "legendFormat": "Idle"
+          },
+          {
+            "expr": "database_connections{state=\"total\"}",
+            "legendFormat": "Total"
+          }
+        ],
+        "yaxes": [{ "format": "short" }]
+      },
+      {
+        "id": 6,
+        "title": "Database Query Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 4 },
+        "targets": [
+          {
+            "expr": "rate(database_queries_total[5m])",
+            "legendFormat": "{{operation}} {{table}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 7,
+        "title": "Slow Queries",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+        "targets": [
+          {
+            "expr": "rate(database_slow_queries_total[5m])",
+            "legendFormat": "{{operation}} {{table}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 8,
+        "title": "Queue Depth",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "queue_depth",
+            "legendFormat": "{{queue_name}}"
+          }
+        ],
+        "yaxes": [{ "format": "short" }]
+      },
+      {
+        "id": 9,
+        "title": "Job Processing Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(queue_jobs_processed_total[5m])",
+            "legendFormat": "{{queue_name}} {{status}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 10,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "yaxes": [{ "format": "percent" }]
+      },
+      {
+        "id": 11,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 12 },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "yaxes": [{ "format": "decmbytes" }]
+      },
+      {
+        "id": 12,
+        "title": "Active HTTP Requests",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 12 },
+        "targets": [
+          {
+            "expr": "http_active_requests",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "yaxes": [{ "format": "short" }]
+      }
+    ]
+  }
+}

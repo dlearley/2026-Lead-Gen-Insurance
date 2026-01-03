@@ -1,0 +1,253 @@
+{
+  "dashboard": {
+    "title": "Business Metrics - Leads & AI",
+    "tags": ["business", "leads", "ai"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Leads Ingested (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "increase(leads_ingested_total[24h])",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Leads Qualified (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+        "targets": [
+          {
+            "expr": "increase(leads_qualified_total[24h])",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Leads Converted (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+        "targets": [
+          {
+            "expr": "increase(leads_converted_total[24h])",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Conversion Rate",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "increase(leads_converted_total[24h]) / increase(leads_ingested_total[24h]) * 100",
+            "legendFormat": "Rate"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "percent"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Lead Ingestion Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(leads_ingested_total[5m])",
+            "legendFormat": "{{source}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 6,
+        "title": "Lead Funnel",
+        "type": "bargauge",
+        "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+        "targets": [
+          {
+            "expr": "increase(leads_ingested_total[24h])",
+            "legendFormat": "Ingested"
+          },
+          {
+            "expr": "increase(leads_qualified_total[24h])",
+            "legendFormat": "Qualified"
+          },
+          {
+            "expr": "increase(leads_routed_total[24h])",
+            "legendFormat": "Routed"
+          },
+          {
+            "expr": "increase(leads_converted_total[24h])",
+            "legendFormat": "Converted"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Lead Processing Time",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(lead_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(lead_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(lead_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P99"
+          }
+        ],
+        "yaxes": [{ "format": "s" }]
+      },
+      {
+        "id": 8,
+        "title": "Lead Score Distribution",
+        "type": "heatmap",
+        "gridPos": { "h": 4, "w": 12, "x": 8, "y": 4 },
+        "targets": [
+          {
+            "expr": "increase(lead_score_distribution_bucket[1h])",
+            "legendFormat": "{{insurance_type}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "AI Requests (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "increase(ai_requests_total[24h])",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 10,
+        "title": "AI Cost (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 4, "y": 8 },
+        "targets": [
+          {
+            "expr": "increase(ai_costs_total[24h])",
+            "legendFormat": "Cost"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "currencyUSD"
+        }
+      },
+      {
+        "id": 11,
+        "title": "AI Model Accuracy",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
+        "targets": [
+          {
+            "expr": "ai_model_accuracy",
+            "legendFormat": "{{model}}"
+          }
+        ],
+        "options": {
+          "unit": "percent"
+        }
+      },
+      {
+        "id": 12,
+        "title": "AI Tokens (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "increase(ai_tokens_total[24h])",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 13,
+        "title": "AI Latency (P95)",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(ai_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{model}} {{operation}}"
+          }
+        ],
+        "yaxes": [{ "format": "s" }]
+      },
+      {
+        "id": 14,
+        "title": "AI Cost Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(ai_costs_total[5m]) * 3600",
+            "legendFormat": "{{model}} $/hr"
+          }
+        ],
+        "yaxes": [{ "format": "currencyUSD" }]
+      },
+      {
+        "id": 15,
+        "title": "AI Errors",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(ai_errors_total[5m])",
+            "legendFormat": "{{model}} {{error_type}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      }
+    ]
+  }
+}
