@@ -19,7 +19,7 @@ model User {
   email     String   @unique
   firstName String?
   lastName  String?
-  role      UserRole @default(USER)
+  role      UserRole @default(agent)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -36,9 +36,10 @@ model User {
 }
 
 enum UserRole {
-  USER
-  ADMIN
-  SUPER_ADMIN
+  admin
+  broker
+  agent
+  system
 }
 
 // ========================================

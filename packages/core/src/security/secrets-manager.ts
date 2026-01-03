@@ -193,11 +193,6 @@ export class SecretsManager {
   }
 
   private async getFromVault(key: string): Promise<Secret | undefined> {
-    // Placeholder for HashiCorp Vault integration
-    logger.warn('Vault integration not implemented', { key });
-
-    // Example implementation structure:
-    /*
     try {
       const response = await fetch(`${this.config.vaultAddr}/v1/secret/data/${key}`, {
         headers: {
@@ -206,28 +201,43 @@ export class SecretsManager {
       });
       
       if (!response.ok) {
+        if (response.status !== 404) {
+          logger.error('Failed to get secret from Vault', { key, status: response.status });
+        }
         return undefined;
       }
       
-      const data = await response.json();
+      const data: any = await response.json();
       return {
         key,
         value: data.data.data.value,
-        version: data.data.metadata.version,
+        version: data.data.metadata.version.toString(),
         createdAt: new Date(data.data.metadata.created_time),
       };
     } catch (error) {
       logger.error('Failed to get secret from Vault', { key, error });
       return undefined;
     }
-    */
-
-    return undefined;
   }
 
   private async setToVault(secret: Secret): Promise<void> {
-    // Placeholder for HashiCorp Vault integration
-    logger.warn('Vault integration not implemented', { key: secret.key });
+    try {
+      await fetch(`${this.config.vaultAddr}/v1/secret/data/${secret.key}`, {
+        method: 'POST',
+        headers: {
+          'X-Vault-Token': this.config.vaultToken || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: {
+            value: secret.value,
+          },
+        }),
+      });
+    } catch (error) {
+      logger.error('Failed to set secret in Vault', { key: secret.key, error });
+      throw error;
+    }
   }
 
   private async deleteFromVault(key: string): Promise<void> {

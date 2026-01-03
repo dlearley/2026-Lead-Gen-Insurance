@@ -58,3 +58,10 @@ export {
   type SecretsManagerConfig,
   type Secret,
 } from './secrets-manager.js';
+
+// Authentication & Authorization
+export {
+  AuthService,
+  authService,
+  type AuthConfig,
+} from './auth.js';

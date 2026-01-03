@@ -2,7 +2,7 @@
 // USER TYPES
 // ========================================
 
-export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+export * from './auth.js';
 
 export interface User {
   id: string;

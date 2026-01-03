@@ -1,15 +1,19 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requirePermission } from '../middleware/auth.js';
 import { createLeadSchema, leadListSchema, updateLeadSchema, validateBody, validateQuery } from '../utils/validation.js';
+import { createEndpointRateLimiter } from '../middleware/user-rate-limit.js';
 import { store, generateId } from '../storage/in-memory.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 import type { Lead } from '@insurance-lead-gen/types';
 import { logger } from '@insurance-lead-gen/core';
 
 const router = Router();
 
-router.post('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+const createLeadLimiter = createEndpointRateLimiter(50, 60 * 60 * 1000);
+
+router.post('/', authMiddleware, requirePermission('write:leads'), createLeadLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user!;
     const validated = validateBody(createLeadSchema, req.body);
@@ -51,18 +55,17 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     };
     store.activities.set(activity.id, activity);
 
-    res.status(201).json(lead);
+    return sendSuccess(res, lead, 201);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation error', details: error.errors });
-      return;
+      return sendError(res, 'Validation error', 400, error.errors);
     }
     logger.error('Error creating lead', { error });
-    res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, 'Internal server error', 500);
   }
 });
 
-router.get('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/', authMiddleware, requirePermission('read:leads'), async (req: Request, res: Response): Promise<void> => {
   try {
     const filters = validateQuery(leadListSchema, req.query);
 
@@ -89,7 +92,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
     const total = leads.length;
     const data = leads.slice(filters.skip, filters.skip + filters.take);
 
-    res.json({
+    return sendSuccess(res, {
       data,
       pagination: {
         skip: filters.skip,
@@ -99,11 +102,10 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation error', details: error.errors });
-      return;
+      return sendError(res, 'Validation error', 400, error.errors);
     }
     logger.error('Error listing leads', { error });
-    res.status(500).json({ error: 'Internal server error' });
+    return sendError(res, 'Internal server error', 500);
   }
 });
 
