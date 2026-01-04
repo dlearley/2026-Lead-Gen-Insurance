@@ -1,14 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDotEnv": [".env"],
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "build/**"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
+      "outputs": ["dist/**", "!.env", "tsconfig.tsbuildinfo"]
     },
     "lint": {
       "outputs": []
@@ -20,12 +15,28 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [],
+      "outputs": ["coverage/**"],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "__tests__/**/*.ts"]
     },
     "test:watch": {
       "cache": false,
       "persistent": true
+    },
+    "test:coverage": {
+      "dependsOn": [],
+      "outputs": ["coverage/**"]
+    },
+    "test:integration": {
+      "dependsOn": [],
+      "outputs": ["test-results/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "clean": {
+      "cache": false
     },
     "db:generate": {
       "cache": false
@@ -33,11 +44,13 @@
     "db:push": {
       "cache": false
     },
-    "db:studio": {
-      "cache": false,
-      "persistent": true
+    "db:migrate": {
+      "cache": false
     },
-    "clean": {
+    "db:studio": {
+      "cache": false
+    },
+    "db:seed": {
       "cache": false
     }
   }
