@@ -1,0 +1,470 @@
+groups:
+  - name: infrastructure_alerts
+    rules:
+      - alert: NodeCPUHigh
+        expr: instance:node_cpu_usage:rate5m > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node CPU usage > 80%"
+          description: "Node {{ $labels.instance }} has high CPU usage ({{ $value }}%)"
+
+      - alert: NodeCPUUsageCritical
+        expr: instance:node_cpu_usage:rate5m > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node CPU usage critical"
+          description: "Node {{ $labels.instance }} has critical CPU usage ({{ $value }}%)"
+
+      - alert: NodeMemoryHigh
+        expr: instance:node_memory_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node Memory usage > 85%"
+          description: "Node {{ $labels.instance }} has high memory usage ({{ $value }}%)"
+
+      - alert: NodeMemoryCritical
+        expr: instance:node_memory_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Memory usage critical"
+          description: "Node {{ $labels.instance }} has critical memory usage ({{ $value }}%)"
+
+      - alert: NodeDiskSpaceLow
+        expr: instance:node_disk_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node disk space low"
+          description: "Node {{ $labels.instance }} disk usage is over 80%"
+
+      - alert: NodeDiskSpaceCritical
+        expr: instance:node_disk_usage_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node disk space critical"
+          description: "Node {{ $labels.instance }} disk usage is over 95%"
+
+      - alert: NodeNetworkErrorHigh
+        expr: rate(node_network_receive_errs_total[5m]) + rate(node_network_transmit_errs_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High network errors on node"
+          description: "Node {{ $labels.instance }} has more than 1 network error per second"
+
+      - alert: PodRestartRateHigh
+        expr: rate(kube_pod_container_status_restarts_total[1h]) * 3600 > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod restart rate high"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} restarted {{ $value }} times in the last hour"
+
+  - name: application_alerts
+    rules:
+      - alert: ServiceLatencyHigh
+        expr: job:request_latency_p99:rate5m > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service latency high"
+          description: "Service {{ $labels.job }} p99 latency is {{ $value }}s"
+
+      - alert: ServiceLatencyCritical
+        expr: job:request_latency_p99:rate5m > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service latency critical"
+          description: "Service {{ $labels.job }} p99 latency is {{ $value }}s"
+
+      - alert: ServiceErrorRateHigh
+        expr: job:error_rate:rate5m > 0.01
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service error rate high"
+          description: "Service {{ $labels.job }} error rate is {{ $value | printf \"%.2f\" }}%"
+
+      - alert: ServiceErrorRateCritical
+        expr: job:error_rate:rate5m > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service error rate critical"
+          description: "Service {{ $labels.job }} error rate is {{ $value | printf \"%.2f\" }}%"
+
+      - alert: ServiceAvailabilityLow
+        expr: job:availability:rate5m < 0.999
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service availability low"
+          description: "Service {{ $labels.job }} availability is {{ $value | printf \"%.4f\" }}"
+
+      - alert: ServiceAvailabilityCritical
+        expr: job:availability:rate5m < 0.99
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service availability critical"
+          description: "Service {{ $labels.job }} availability is {{ $value | printf \"%.4f\" }}"
+
+      - alert: RequestQueueDepthHigh
+        expr: queue_depth > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Request queue depth high"
+          description: "Queue depth is {{ $value }} for {{ $labels.service }}"
+
+  - name: database_alerts
+    rules:
+      - alert: PostgresReplicationLag
+        expr: pg_replication_lag_bytes > 104857600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres replication lag high"
+          description: "Postgres replication lag is {{ $value | humanize1024 }}B"
+
+      - alert: PostgresConnectionPoolExhausted
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres connection pool almost full"
+          description: "Postgres using {{ $value | printf \"%.2f\" }}% of max connections"
+
+      - alert: RedisCacheHitRatioLow
+        expr: job:redis_hit_rate < 0.95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis cache hit ratio low"
+          description: "Redis hit ratio is {{ $value | printf \"%.2f\" }}"
+
+      - alert: DatabaseQueryLatencyHigh
+        expr: histogram_quantile(0.99, rate(database_query_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database query latency high"
+          description: "99th percentile query latency is {{ $value }}s"
+
+      - alert: BackupFailure
+        expr: backup_status == 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database backup failed"
+          description: "The latest backup attempt for {{ $labels.database }} failed"
+
+  - name: api_alerts
+    rules:
+      - alert: APITopSlowEndpoints
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow API endpoints detected"
+          description: "Endpoint {{ $labels.path }} is slow (p95: {{ $value }}s)"
+
+  - name: business_alerts
+    rules:
+      - alert: LeadVolumeDrop
+        expr: rate(leads_generated_total[1h]) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lead volume dropped to zero"
+          description: "No leads have been generated in the last 15 minutes"
+
+      - alert: HighLeadProcessingFailure
+        expr: rate(lead_processing_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High lead processing failure rate"
+          description: "Lead processing failure rate is {{ $value }} per second"
+
+  - name: slo_alerts
+    rules:
+      - alert: ErrorBudgetBurningFast
+        expr: app:error_budget_remaining:percent < 20
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error budget burning fast"
+          description: "Remaining error budget for {{ $labels.job }} is below 20%"
+
+      - alert: SLOBreach
+        expr: app:error_budget_remaining:percent <= 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "SLO Breached"
+          description: "Service {{ $labels.job }} has breached its SLO"
+
+  - name: additional_monitoring_alerts
+    rules:
+      - alert: PrometheusScrapeFailed
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus scrape failed"
+          description: "Prometheus failed to scrape {{ $labels.instance }} for {{ $labels.job }}"
+
+      - alert: HighMemoryFragmentationRedis
+        expr: redis_memory_fragmentation_ratio > 1.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory fragmentation high"
+          description: "Redis fragmentation ratio is {{ $value }}"
+
+      - alert: Neo4jTransactionFailureHigh
+        expr: rate(neo4j_transaction_failed_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Neo4j transaction failure rate high"
+          description: "Neo4j is experiencing {{ $value }} failed transactions per second"
+
+      - alert: QdrantCollectionFull
+        expr: qdrant_collection_vectors_count / qdrant_collection_capacity > 0.9
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Qdrant collection almost full"
+          description: "Qdrant collection {{ $labels.collection }} is 90% full"
+
+      - alert: IngressControllerHighErrorRate
+        expr: rate(nginx_ingress_controller_requests{status=~"5.."}[5m]) > 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ingress controller high error rate"
+          description: "Nginx Ingress is returning 5xx errors for {{ $labels.ingress }}"
+
+      - alert: PersistentVolumeSpaceLow
+        expr: kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Persistent volume space low"
+          description: "PVC {{ $labels.persistentvolumeclaim }} is below 10% free space"
+
+      - alert: CertificateExpiringSoon
+        expr: (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 14
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL Certificate expiring soon"
+          description: "Certificate {{ $labels.name }} expires in {{ $value | printf \"%.1f\" }} days"
+
+      - alert: HighCardinalityDetected
+        expr: count by (__name__) ({__name__=~".+"}) > 10000
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "High cardinality metric detected"
+          description: "Metric {{ $labels.__name__ }} has high cardinality"
+
+      - alert: ObservabilityCostRatioHigh
+        expr: app:observability_cost_ratio > 0.05
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Observability cost ratio high"
+          description: "Observability cost is over 5% of infrastructure cost ({{ $value | printf \"%.2f\" }}%)"
+
+      - alert: APICacheHitRatioLow
+        expr: rate(api_cache_hits_total[5m]) / (rate(api_cache_hits_total[5m]) + rate(api_cache_misses_total[5m])) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API cache hit ratio low"
+          description: "API cache hit ratio is below 50%"
+
+      - alert: LongRunningDatabaseQuery
+        expr: pg_stat_activity_max_tx_duration > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Long running database query"
+          description: "A database query has been running for more than 5 minutes"
+
+      - alert: RedisReplicationDisconnected
+        expr: redis_connected_slaves == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis replication disconnected"
+          description: "Redis master has no connected slaves"
+
+      - alert: KubeStateMetricsDown
+        expr: absent(up{job="kube-state-metrics"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kube-state-metrics is down"
+          description: "Prometheus is not receiving metrics from kube-state-metrics"
+
+      - alert: NodeNotReady
+        expr: kube_node_status_condition{condition="Ready", status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node not ready"
+          description: "Node {{ $labels.node }} has been in NotReady state for 5 minutes"
+
+      - alert: PodStuckInPending
+        expr: kube_pod_status_phase{phase="Pending"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod stuck in Pending"
+          description: "Pod {{ $labels.pod }} has been in Pending state for 15 minutes"
+
+      - alert: HPAReachMaxReplicas
+        expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HPA reached max replicas"
+          description: "HPA {{ $labels.horizontalpodautoscaler }} has reached its maximum replicas"
+
+      - alert: HighAIModelInferenceTime
+        expr: app:ai_inference_time:p99 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High AI inference time"
+          description: "AI model p99 inference time is over 10s"
+
+      - alert: AIAPILimitApproaching
+        expr: rate(ai_api_calls_total[1h]) / ai_api_quota_per_hour > 0.8
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI API limit approaching"
+          description: "AI API usage is at 80% of hourly quota"
+
+      - alert: DataFreshnessSLIViolation
+        expr: (time() - data_last_updated_timestamp_seconds) > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data freshness SLI violation"
+          description: "Data has not been updated for more than 10 minutes"
+
+      - alert: VectorSearchLatencyHigh
+        expr: app:vector_search_latency:p95 > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Vector search latency high"
+          description: "Vector search p95 latency is over 500ms"
+
+      - alert: AuthSuccessRateLow
+        expr: app:auth_success_rate:ratio < 0.95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Authentication success rate low"
+          description: "Auth success rate is below 95%"
+
+      - alert: NetworkTrafficAnomaly
+        expr: rate(node_network_receive_bytes_total[5m]) > (avg_over_time(rate(node_network_receive_bytes_total[5m])[24h]) * 5)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network traffic anomaly"
+          description: "Inbound network traffic is 5x higher than 24h average"
+
+      - alert: ExcessiveLogVolume
+        expr: rate(loki_distributor_bytes_received_total[5m]) > 10485760 # 10MB/s
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Excessive log volume"
+          description: "Logs are being ingested at a rate over 10MB/s"
+
+      - alert: HighContainerOOMKills
+        expr: increase(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container OOM Kill detected"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was killed due to Out Of Memory"
+
+      - alert: HighDatabaseTableGrowth
+        expr: delta(pg_total_relation_size_bytes[24h]) > 10737418240 # 10GB
+        labels:
+          severity: info
+        annotations:
+          summary: "Large database table growth"
+          description: "Table {{ $labels.relname }} grew by more than 10GB in 24h"
+
+      - alert: UnusedPersistentVolumes
+        expr: kube_persistentvolume_status_phase{phase="Available"} > 0
+        for: 24h
+        labels:
+          severity: info
+        annotations:
+          summary: "Unused Persistent Volumes"
+          description: "There are PVs in Available state for more than 24h"

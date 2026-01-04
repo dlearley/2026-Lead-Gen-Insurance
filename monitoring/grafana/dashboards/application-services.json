@@ -1,0 +1,21 @@
+{
+  "title": "Application Services",
+  "uid": "application-services",
+  "panels": [
+    {
+      "title": "Request Rate",
+      "type": "timeseries",
+      "targets": [{ "expr": "job:requests_per_second:rate5m" }]
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "targets": [{ "expr": "job:error_rate:rate5m" }]
+    },
+    {
+      "title": "p99 Latency",
+      "type": "timeseries",
+      "targets": [{ "expr": "job:request_latency_p99:rate5m" }]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "title": "Infrastructure Health",
+  "uid": "infrastructure",
+  "panels": [
+    {
+      "title": "Node CPU Usage",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "instance:node_cpu_usage:rate5m" }
+      ]
+    },
+    {
+      "title": "Node Memory Usage",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "instance:node_memory_usage_percent" }
+      ]
+    }
+  ]
+}

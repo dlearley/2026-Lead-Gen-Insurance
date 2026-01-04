@@ -1,0 +1,21 @@
+{
+  "title": "PostgreSQL Database",
+  "uid": "postgres",
+  "panels": [
+    {
+      "title": "Transaction Rate",
+      "type": "timeseries",
+      "targets": [{ "expr": "job:postgres_transaction_rate" }]
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "timeseries",
+      "targets": [{ "expr": "job:postgres_cache_hit_ratio" }]
+    },
+    {
+      "title": "Active Connections",
+      "type": "timeseries",
+      "targets": [{ "expr": "pg_stat_activity_count" }]
+    }
+  ]
+}

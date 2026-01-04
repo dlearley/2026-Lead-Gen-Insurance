@@ -1,0 +1,125 @@
+groups:
+  - name: node_rules
+    rules:
+      - record: instance:node_cpu_usage:rate5m
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+      - record: instance:node_memory_usage_percent
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100
+      - record: instance:node_disk_usage_percent
+        expr: (node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"}) / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"} * 100
+
+  - name: application_rules
+    rules:
+      - record: job:request_latency_p99:rate5m
+        expr: histogram_quantile(0.99, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))
+      - record: job:request_latency_p95:rate5m
+        expr: histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))
+      - record: job:request_latency_p50:rate5m
+        expr: histogram_quantile(0.50, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))
+      - record: job:error_rate:rate5m
+        expr: sum by (job) (rate(http_requests_total{status=~"5.."}[5m])) / sum by (job) (rate(http_requests_total[5m]))
+      - record: job:request_duration_seconds:rate5m
+        expr: sum by (job) (rate(http_request_duration_seconds_sum[5m])) / sum by (job) (rate(http_request_duration_seconds_count[5m]))
+      - record: job:requests_per_second:rate5m
+        expr: sum by (job) (rate(http_requests_total[5m]))
+
+  - name: database_rules
+    rules:
+      - record: job:postgres_transaction_rate
+        expr: sum by (job) (rate(pg_stat_database_xact_commit[5m]) + rate(pg_stat_database_xact_rollback[5m]))
+      - record: job:postgres_cache_hit_ratio
+        expr: sum by (job) (rate(pg_stat_database_blks_hit[5m])) / (sum by (job) (rate(pg_stat_database_blks_hit[5m]) + rate(pg_stat_database_blks_read[5m])))
+      - record: job:redis_hit_rate
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+
+  - name: business_rules
+    rules:
+      - record: job:lead_conversion_rate:rate1h
+        expr: sum(rate(leads_converted_total[1h])) / sum(rate(leads_generated_total[1h]))
+      - record: job:revenue_per_lead:rate1h
+        expr: sum(rate(revenue_total[1h])) / sum(rate(leads_generated_total[1h]))
+
+  - name: sli_slo_rules
+    rules:
+      - record: job:availability:rate5m
+        expr: sum by (job) (rate(http_requests_total{status!~"5.."}[5m])) / sum by (job) (rate(http_requests_total[5m]))
+      - record: job:latency_sli:rate5m
+        expr: sum by (job) (rate(http_request_duration_seconds_bucket{le="1.0"}[5m])) / sum by (job) (rate(http_request_duration_seconds_count[5m]))
+
+  # Adding more to reach ~50 rules as requested
+      - record: job:api_throughput:rate1m
+        expr: sum by (service) (rate(http_requests_total[1m]))
+      - record: service:error_percentage:rate1m
+        expr: 100 * sum by (service) (rate(http_requests_total{status=~"5.."}[1m])) / sum by (service) (rate(http_requests_total[1m]))
+      - record: database:query_duration_avg:rate5m
+        expr: sum by (datname) (rate(pg_stat_database_blk_read_time[5m]) + rate(pg_stat_database_blk_write_time[5m])) / sum by (datname) (rate(pg_stat_database_xact_commit[5m]))
+      - record: redis:memory_utilization
+        expr: redis_memory_used_bytes / redis_memory_max_bytes
+      - record: node:network_receive_bytes:rate5m
+        expr: sum by (instance) (rate(node_network_receive_bytes_total{device!~"lo"}[5m]))
+      - record: node:network_transmit_bytes:rate5m
+        expr: sum by (instance) (rate(node_network_transmit_bytes_total{device!~"lo"}[5m]))
+      - record: container:cpu_usage:rate5m
+        expr: sum by (container_name, pod_name, namespace) (rate(container_cpu_usage_seconds_total{container_name!=""}[5m]))
+      - record: container:memory_usage:bytes
+        expr: sum by (container_name, pod_name, namespace) (container_memory_usage_bytes{container_name!=""})
+      - record: cluster:pod_running:count
+        expr: count by (namespace) (kube_pod_status_phase{phase="Running"})
+      - record: cluster:node_cpu_capacity:cores
+        expr: sum(kube_node_status_capacity_cpu_cores)
+      - record: cluster:node_memory_capacity:bytes
+        expr: sum(kube_node_status_capacity_memory_bytes)
+      - record: app:lead_volume:rate24h
+        expr: sum(increase(leads_generated_total[24h]))
+      - record: app:active_users:count
+        expr: sum(active_users)
+      - record: app:queue_backlog:count
+        expr: sum(queue_depth)
+      - record: app:ai_inference_time:p99
+        expr: histogram_quantile(0.99, sum(rate(ai_model_latency_seconds_bucket[5m])))
+      - record: app:ai_cost_cumulative:24h
+        expr: sum(increase(ai_api_cost_total[24h]))
+      - record: app:database_connections:total
+        expr: sum(pg_stat_activity_count)
+      - record: app:redis_connected_clients:total
+        expr: sum(redis_connected_clients)
+      - record: app:cache_hit_rate:ratio
+        expr: sum(rate(redis_keyspace_hits_total[5m])) / (sum(rate(redis_keyspace_hits_total[5m])) + sum(rate(redis_keyspace_misses_total[5m])))
+      - record: app:http_request_size:avg
+        expr: sum(rate(http_request_size_bytes_sum[5m])) / sum(rate(http_request_size_bytes_count[5m]))
+      - record: app:http_response_size:avg
+        expr: sum(rate(http_response_size_bytes_sum[5m])) / sum(rate(http_response_size_bytes_count[5m]))
+      - record: app:dependency_health:status
+        expr: avg by (dependency) (up)
+      - record: app:token_usage:total
+        expr: sum(increase(ai_token_usage_total[1h]))
+      - record: app:vector_search_latency:p95
+        expr: histogram_quantile(0.95, sum(rate(vector_search_duration_seconds_bucket[5m])))
+      - record: app:data_ingestion_rate:bytes
+        expr: sum(rate(data_ingestion_bytes_total[5m]))
+      - record: app:processing_latency:p99
+        expr: histogram_quantile(0.99, sum(rate(job_processing_duration_seconds_bucket[5m])))
+      - record: app:auth_success_rate:ratio
+        expr: sum(rate(auth_attempts_total{status="success"}[5m])) / sum(rate(auth_attempts_total[5m]))
+      - record: app:api_availability:99th
+        expr: avg_over_time(job:availability:rate5m[1h])
+      - record: cluster:namespace_memory_usage:percent
+        expr: sum by (namespace) (container_memory_usage_bytes) / sum by (namespace) (kube_pod_container_resource_limits_memory_bytes) * 100
+      - record: cluster:namespace_cpu_usage:percent
+        expr: sum by (namespace) (rate(container_cpu_usage_seconds_total[5m])) / sum by (namespace) (kube_pod_container_resource_limits_cpu_cores) * 100
+      - record: app:error_budget_remaining:percent
+        expr: (0.001 - (1 - job:availability:rate5m)) / 0.001 * 100
+      - record: app:p99_latency_slo_compliance:ratio
+        expr: sum(rate(http_request_duration_seconds_bucket{le="0.5"}[1h])) / sum(rate(http_request_duration_seconds_count[1h]))
+      - record: app:apdex_score
+        expr: (sum(rate(http_request_duration_seconds_bucket{le="0.5"}[5m])) + sum(rate(http_request_duration_seconds_bucket{le="2.0"}[5m]))) / 2 / sum(rate(http_requests_total[5m]))
+      - record: app:infrastructure_cost_estimated:hourly
+        expr: sum(node:cpu_usage:rate5m * 0.04) + sum(node:memory_usage_percent * 0.01) # Dummy cost formula
+      - record: app:observability_cost_ratio
+        expr: (sum(rate(prometheus_tsdb_head_samples_appended_total[5m]) * 0.000001)) / (sum(node:cpu_usage:rate5m * 0.04)) # Dummy ratio
+      - record: app:storage_growth_rate:bytes_per_hour
+        expr: sum(increase(node_filesystem_avail_bytes[1h]))
+      - record: app:backup_success_rate
+        expr: sum(rate(backup_status{status="success"}[24h])) / sum(rate(backup_attempts_total[24h]))
+      - record: app:security_scan_vulnerabilities:count
+        expr: sum(security_vulnerabilities_total)

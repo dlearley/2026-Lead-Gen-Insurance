@@ -3,8 +3,15 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { logger } from '@insurance-lead-gen/core';
+import { logger, initializeTracing } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
+
+// Initialize tracing
+initializeTracing({
+  serviceName: 'data-service',
+  environment: process.env.NODE_ENV || 'production',
+});
+
 import { EVENT_SUBJECTS, type LeadReceivedEvent } from '@insurance-lead-gen/types';
 
 import { NatsEventBus } from './nats/nats-event-bus.js';

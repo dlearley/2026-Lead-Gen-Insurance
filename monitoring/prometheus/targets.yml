@@ -1,0 +1,58 @@
+# Static targets for external services and documentation of endpoints
+- targets:
+    - 'api:3000'
+  labels:
+    job: 'api-service'
+    env: 'production'
+    region: 'us-east-1'
+
+- targets:
+    - 'data-service:3001'
+  labels:
+    job: 'data-service'
+    env: 'production'
+    region: 'us-east-1'
+
+- targets:
+    - 'orchestrator:3002'
+  labels:
+    job: 'orchestrator'
+    env: 'production'
+    region: 'us-east-1'
+
+- targets:
+    - 'backend:8000'
+  labels:
+    job: 'backend-python'
+    env: 'production'
+    region: 'us-east-1'
+
+- targets:
+    - 'node-exporter:9100'
+  labels:
+    job: 'node-exporter'
+
+- targets:
+    - 'postgres-exporter:9187'
+  labels:
+    job: 'postgres'
+
+- targets:
+    - 'redis-exporter:9121'
+  labels:
+    job: 'redis'
+
+- targets:
+    - 'neo4j:2004'
+  labels:
+    job: 'neo4j'
+
+- targets:
+    - 'qdrant:6333'
+  labels:
+    job: 'qdrant'
+
+- targets:
+    - 'nats:8222'
+  labels:
+    job: 'nats'

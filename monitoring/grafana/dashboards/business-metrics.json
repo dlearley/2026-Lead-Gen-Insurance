@@ -1,0 +1,16 @@
+{
+  "title": "Business Metrics",
+  "uid": "business-metrics",
+  "panels": [
+    {
+      "title": "Lead Volume",
+      "type": "timeseries",
+      "targets": [{ "expr": "sum(rate(leads_generated_total[1h]))" }]
+    },
+    {
+      "title": "Lead Conversion Rate",
+      "type": "timeseries",
+      "targets": [{ "expr": "job:lead_conversion_rate:rate1h" }]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+groups:
+  - name: cost_tracking_rules
+    rules:
+      - record: observability:metric_cardinality:count
+        expr: count by (__name__) ({__name__=~".+"})
+
+      - record: observability:scrape_samples_scraped:rate5m
+        expr: sum by (job) (rate(prometheus_target_scraped_samples_total[5m]))
+
+      - record: observability:estimated_monthly_storage_bytes
+        expr: prometheus_tsdb_size_bytes_total * 30 # Simple estimation
+
+      - record: observability:log_ingestion_rate:bytes5m
+        expr: sum by (job) (rate(loki_distributor_bytes_received_total[5m]))
+
+      - record: observability:trace_ingestion_rate:spans5m
+        expr: sum by (service_name) (rate(jaeger_collector_spans_received_total[5m]))
+
+      - record: observability:total_cost_estimate:hourly
+        expr: |
+          (sum(observability:metric_cardinality:count) * 0.0001) +
+          (sum(observability:log_ingestion_rate:bytes5m) * 0.0000005) +
+          (sum(observability:trace_ingestion_rate:spans5m) * 0.000001)
+
+      - record: observability:cost_percentage_of_infra
+        expr: observability:total_cost_estimate:hourly / app:infrastructure_cost_estimated:hourly * 100

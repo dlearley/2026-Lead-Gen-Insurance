@@ -1,9 +1,11 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 10s
   external_labels:
     cluster: 'insurance-lead-gen'
     environment: 'production'
+    region: 'us-east-1'
 
 # Alertmanager configuration
 alerting:
@@ -13,7 +15,10 @@ alerting:
 
 # Load rules once and periodically evaluate them
 rule_files:
-  - '/etc/prometheus/alerts.yml'
+  - '/etc/prometheus/alert-rules.yml'
+  - '/etc/prometheus/recording-rules.yml'
+  - '/etc/prometheus/cost-tracking-rules.yml'
+  - '/etc/prometheus/sli-rules.yml'
 
 # Scrape configurations
 scrape_configs:
@@ -26,6 +31,11 @@ scrape_configs:
 
   # Node Exporter - System metrics
   - job_name: 'node-exporter'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
     static_configs:
       - targets: ['node-exporter:9100']
         labels:
@@ -48,61 +58,78 @@ scrape_configs:
 
   # API Service (TypeScript NestJS)
   - job_name: 'api-service'
+    metrics_path: '/metrics'
     static_configs:
-      - targets: ['host.docker.internal:3000']
+      - targets: ['api:3000']
         labels:
           service: 'api'
           app: 'insurance-lead-gen'
-    metrics_path: '/metrics'
 
   # Data Service (TypeScript Express)
   - job_name: 'data-service'
+    metrics_path: '/metrics'
     static_configs:
-      - targets: ['host.docker.internal:3001']
+      - targets: ['data-service:3001']
         labels:
           service: 'data-service'
           app: 'insurance-lead-gen'
-    metrics_path: '/metrics'
 
   # Orchestrator Service (TypeScript Express)
   - job_name: 'orchestrator'
+    metrics_path: '/metrics'
     static_configs:
-      - targets: ['host.docker.internal:3002']
+      - targets: ['orchestrator:3002']
         labels:
           service: 'orchestrator'
           app: 'insurance-lead-gen'
-    metrics_path: '/metrics'
 
   # Backend Service (Python FastAPI)
   - job_name: 'backend-python'
+    metrics_path: '/metrics'
     static_configs:
-      - targets: ['host.docker.internal:8000']
+      - targets: ['backend:8000']
         labels:
           service: 'backend'
           app: 'insurance-lead-gen'
           language: 'python'
-    metrics_path: '/metrics'
 
-  # Neo4j metrics (if enabled)
+  # Neo4j metrics
   - job_name: 'neo4j'
+    metrics_path: '/metrics'
     static_configs:
       - targets: ['neo4j:2004']
         labels:
           service: 'neo4j'
-    metrics_path: '/metrics'
 
   # Qdrant metrics
   - job_name: 'qdrant'
+    metrics_path: '/metrics'
     static_configs:
       - targets: ['qdrant:6333']
         labels:
           service: 'qdrant'
-    metrics_path: '/metrics'
 
   # NATS monitoring
   - job_name: 'nats'
+    metrics_path: '/varz'
     static_configs:
       - targets: ['nats:8222']
         labels:
           service: 'nats'
-    metrics_path: '/varz'
+
+  # Kube-state-metrics
+  - job_name: 'kube-state-metrics'
+    static_configs:
+      - targets: ['kube-state-metrics:8080']
+
+  # cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+# Remote storage
+remote_write:
+  - url: "https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push"
+    basic_auth:
+      username: "${GRAFANA_CLOUD_USER}"
+      password: "${GRAFANA_CLOUD_API_KEY}"

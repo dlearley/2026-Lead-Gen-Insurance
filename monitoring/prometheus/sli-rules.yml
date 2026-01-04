@@ -1,0 +1,22 @@
+groups:
+  - name: sli_rules
+    rules:
+      # Availability SLI: uptime percentage
+      - record: sli:service_availability:ratio
+        expr: sum by (job) (rate(http_requests_total{status!~"5.."}[5m])) / sum by (job) (rate(http_requests_total[5m]))
+
+      # Latency SLI: request latency < 500ms (p99)
+      - record: sli:service_latency_500ms:ratio
+        expr: sum by (job) (rate(http_request_duration_seconds_bucket{le="0.5"}[5m])) / sum by (job) (rate(http_request_duration_seconds_count[5m]))
+
+      # Error rate SLI: error rate < 1%
+      - record: sli:service_error_rate:ratio
+        expr: sum by (job) (rate(http_requests_total{status=~"5.."}[5m])) / sum by (job) (rate(http_requests_total[5m]))
+
+      # Throughput SLI: requests per second
+      - record: sli:service_throughput:rps
+        expr: sum by (job) (rate(http_requests_total[5m]))
+
+      # Data freshness SLI: data staleness < 5 minutes
+      - record: sli:data_freshness:seconds
+        expr: time() - data_last_updated_timestamp_seconds
