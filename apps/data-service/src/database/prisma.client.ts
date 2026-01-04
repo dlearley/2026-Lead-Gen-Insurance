@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@insurance-lead-gen/core';
+import { ensureAuditLogInfrastructure } from '../audit/audit-log.js';
 
 class PrismaClientSingleton {
   private static instance: PrismaClient | null = null;
@@ -46,5 +47,9 @@ class PrismaClientSingleton {
 }
 
 export const prisma = PrismaClientSingleton.getInstance();
+
+if (process.env.ENABLE_AUDIT_LOGGING !== 'false') {
+  void ensureAuditLogInfrastructure(prisma);
+}
 
 export const disconnectPrisma = () => PrismaClientSingleton.disconnect();

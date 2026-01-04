@@ -2,13 +2,17 @@
 import { Router, Request, Response } from 'express';
 import {
   dataPrivacyService,
-  auditLogger,
+  maskCommonPIIFields,
   type DataExportRequest,
   type DataDeletionRequest,
 } from '@insurance-lead-gen/core';
 import { z } from 'zod';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
+import { auditLogService, buildAuditContext } from '../services/audit.js';
 
 const router = Router();
+
+router.use(authMiddleware);
 
 // Validation schemas
 const exportRequestSchema = z.object({
@@ -34,10 +38,36 @@ const consentSchema = z.object({
   expiresAt: z.string().datetime().optional(),
 });
 
+function isAdmin(req: Request): boolean {
+  return req.user?.role === 'ADMIN' || req.user?.role === 'SUPER_ADMIN';
+}
+
+async function enforceSameUserOrAdmin(req: Request, res: Response, userId: string, action: string): Promise<boolean> {
+  if (req.user?.id === userId || isAdmin(req)) {
+    return true;
+  }
+
+  await auditLogService.logCritical({
+    ...buildAuditContext(req),
+    action,
+    resourceType: 'privacy',
+    status: 'failure',
+    errorMessage: 'Forbidden: cannot perform action on another user',
+    newValues: { targetUserId: userId },
+  });
+
+  res.status(403).json({ success: false, error: 'Forbidden' });
+  return false;
+}
+
 // POST /api/v1/privacy/export - Export user data (GDPR Article 20 - Right to data portability)
 router.post('/export', async (req: Request, res: Response): Promise<void> => {
   try {
     const validatedRequest = exportRequestSchema.parse(req.body);
+
+    if (!(await enforceSameUserOrAdmin(req, res, validatedRequest.userId, 'privacy_export_denied'))) {
+      return;
+    }
 
     const exportRequest: DataExportRequest = {
       ...validatedRequest,
@@ -46,21 +76,20 @@ router.post('/export', async (req: Request, res: Response): Promise<void> => {
     };
 
     const data = await dataPrivacyService.exportUserData(exportRequest);
+    const maskedData = maskCommonPIIFields(data);
 
-    auditLogger.logPrivacyEvent({
-      userId: validatedRequest.userId,
-      ipAddress: req.ip,
+    await auditLogService.logCritical({
+      ...buildAuditContext(req),
       action: 'data_export_requested',
-      result: 'success',
-      metadata: {
-        format: validatedRequest.format,
-      },
-      requestId: (req as any).id,
+      resourceType: 'user',
+      resourceId: validatedRequest.userId,
+      status: 'success',
+      newValues: { format: validatedRequest.format, masked: true },
     });
 
     res.status(200).json({
       success: true,
-      data,
+      data: maskedData,
     });
   } catch (error: any) {
     res.status(400).json({
@@ -75,6 +104,10 @@ router.post('/delete', async (req: Request, res: Response): Promise<void> => {
   try {
     const validatedRequest = deletionRequestSchema.parse(req.body);
 
+    if (!(await enforceSameUserOrAdmin(req, res, validatedRequest.userId, 'privacy_deletion_denied'))) {
+      return;
+    }
+
     const deletionRequest: DataDeletionRequest = {
       ...validatedRequest,
       requestedAt: new Date(),
@@ -82,16 +115,16 @@ router.post('/delete', async (req: Request, res: Response): Promise<void> => {
 
     await dataPrivacyService.requestDataDeletion(deletionRequest);
 
-    auditLogger.logPrivacyEvent({
-      userId: validatedRequest.userId,
-      ipAddress: req.ip,
+    await auditLogService.logCritical({
+      ...buildAuditContext(req),
       action: 'data_deletion_requested',
-      result: 'success',
-      metadata: {
+      resourceType: 'user',
+      resourceId: validatedRequest.userId,
+      status: 'success',
+      newValues: {
         reason: validatedRequest.reason,
         retainAnalytics: validatedRequest.retainAnalytics,
       },
-      requestId: (req as any).id,
     });
 
     res.status(200).json({
@@ -120,6 +153,19 @@ router.get('/consent/:userId', async (req: Request, res: Response): Promise<void
       return;
     }
 
+    if (!(await enforceSameUserOrAdmin(req, res, userId, 'privacy_consent_read_denied'))) {
+      return;
+    }
+
+    await auditLogService.logCritical({
+      ...buildAuditContext(req),
+      action: 'consent_status_read',
+      resourceType: 'user',
+      resourceId: userId,
+      status: 'success',
+      newValues: { purpose },
+    });
+
     const consent = dataPrivacyService.getConsent(userId, purpose);
     const hasValidConsent = dataPrivacyService.hasValidConsent(userId, purpose);
 
@@ -141,6 +187,10 @@ router.post('/consent', async (req: Request, res: Response): Promise<void> => {
   try {
     const validatedConsent = consentSchema.parse(req.body);
 
+    if (!(await enforceSameUserOrAdmin(req, res, validatedConsent.userId, 'privacy_consent_write_denied'))) {
+      return;
+    }
+
     dataPrivacyService.recordConsent({
       userId: validatedConsent.userId,
       purpose: validatedConsent.purpose,
@@ -150,15 +200,13 @@ router.post('/consent', async (req: Request, res: Response): Promise<void> => {
       expiresAt: validatedConsent.expiresAt ? new Date(validatedConsent.expiresAt) : undefined,
     });
 
-    auditLogger.logPrivacyEvent({
-      userId: validatedConsent.userId,
-      ipAddress: req.ip,
+    await auditLogService.logCritical({
+      ...buildAuditContext(req),
       action: validatedConsent.granted ? 'consent_granted' : 'consent_denied',
-      result: 'success',
-      metadata: {
-        purpose: validatedConsent.purpose,
-      },
-      requestId: (req as any).id,
+      resourceType: 'user',
+      resourceId: validatedConsent.userId,
+      status: 'success',
+      newValues: { purpose: validatedConsent.purpose },
     });
 
     res.status(200).json({
@@ -187,17 +235,19 @@ router.delete('/consent/:userId', async (req: Request, res: Response): Promise<v
       return;
     }
 
+    if (!(await enforceSameUserOrAdmin(req, res, userId, 'privacy_consent_withdraw_denied'))) {
+      return;
+    }
+
     dataPrivacyService.withdrawConsent(userId, purpose);
 
-    auditLogger.logPrivacyEvent({
-      userId,
-      ipAddress: req.ip,
+    await auditLogService.logCritical({
+      ...buildAuditContext(req),
       action: 'consent_withdrawn',
-      result: 'success',
-      metadata: {
-        purpose,
-      },
-      requestId: (req as any).id,
+      resourceType: 'user',
+      resourceId: userId,
+      status: 'success',
+      newValues: { purpose },
     });
 
     res.status(200).json({
@@ -228,9 +278,15 @@ router.get('/notice', (req: Request, res: Response): void => {
 });
 
 // GET /api/v1/privacy/report - Get GDPR compliance report (Admin only)
-router.get('/report', (req: Request, res: Response): void => {
-  // TODO: Add admin authentication middleware
+router.get('/report', requireRole(['ADMIN', 'SUPER_ADMIN']), async (req: Request, res: Response): Promise<void> => {
   const report = dataPrivacyService.generateGDPRReport();
+
+  await auditLogService.logCritical({
+    ...buildAuditContext(req),
+    action: 'gdpr_report_viewed',
+    resourceType: 'privacy',
+    status: 'success',
+  });
 
   res.status(200).json({
     success: true,

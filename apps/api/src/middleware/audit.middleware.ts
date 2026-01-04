@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await, @typescript-eslint/no-misused-promises, @typescript-eslint/prefer-nullish-coalescing */
 import { Request, Response, NextFunction } from 'express';
-import { auditLogger, AuditEventType, AuditEventSeverity } from '@insurance-lead-gen/core';
+import { AuditEventType, AuditEventSeverity } from '@insurance-lead-gen/core';
+import { auditLogService, buildAuditContext } from '../services/audit.js';
 
 export interface AuditMiddlewareConfig {
   excludePaths?: string[];
@@ -30,13 +31,10 @@ export function createAuditMiddleware(config: AuditMiddlewareConfig = {}) {
 
       // Log based on configuration
       if ((isSuccess && logSuccessful) || (isFailed && logFailed)) {
-        const userId = (req as any).user?.id || (req as any).userId;
-        const userName = (req as any).user?.name || (req as any).userName;
-
         // Determine event type based on path and method
         const eventType = determineEventType(req.path, req.method);
 
-        // Determine severity
+        // Determine severity (used for routing alerts; stored as metadata)
         let severity = AuditEventSeverity.INFO;
         if (statusCode >= 500) {
           severity = AuditEventSeverity.ERROR;
@@ -44,26 +42,33 @@ export function createAuditMiddleware(config: AuditMiddlewareConfig = {}) {
           severity = AuditEventSeverity.WARNING;
         }
 
-        auditLogger.log({
-          eventType,
-          severity,
-          userId,
-          userName,
-          ipAddress: req.ip || req.socket.remoteAddress,
-          userAgent: req.get('user-agent'),
-          action: `${req.method} ${req.path}`,
-          resource: extractResource(req.path),
-          resourceId: req.params.id,
-          result: isSuccess ? 'success' : 'failure',
-          requestId: (req as any).id || req.get('x-request-id'),
-          metadata: {
-            method: req.method,
-            path: req.path,
-            statusCode,
-            duration,
-            query: req.query,
-          },
-        });
+        const resourceType = extractResource(req.path);
+        const resourceId = extractResourceId(req.params);
+
+        const status = isSuccess ? 'success' : 'failure';
+
+        const newValues = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' ? req.body : undefined;
+
+        const ctx = buildAuditContext(req);
+
+        void auditLogService
+          .log({
+            ...ctx,
+            action: `${req.method} ${req.path}`,
+            resourceType,
+            resourceId,
+            status,
+            newValues,
+            authContext: {
+              ...(ctx.authContext ?? {}),
+              eventType,
+              severity,
+              statusCode,
+              durationMs: duration,
+              query: req.query,
+            },
+          })
+          .catch(() => undefined);
       }
 
       return originalSend(body);
@@ -114,4 +119,20 @@ function extractResource(path: string): string {
 
   // Return the first resource part
   return filtered[0] || 'unknown';
+}
+
+function extractResourceId(params: Record<string, string | undefined>): string | undefined {
+  const candidates = [
+    params.id,
+    params.leadId,
+    params.noteId,
+    params.taskId,
+    params.policyId,
+    params.claimId,
+    params.agentId,
+    params.brokerId,
+    params.carrierId,
+  ];
+
+  return candidates.find((c) => Boolean(c));
 }

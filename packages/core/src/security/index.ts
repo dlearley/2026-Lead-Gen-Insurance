@@ -23,6 +23,16 @@ export {
   type AuditLoggerConfig,
 } from './audit-logger.js';
 
+export {
+  AuditLogService,
+  ConsoleAuditWriter,
+  InMemoryAuditWriter,
+  type AuditLogRecord,
+  type AuditLogRecordInput,
+  type AuditStatus,
+  type AuditWriter,
+} from './audit-service.js';
+
 // Input Sanitization
 export {
   InputSanitizer,
@@ -48,6 +58,33 @@ export {
   type DataExportRequest,
   type DataDeletionRequest,
 } from './data-privacy.js';
+
+// Data Classification & Masking
+export {
+  DataClassification,
+  defaultClassificationMatrix,
+  discoverSensitiveFields,
+  getFieldClassification,
+  isSensitiveClassification,
+  type ClassificationEntity,
+  type ClassificationMatrix,
+  type FieldClassification,
+} from './data-classification.js';
+
+export {
+  deepRedact,
+  maskAddress,
+  maskCommonPIIFields,
+  maskCreditCard,
+  maskEmail,
+  maskName,
+  maskPhone,
+  maskSSN,
+  redactSensitiveStrings,
+  redactValue,
+  type MaskingOptions,
+  type MaskingStrategy,
+} from './masking.js';
 
 // Secrets Management
 export {

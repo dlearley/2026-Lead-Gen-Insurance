@@ -44,7 +44,7 @@ export class DataPrivacyService {
     const defaultPolicies: DataRetentionPolicy[] = [
       { dataType: 'lead', retentionDays: 365, deletionMethod: 'soft' },
       { dataType: 'user', retentionDays: 730, deletionMethod: 'soft' },
-      { dataType: 'audit_log', retentionDays: 90, deletionMethod: 'hard' },
+      { dataType: 'audit_log', retentionDays: 2555, deletionMethod: 'hard' },
       { dataType: 'session', retentionDays: 30, deletionMethod: 'hard' },
       { dataType: 'analytics', retentionDays: 365, deletionMethod: 'anonymize' },
     ];
@@ -123,8 +123,14 @@ export class DataPrivacyService {
             anonymized[field] = this.anonymizeEmail(value) as T[keyof T];
           } else if (field === 'phone' || String(field).includes('phone')) {
             anonymized[field] = this.anonymizePhone(value) as T[keyof T];
-          } else if (field === 'ssn' || String(field).includes('ssn')) {
-            anonymized[field] = 'XXX-XX-XXXX' as T[keyof T];
+          } else if (
+            field === 'ssn' ||
+            String(field).toLowerCase().includes('ssn') ||
+            String(field).toLowerCase().includes('tax')
+          ) {
+            anonymized[field] = this.anonymizeSSN(value) as T[keyof T];
+          } else if (String(field).toLowerCase().includes('name')) {
+            anonymized[field] = this.maskName(value) as T[keyof T];
           } else {
             anonymized[field] = this.maskString(value) as T[keyof T];
           }
@@ -141,11 +147,10 @@ export class DataPrivacyService {
   }
 
   private anonymizeEmail(email: string): string {
-    const [local, domain] = email.split('@');
-    if (!domain || !local) return '***@***.***';
-
-    const maskedLocal = local.length > 2 ? local[0] + '***' + local[local.length - 1] : '***';
-    return `${maskedLocal}@${domain}`;
+    const at = email.lastIndexOf('@');
+    if (at <= 0 || at === email.length - 1) return '***@***';
+    const domain = email.slice(at + 1);
+    return `***@${domain}`;
   }
 
   private anonymizePhone(phone: string): string {
@@ -156,9 +161,25 @@ export class DataPrivacyService {
     return `***-***-${lastFour}`;
   }
 
+  private anonymizeSSN(ssn: string): string {
+    const digits = ssn.replace(/\D/g, '');
+    if (digits.length < 4) return '***-**-****';
+
+    const lastFour = digits.slice(-4);
+    return `***-**-${lastFour}`;
+  }
+
+  private maskName(name: string): string {
+    const trimmed = name.trim();
+    if (!trimmed) return '***';
+    return `${trimmed[0]}***`;
+  }
+
   private maskString(str: string): string {
-    if (str.length <= 2) return '***';
-    return str[0] + '*'.repeat(str.length - 2) + str[str.length - 1];
+    const trimmed = str.trim();
+    if (!trimmed) return '***';
+    if (trimmed.length <= 2) return '***';
+    return `${trimmed[0]}${'*'.repeat(Math.min(trimmed.length - 1, 6))}`;
   }
 
   identifyPII<T extends Record<string, any>>(data: T): (keyof T)[] {
