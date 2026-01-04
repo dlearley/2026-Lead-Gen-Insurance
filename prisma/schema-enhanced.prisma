@@ -1,0 +1,318 @@
+// Enhanced Prisma schema with database hardening
+// This schema includes audit columns, constraints, and data integrity features
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enhanced Lead model with audit columns and constraints
+model Lead {
+  id              String         @id @default(uuid())
+  source          String         @db.VarChar(100)
+  email           String?        @unique @db.VarChar(255)
+  phone           String?        @db.VarChar(20)
+  firstName       String?        @db.VarChar(100)
+  lastName        String?        @db.VarChar(100)
+  street          String?        @db.Text
+  city            String?        @db.VarChar(100)
+  state           String?        @db.VarChar(50)
+  zipCode         String?        @db.VarChar(20)
+  country         String?        @default("USA") @db.VarChar(50)
+  insuranceType   InsuranceType?
+  qualityScore    Int?           @db.Int
+  status          LeadStatus     @default(RECEIVED)
+  metadata        Json?
+  version         Int            @default(1) // Optimistic locking version
+
+  // Audit columns
+  createdAt       DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(6)
+  createdBy       String?        @db.VarChar(255)
+  updatedBy       String?        @db.VarChar(255)
+  deletedAt       DateTime?      @db.Timestamptz(6) // Soft delete
+
+  // Relationships
+  assignments     LeadAssignment[]
+  events          Event[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt]) // For soft delete queries
+  @@index([source])
+  @@map("leads")
+}
+
+// Enhanced Agent model
+model Agent {
+  id                  String        @id @default(uuid())
+  firstName           String        @db.VarChar(100)
+  lastName            String        @db.VarChar(100)
+  email               String        @unique @db.VarChar(255)
+  phone               String        @db.VarChar(20)
+  licenseNumber       String        @unique @db.VarChar(50)
+  specializations     String[]
+  city                String        @db.VarChar(100)
+  state               String        @db.VarChar(50)
+  country             String        @default("USA") @db.VarChar(50)
+  rating              Float         @default(0.0) @db.Decimal(2, 1)
+  isActive            Boolean       @default(true)
+  maxLeadCapacity     Int           @default(10) @db.Int
+  currentLeadCount    Int           @default(0) @db.Int
+  averageResponseTime Float         @default(0.0) @db.Decimal(10, 2)
+  conversionRate      Float         @default(0.0) @db.Decimal(5, 2)
+  version             Int           @default(1)
+
+  // Audit columns
+  createdAt           DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(6)
+  createdBy           String?       @db.VarChar(255)
+  updatedBy           String?       @db.VarChar(255)
+  deletedAt           DateTime?     @db.Timestamptz(6)
+
+  // Relationships
+  assignments         LeadAssignment[]
+
+  @@index([email])
+  @@index([licenseNumber])
+  @@index([isActive])
+  @@index([city])
+  @@index([state])
+  @@index([deletedAt])
+  @@map("agents")
+}
+
+// Enhanced LeadAssignment model
+model LeadAssignment {
+  id            String           @id @default(uuid())
+  leadId        String
+  agentId       String
+  assignedAt    DateTime         @default(now()) @db.Timestamptz(6)
+  status        AssignmentStatus  @default(PENDING)
+  acceptedAt    DateTime?        @db.Timestamptz(6)
+  notes         String?          @db.Text
+  version       Int              @default(1)
+
+  // Audit columns
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+  createdBy      String?          @db.VarChar(255)
+  updatedBy      String?          @db.VarChar(255)
+
+  // Relationships
+  lead          Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent         Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([assignedAt])
+  @@index([agentId, status]) // Composite index
+  @@map("lead_assignments")
+}
+
+// Enhanced Event model
+model Event {
+  id          String    @id @default(uuid())
+  type        String    @db.VarChar(100)
+  source      String    @db.VarChar(100)
+  entityType  String    @db.VarChar(100)
+  entityId    String
+  data        Json
+  timestamp   DateTime  @default(now()) @db.Timestamptz(6)
+  metadata    Json?
+
+  // Audit columns
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+
+  // Relationships
+  lead        Lead?     @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([type])
+  @@index([source])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([timestamp])
+  @@index([type, timestamp]) // Composite index for time-series queries
+  @@map("events")
+}
+
+// Enhanced Carrier model
+model Carrier {
+  id                  String              @id @default(uuid())
+  name                String              @db.VarChar(255)
+  description         String?             @db.Text
+  website             String?             @db.VarChar(500)
+  contactEmail        String              @db.VarChar(255)
+  contactPhone        String              @db.VarChar(20)
+  address             String?             @db.Text
+  city                String?             @db.VarChar(100)
+  state               String?             @db.VarChar(50)
+  zipCode             String?             @db.VarChar(20)
+  country             String?             @default("USA") @db.VarChar(50)
+  partnershipTier     PartnershipTier      @default(BASIC)
+  partnershipStatus   PartnershipStatus   @default(ACTIVE)
+  contractStartDate   DateTime            @db.Timestamptz(6)
+  contractEndDate     DateTime?           @db.Timestamptz(6)
+  commissionRate      Float               @default(0.0) @db.Decimal(5, 2)
+  isActive            Boolean             @default(true)
+  integrationEnabled  Boolean             @default(false)
+  apiEndpoint         String?             @db.VarChar(500)
+  apiKey              String?             @db.VarChar(500) // Should be encrypted
+  performanceScore    Float               @default(0.0) @db.Decimal(5, 2)
+  conversionRate      Float               @default(0.0) @db.Decimal(5, 2)
+  averageResponseTime Float               @default(0.0) @db.Decimal(10, 2)
+  totalLeadsReceived  Int                 @default(0) @db.Int
+  totalLeadsConverted Int                 @default(0) @db.Int
+  version             Int                 @default(1)
+
+  // Audit columns
+  createdAt           DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime            @updatedAt @db.Timestamptz(6)
+  createdBy           String?             @db.VarChar(255)
+  updatedBy           String?             @db.VarChar(255)
+  deletedAt           DateTime?           @db.Timestamptz(6)
+
+  // Relationships
+  performanceMetrics  CarrierPerformanceMetric[]
+
+  @@index([name])
+  @@index([partnershipStatus])
+  @@index([partnershipTier])
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("carriers")
+}
+
+// Enhanced CarrierPerformanceMetric model
+model CarrierPerformanceMetric {
+  id                    String     @id @default(uuid())
+  carrierId             String
+  month                 Int         @db.Int
+  year                  Int         @db.Int
+  leadsReceived         Int         @default(0) @db.Int
+  leadsConverted        Int         @default(0) @db.Int
+  conversionRate        Float       @default(0.0) @db.Decimal(5, 2)
+  averageResponseTime   Float       @default(0.0) @db.Decimal(10, 2)
+  averageQuoteValue     Float       @default(0.0) @db.Decimal(10, 2)
+  customerSatisfaction  Float       @default(0.0) @db.Decimal(5, 2)
+  onTimeDeliveryRate    Float       @default(0.0) @db.Decimal(5, 2)
+  version               Int         @default(1)
+
+  // Audit columns
+  createdAt             DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime    @updatedAt @db.Timestamptz(6)
+
+  // Relationships
+  carrier               Carrier     @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+
+  @@index([carrierId])
+  @@index([year])
+  @@index([month])
+  @@index([createdAt])
+  @@unique([carrierId, year, month])
+  @@map("carrier_performance_metrics")
+}
+
+// Audit log model for sensitive operations
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String?   @db.VarChar(255)
+  action      String    @db.VarChar(100)
+  entityType  String    @db.VarChar(100)
+  entityId    String?
+  changes     Json?
+  ipAddress   String?   @db.VarChar(45)
+  userAgent   String?   @db.Text
+  timestamp   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([timestamp])
+  @@index([userId, timestamp]) // Composite for user activity
+  @@map("audit_logs")
+}
+
+// Archive table for old leads (partitioned by date)
+model LeadsArchive {
+  id              String         @id @default(uuid())
+  source          String         @db.VarChar(100)
+  email           String?        @db.VarChar(255)
+  phone           String?        @db.VarChar(20)
+  firstName       String?        @db.VarChar(100)
+  lastName        String?        @db.VarChar(100)
+  street          String?        @db.Text
+  city            String?        @db.VarChar(100)
+  state           String?        @db.VarChar(50)
+  zipCode         String?        @db.VarChar(20)
+  country         String?        @db.VarChar(50)
+  insuranceType   InsuranceType?
+  qualityScore    Int?           @db.Int
+  status          LeadStatus
+  metadata        Json?
+  version         Int
+
+  // Original timestamps
+  createdAt       DateTime       @db.Timestamptz(6)
+  updatedAt       DateTime       @db.Timestamptz(6)
+  createdBy       String?        @db.VarChar(255)
+  updatedBy       String?        @db.VarChar(255)
+
+  // Archive metadata
+  archivedAt      DateTime       @default(now()) @db.Timestamptz(6)
+  archivedBy      String?        @db.VarChar(255)
+
+  @@index([createdAt])
+  @@index([archivedAt])
+  @@map("leads_archive")
+}
+
+// Enums
+enum LeadStatus {
+  RECEIVED
+  PROCESSING
+  QUALIFIED
+  ROUTED
+  CONVERTED
+  REJECTED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  TIMEOUT
+}
+
+enum InsuranceType {
+  AUTO
+  HOME
+  LIFE
+  HEALTH
+  COMMERCIAL
+}
+
+enum PartnershipTier {
+  BASIC
+  STANDARD
+  PREMIUM
+  ELITE
+  STRATEGIC
+}
+
+enum PartnershipStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  TERMINATED
+  RENEWAL_NEEDED
+}
