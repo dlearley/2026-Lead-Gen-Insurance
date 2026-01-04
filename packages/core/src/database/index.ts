@@ -12,3 +12,15 @@ export {
   createConnectionPool,
 } from './connection-pool.js';
 export type { ConnectionPoolOptions } from './connection-pool.js';
+
+// Advanced query optimization
+export {
+  AdvancedQueryOptimizer,
+  createAdvancedQueryOptimizer,
+  DatabaseIndex,
+  QueryOptimizationRecommendation,
+  QueryExecutionStats,
+  TableStats,
+  IndexStats,
+  QueryOptimizationUtils
+} from './advanced-query-optimizer.js';
