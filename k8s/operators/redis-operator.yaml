@@ -1,0 +1,218 @@
+# Redis Operator Installation (Redis Enterprise or Community)
+# Managed Redis clusters on Kubernetes
+
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis-operator
+  labels:
+    name: redis-operator
+
+---
+# Redis Cluster Definition (using Redis Operator)
+apiVersion: redis.redis.opstreelabs.in/v1beta1
+kind: RedisCluster
+metadata:
+  name: redis-cluster
+  namespace: redis-operator
+spec:
+  # Cluster size
+  clusterSize: 6
+
+  # Redis version
+  redisExporter:
+    image: quay.io/opstree/redis-exporter:latest
+
+  # Redis configuration
+  redisConfig:
+    customConfig:
+      - maxmemory-policy: allkeys-lru
+      - maxmemory: "0"
+      - save: "900 1 300 10 60 10000"
+      - appendonly: "yes"
+      - appendfsync: "everysec"
+      - auto-aof-rewrite-percentage: "100"
+      - auto-aof-rewrite-min-size: "64mb"
+      - repl-timeout: "60"
+      - repl-backlog-size: "10mb"
+      - repl-backlog-ttl: "3600"
+      - timeout: "300"
+      - tcp-keepalive: "300"
+      - tcp-backlog: "511"
+      - slowlog-log-slower-than: "10000"
+      - slowlog-max-len: "128"
+      - lua-time-limit: "5000"
+      - hash-max-ziplist-entries: "512"
+      - hash-max-ziplist-value: "64"
+      - list-max-ziplist-size: "-2"
+      - set-max-intset-entries: "512"
+      - zset-max-ziplist-entries: "128"
+      - zset-max-ziplist-value: "64"
+
+  # Sentinel configuration
+  sentinelConfig:
+    customConfig:
+      - sentinel-monitor: "mymaster $(REDIS_MASTER_HOST) 6379 2"
+      - sentinel-down-after-milliseconds: "mymaster 5000"
+      - sentinel-failover-timeout: "mymaster 300000"
+      - sentinel-parallel-syncs: "mymaster 1"
+      - sentinel-notification-script: "/etc/redis/sentinel/notify.sh"
+
+  # Storage configuration
+  storage:
+    type: "pvc"
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "gp3-encrypted"
+        resources:
+          requests:
+            storage: "100Gi"
+
+  # Security
+  securityContext:
+    runAsUser: 999
+    fsGroup: 999
+
+  # TLS configuration
+  tls:
+    secret:
+      secretName: redis-tls-cert
+
+  # Resources
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "2"
+      memory: "8Gi"
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    minAvailable: 2
+
+---
+# Redis Sentinel Configuration
+apiVersion: redis.redis.opstreelabs.in/v1beta1
+kind: RedisSentinel
+metadata:
+  name: redis-sentinel
+  namespace: redis-operator
+spec:
+  # Sentinel size (3 sentinels for quorum)
+  clusterSize: 3
+
+  # Sentinel configuration
+  sentinelConfig:
+    customConfig:
+      - sentinel-monitor: "mymaster redis-cluster-master 6379 2"
+      - sentinel-down-after-milliseconds: "mymaster 5000"
+      - sentinel-failover-timeout: "mymaster 300000"
+      - sentinel-parallel-syncs: "mymaster 1"
+      - sentinel-announce-ip: "$(POD_IP)"
+      - sentinel-announce-port: "26379"
+
+  # Redis master to monitor
+  redisConfig:
+    customConfig:
+      - requirepass: "${REDIS_PASSWORD}"
+
+  # Resources
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    minAvailable: 2
+
+---
+# Redis Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-password
+  namespace: redis-operator
+type: Opaque
+stringData:
+  password: "${REDIS_PASSWORD}"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-tls-cert
+  namespace: redis-operator
+type: kubernetes.io/tls
+data:
+  tls.crt: "${TLS_CRT}"
+  tls.key: "${TLS_KEY}"
+  ca.crt: "${CA_CRT}"
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster
+  namespace: redis-operator
+  labels:
+    app: redis-cluster
+spec:
+  selector:
+    app: redis-cluster
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP
+  - name: sentinel
+    port: 26379
+    targetPort: 26379
+    protocol: TCP
+  clusterIP: None  # Headless service for statefulset
+
+---
+# Redis Sentinel Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: redis-operator
+  labels:
+    app: redis-sentinel
+spec:
+  selector:
+    app: redis-sentinel
+  ports:
+  - name: sentinel
+    port: 26379
+    targetPort: 26379
+    protocol: TCP
+  clusterIP: None  # Headless service
+
+---
+# Service Monitor for Redis
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis
+  namespace: redis-operator
+  labels:
+    app: redis
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: redis-cluster
+  endpoints:
+  - port: redis
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

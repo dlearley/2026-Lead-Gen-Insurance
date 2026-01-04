@@ -1,0 +1,38 @@
+#!/bin/bash
+# Database Backup Configuration Template
+# Copy this file to backup-config.sh and fill in your credentials
+
+# S3 Configuration
+S3_BUCKET="insurance-lead-gen-database-backups"
+AWS_REGION="us-east-1"
+
+# Slack Notifications (optional)
+SLACK_WEBHOOK_URL=""
+
+# Backup Retention
+RETENTION_DAYS=30
+
+# PostgreSQL Configuration
+PGHOST="postgres-primary.insurance-lead-gen.internal"
+PGPORT="5432"
+PGDATABASE="insurance_lead_gen"
+PGUSER="postgres"
+PGPASSWORD="your_postgres_password"
+
+# Redis Configuration
+REDIS_HOST="redis-cluster.insurance-lead-gen.internal"
+REDIS_PORT="6379"
+REDIS_PASSWORD="your_redis_password"
+REDIS_DATA_DIR="/var/lib/redis"
+
+# Neo4j Configuration
+NEO4J_HOST="neo4j.insurance-lead-gen.internal"
+NEO4J_BOLT_PORT="7687"
+NEO4J_USERNAME="neo4j"
+NEO4J_PASSWORD="your_neo4j_password"
+NEO4J_DATA_DIR="/var/lib/neo4j/data"
+
+# Qdrant Configuration
+QDRANT_HOST="qdrant.qdrant.svc.cluster.local"
+QDRANT_PORT="6333"
+QDRANT_API_KEY="your_qdrant_api_key"
