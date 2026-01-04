@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  labels:
+    app: postgres
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: postgres
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            fsGroup: 999
+          containers:
+          - name: backup
+            image: postgres:16-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              NOW=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="/backup/postgres_backup_${NOW}.sql.gz"
+
+              echo "Starting backup at $(date)"
+              PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h postgres -U postgres -d $POSTGRES_DB | gzip > $BACKUP_FILE
+
+              # Upload to S3 (if AWS) or GCS (if GCP)
+              if [ -n "$AWS_S3_BUCKET" ]; then
+                aws s3 cp $BACKUP_FILE s3://$AWS_S3_BUCKET/postgres/backup_${NOW}.sql.gz
+              fi
+
+              # Keep only last 7 days of local backups
+              find /backup -name "postgres_backup_*.sql.gz" -mtime +7 -delete
+
+              echo "Backup completed at $(date)"
+            envFrom:
+            - secretRef:
+                name: postgres-secrets
+            env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            - name: AWS_S3_BUCKET
+              value: "insurance-lead-gen-backups"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+            volumeMounts:
+            - name: backup
+              mountPath: /backup
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: backup
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc
+          nodeSelector:
+            node-type: database
+          tolerations:
+          - key: dedicated
+            operator: Equal
+            value: database
+            effect: NoSchedule
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backup-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: standard-ssd
+  resources:
+    requests:
+      storage: 500Gi

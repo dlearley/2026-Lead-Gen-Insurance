@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- api
+- data-service
+- orchestrator
+- frontend
+- backend
+- postgres
+- redis
+- neo4j
+- qdrant
+
+namespace: insurance-lead-gen
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  environment: production

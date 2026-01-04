@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP
+  clusterIP: None
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redis
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/insurance-lead-gen-redis
