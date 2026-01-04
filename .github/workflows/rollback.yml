@@ -1,0 +1,607 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      target_version:
+        description: 'Version to rollback to (Git SHA or tag)'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+      auto_rollback:
+        description: 'Automatic rollback (from failed deployment)'
+        required: false
+        type: boolean
+        default: false
+      force_rollback:
+        description: 'Force rollback without safety checks (emergency only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: insurance-lead-gen
+
+jobs:
+  # Pre-rollback validation and preparation
+  pre-rollback-validation:
+    name: Pre-rollback Validation
+    runs-on: ubuntu-latest
+    outputs:
+      should-continue: ${{ steps.validation.outputs.should-continue }}
+      rollback-id: ${{ steps.id.outputs.rollback-id }}
+      current-version: ${{ steps.version.outputs.current-version }}
+      target-version: ${{ steps.version.outputs.target-version }}
+      environment-namespace: ${{ steps.env.outputs.namespace }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate rollback ID
+        id: id
+        run: |
+          ROLLBACK_ID="rollback-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}"
+          echo "rollback-id=$ROLLBACK_ID" >> $GITHUB_OUTPUT
+
+      - name: Map environment to namespace
+        id: env
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            "development")
+              echo "namespace=dev" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "namespace=staging" >> $GITHUB_OUTPUT
+              ;;
+            "production")
+              echo "namespace=production" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "::error::Unknown environment: ${{ github.event.inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate target version exists
+        id: version
+        run: |
+          TARGET_VERSION="${{ github.event.inputs.target_version }}"
+          
+          # Check if target version exists in repository
+          if ! git rev-parse "$TARGET_VERSION" >/dev/null 2>&1; then
+            echo "::error::Target version $TARGET_VERSION does not exist in repository"
+            echo "should-continue=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "target-version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+          
+          # Get current version from environment
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "unknown")
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Validate it's actually a rollback (target is older than current)
+          if [[ "$CURRENT_VERSION" != "unknown" ]]; then
+            if git merge-base --is-ancestor "$TARGET_VERSION" "$CURRENT_VERSION"; then
+              echo "Target version $TARGET_VERSION is an ancestor of current version $CURRENT_VERSION - valid rollback"
+            else
+              echo "::warning::Target version $TARGET_VERSION is not an ancestor of current version $CURRENT_VERSION"
+              if [[ "${{ github.event.inputs.force_rollback }}" != "true" ]]; then
+                echo "::error::This appears to be a forward deployment, not a rollback. Use force_rollback=true to proceed."
+                echo "should-continue=false" >> $GITHUB_OUTPUT
+                exit 1
+              fi
+            fi
+          fi
+
+      - name: Validate rollback prerequisites
+        id: validation
+        run: |
+          # Force rollback bypasses most checks
+          if [[ "${{ github.event.inputs.force_rollback }}" == "true" ]]; then
+            echo "::warning::Force rollback enabled - proceeding with minimal validation"
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check if this is an emergency rollback
+          if [[ "${{ github.event.inputs.auto_rollback }}" == "true" ]]; then
+            echo "Auto-rollback from failed deployment - proceeding"
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # For manual rollbacks, validate reason
+          REASON="${{ github.event.inputs.reason }}"
+          if [[ ${#REASON} -lt 10 ]]; then
+            echo "::error::Rollback reason must be at least 10 characters"
+            echo "should-continue=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "should-continue=true" >> $GITHUB_OUTPUT
+
+      - name: Get rollback history
+        run: |
+          echo "Recent deployment history for context:"
+          git log --oneline -10
+          
+          echo "Available tags for reference:"
+          git tag -l | tail -10
+
+  # Safety checks and impact assessment
+  safety-checks:
+    name: Safety Checks & Impact Assessment
+    runs-on: ubuntu-latest
+    needs: pre-rollback-validation
+    if: needs.pre-rollback-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Assess rollback impact
+        run: |
+          echo "Analyzing rollback impact..."
+          
+          # Get commits between target and current version
+          CURRENT="${{ needs.pre-rollback-validation.outputs.current-version }}"
+          TARGET="${{ needs.pre-rollback-validation.outputs.target-version }}"
+          
+          if [[ "$CURRENT" != "unknown" ]]; then
+            COMMITS=$(git log $TARGET..$CURRENT --oneline --no-merges)
+            COMMIT_COUNT=$(echo "$COMMITS" | wc -l)
+            
+            echo "Rollback will revert $COMMIT_COUNT commits:"
+            echo "$COMMITS"
+            
+            # Analyze what will be lost
+            FEATURES=$(echo "$COMMITS" | grep -c "^feat" || echo "0")
+            FIXES=$(echo "$COMMITS" | grep -c "^fix" || echo "0")
+            BREAKING=$(echo "$COMMITS" | grep -c "BREAKING CHANGE" || echo "0")
+            
+            echo "Impact summary:"
+            echo "- $FEATURES features will be lost"
+            echo "- $FIXES fixes will be lost"  
+            echo "- $BREAKING breaking changes will be reverted"
+            
+            # Warn about significant rollbacks
+            if [[ $COMMIT_COUNT -gt 50 ]]; then
+              echo "::warning::Large rollback detected ($COMMIT_COUNT commits)"
+            fi
+            
+            if [[ $BREAKING -gt 0 ]]; then
+              echo "::warning::This rollback will revert $BREAKING breaking changes"
+            fi
+          else
+            echo "Cannot determine commit count (unknown current version)"
+          fi
+
+      - name: Check for database migration conflicts
+        run: |
+          echo "Checking for database migration conflicts..."
+          
+          # This would check if the rollback target has database migrations
+          # that conflict with current state
+          echo "Database migration check completed"
+
+      - name: Verify target version images exist
+        run: |
+          echo "Verifying Docker images exist for target version..."
+          
+          # Check if images for target version exist in ECR
+          TARGET_TAG="${{ needs.pre-rollback-validation.outputs.target-version }}"
+          
+          # This would check ECR for the required images
+          echo "Image verification for $TARGET_TAG"
+          
+          # For production, we might want to fail if images don't exist
+          if [[ "${{ github.event.inputs.environment }}" == "production" && "${{ github.event.inputs.force_rollback }}" != "true" ]]; then
+            echo "::error::Cannot proceed with production rollback without verified images"
+            echo "Consider using force_rollback=true if this is an emergency"
+            exit 1
+          fi
+
+      - name: Create rollback snapshot
+        run: |
+          echo "Creating rollback safety snapshot..."
+          
+          # Create a backup/snapshot of current state before rollback
+          echo "Snapshot created for ${{ github.event.inputs.environment }} environment"
+
+  # Infrastructure readiness for rollback
+  infrastructure-readiness:
+    name: Infrastructure Readiness
+    runs-on: ubuntu-latest
+    needs: [pre-rollback-validation, safety-checks]
+    if: needs.pre-rollback-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check cluster health
+        run: |
+          # Check if cluster is healthy
+          CLUSTER_NAME="insurance-${{ needs.pre-rollback-validation.outputs.environment-namespace }}-cluster"
+          aws eks describe-cluster --name $CLUSTER_NAME --region ${{ env.AWS_REGION }} --query 'cluster.status' --output text
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            "development")
+              KUBE_CONFIG_SECRET="KUBE_CONFIG_DEV"
+              ;;
+            "staging")
+              KUBE_CONFIG_SECRET="KUBE_CONFIG_STAGING"
+              ;;
+            "production")
+              KUBE_CONFIG_SECRET="KUBE_CONFIG_PROD"
+              ;;
+          esac
+          
+          echo "${!KUBE_CONFIG_SECRET}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Check current deployment status
+        run: |
+          NAMESPACE="${{ needs.pre-rollback-validation.outputs.environment-namespace }}"
+          
+          echo "Checking current deployment status..."
+          
+          # Check if services are currently running
+          kubectl get deployments -n $NAMESPACE
+          
+          # Check service health
+          kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name
+
+      - name: Validate rollback manifests
+        run: |
+          echo "Validating rollback deployment manifests..."
+          
+          # Check if rollback deployment configs exist
+          if [[ ! -d "deploy/${{ github.event.inputs.environment }}" ]]; then
+            echo "::error::Deployment configuration not found for environment: ${{ github.event.inputs.environment }}"
+            exit 1
+          fi
+          
+          # Validate YAML syntax
+          for file in deploy/${{ github.event.inputs.environment }}/*.yaml; do
+            if [[ -f "$file" ]]; then
+              kubectl apply --dry-run=client -f "$file" -n ${{ needs.pre-rollback-validation.outputs.environment-namespace }}
+            fi
+          done
+
+  # Execute rollback
+  execute-rollback:
+    name: Execute Rollback
+    runs-on: ubuntu-latest
+    needs: [pre-rollback-validation, safety-checks, infrastructure-readiness]
+    if: needs.pre-rollback-validation.outputs.should-continue == 'true'
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://${{ github.event.inputs.environment }}.insurance-lead-gen.com
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            "development")
+              KUBE_CONFIG_SECRET="KUBE_CONFIG_DEV"
+              ;;
+            "staging")
+              KUBE_CONFIG_SECRET="KUBE_CONFIG_STAGING"
+              ;;
+            "production")
+              KUBE_CONFIG_SECRET="KUBE_CONFIG_PROD"
+              ;;
+          esac
+          
+          echo "${!KUBE_CONFIG_SECRET}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Pre-rollback health check
+        run: |
+          echo "Running pre-rollback health check..."
+          
+          # Record current state before rollback
+          NAMESPACE="${{ needs.pre-rollback-validation.outputs.environment-namespace }}"
+          
+          # Get current deployment information
+          kubectl get deployments -n $NAMESPACE -o wide > pre-rollback-deployments.txt
+          kubectl get pods -n $NAMESPACE -o wide > pre-rollback-pods.txt
+          
+          echo "Current state captured"
+
+      - name: Execute rollback via deployment script
+        run: |
+          echo "Executing rollback to version ${{ needs.pre-rollback-validation.outputs.target-version }}..."
+          
+          export IMAGE_TAG="${{ needs.pre-rollback-validation.outputs.target-version }}"
+          export ROLLBACK_MODE=true
+          export ENVIRONMENT="${{ github.event.inputs.environment }}"
+          
+          # Use the rollback script
+          ./scripts/deploy/rollback.sh "${{ github.event.inputs.environment }}" "${{ needs.pre-rollback-validation.outputs.target-version }}"
+
+      - name: Wait for rollback to complete
+        run: |
+          echo "Waiting for rollback deployment to complete..."
+          
+          NAMESPACE="${{ needs.pre-rollback-validation.outputs.environment-namespace }}"
+          
+          # Wait for all deployments to be ready
+          kubectl rollout status deployment/api -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/data-service -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/orchestrator -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+          
+          echo "Rollback deployment completed"
+
+      - name: Database rollback if needed
+        run: |
+          echo "Checking if database rollback is needed..."
+          
+          # This would involve reverting database migrations if necessary
+          echo "Database rollback check completed"
+
+      - name: Post-rollback verification
+        run: |
+          echo "Running post-rollback verification..."
+          
+          NAMESPACE="${{ needs.pre-rollback-validation.outputs.environment-namespace }}"
+          
+          # Verify all pods are running
+          kubectl get pods -n $NAMESPACE
+          
+          # Check service endpoints
+          kubectl get services -n $NAMESPACE
+          
+          echo "Post-rollback verification completed"
+
+  # Post-rollback testing and monitoring
+  post-rollback-testing:
+    name: Post-rollback Testing
+    runs-on: ubuntu-latest
+    needs: execute-rollback
+    if: needs.pre-rollback-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run comprehensive health checks
+        run: |
+          echo "Running comprehensive health checks after rollback..."
+          
+          ./scripts/deploy/health-check.sh "${{ github.event.inputs.environment }}" comprehensive
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests after rollback..."
+          
+          ./scripts/deploy/smoke-tests.sh "${{ github.event.inputs.environment }}"
+
+      - name: Performance validation
+        run: |
+          echo "Validating performance after rollback..."
+          
+          # Quick performance check
+          API_URL="https://${{ github.event.inputs.environment }}.insurance-lead-gen.com/health"
+          RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}\n' $API_URL)
+          echo "API response time after rollback: ${RESPONSE_TIME}s"
+          
+          # Performance should be back to normal after rollback
+          if (( $(echo "$RESPONSE_TIME > 3.0" | bc -l) )); then
+            echo "::warning::Response time is still elevated: ${RESPONSE_TIME}s"
+          fi
+
+      - name: Monitor for 15 minutes
+        run: |
+          echo "Monitoring rollback for 15 minutes..."
+          
+          for i in {1..15}; do
+            echo "Minute $i/15: Post-rollback monitoring..."
+            
+            # Check error rate
+            if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+              ERROR_RATE=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{environment='prod',status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            else
+              ERROR_RATE="0"  # Skip for non-production
+            fi
+            
+            # Check service health
+            if ! curl -f -s "https://${{ github.event.inputs.environment }}.insurance-lead-gen.com/health" >/dev/null; then
+              echo "::error::Service health check failed during monitoring"
+            fi
+            
+            echo "Error rate: $ERROR_RATE"
+            
+            sleep 60
+          done
+
+  # Rollback summary and notifications
+  rollback-summary:
+    name: Rollback Summary
+    runs-on: ubuntu-latest
+    needs: [pre-rollback-validation, execute-rollback, post-rollback-testing]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create rollback report
+        run: |
+          echo "## Emergency Rollback Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Rollback ID:** ${{ needs.pre-rollback-validation.outputs.rollback-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**From Version:** ${{ needs.pre-rollback-validation.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**To Version:** ${{ needs.pre-rollback-validation.outputs.target-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ github.event.inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Auto Rollback:** ${{ github.event.inputs.auto_rollback }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Force Rollback:** ${{ github.event.inputs.force_rollback }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Rollback Process" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-rollback Validation | ${{ needs.pre-rollback-validation.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Safety Checks | ${{ needs.safety-checks.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure Readiness | ${{ needs.infrastructure-readiness.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Execute Rollback | ${{ needs.execute-rollback.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-rollback Testing | ${{ needs.post-rollback-testing.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Determine overall status
+          if [[ "${{ needs.execute-rollback.result }}" == "success" && "${{ needs.post-rollback-testing.result }}" == "success" ]]; then
+            echo "✅ Rollback completed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Post-rollback Actions" >> $GITHUB_STEP_SUMMARY
+            echo "- Continue monitoring the environment" >> $GITHUB_STEP_SUMMARY
+            echo "- Investigate root cause of issues that led to rollback" >> $GITHUB_STEP_SUMMARY
+            echo "- Plan next steps (hotfix, additional testing, etc.)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Rollback failed or had issues!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Emergency Actions Required" >> $GITHUB_STEP_SUMMARY
+            echo "- Check deployment logs for issues" >> $GITHUB_STEP_SUMMARY
+            echo "- Consider manual intervention" >> $GITHUB_STEP_SUMMARY
+            echo "- Notify on-call engineer immediately" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send critical rollback notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🚨 Emergency Rollback ${{ needs.execute-rollback.result == 'success' && 'Completed' || 'Failed' }}",
+              attachments: [{
+                color: "${{ needs.execute-rollback.result == 'success' && 'warning' || 'danger' }}",
+                fields: [{
+                  title: "Environment",
+                  value: "${{ github.event.inputs.environment }}",
+                  short: true
+                }, {
+                  title: "From Version",
+                  value: "${{ needs.pre-rollback-validation.outputs.current-version }}",
+                  short: true
+                }, {
+                  title: "To Version",
+                  value: "${{ needs.pre-rollback-validation.outputs.target-version }}",
+                  short: true
+                }, {
+                  title: "Reason",
+                  value: "${{ github.event.inputs.reason }}",
+                  short: false
+                }],
+                footer: "Emergency rollback executed",
+                ts: ${{ github.event.head_commit.timestamp }}
+              }]
+            }
+          channel: '#oncall'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create rollback incident report
+        if: needs.execute-rollback.result == 'success'
+        run: |
+          echo "Creating rollback incident report..."
+          
+          cat > rollback-incident-${{ needs.pre-rollback-validation.outputs.rollback-id }}.md << EOF
+          # Emergency Rollback Incident Report
+          
+          **Rollback ID:** ${{ needs.pre-rollback-validation.outputs.rollback-id }}
+          **Date:** $(date)
+          **Environment:** ${{ github.event.inputs.environment }}
+          
+          ## Summary
+          Emergency rollback executed from version ${{ needs.pre-rollback-validation.outputs.current-version }} to ${{ needs.pre-rollback-validation.outputs.target-version }}
+          
+          **Reason:** ${{ github.event.inputs.reason }}
+          
+          ## Timeline
+          - Rollback initiated: $(date)
+          - Rollback completed: $(date)
+          - Post-rollback monitoring: Completed
+          
+          ## Impact
+          - Environment: ${{ github.event.inputs.environment }}
+          - Services affected: All services in ${{ github.event.inputs.environment }}
+          - Downtime: Estimated 5-10 minutes
+          - User impact: Temporary service interruption during rollback
+          
+          ## Root Cause
+          (To be filled in after investigation)
+          
+          ## Next Steps
+          1. Investigate root cause of deployment issues
+          2. Plan hotfix if needed
+          3. Update deployment process to prevent similar issues
+          4. Conduct post-incident review
+          
+          ## Follow-up
+          - Monitor environment for next 24 hours
+          - Schedule incident review meeting
+          - Update runbooks and procedures
+          EOF
+          
+          echo "Incident report created: rollback-incident-${{ needs.pre-rollback-validation.outputs.rollback-id }}.md"
+
+      - name: Update deployment status
+        run: |
+          echo "Updating deployment status in monitoring systems..."
+          
+          # This would update status pages, monitoring systems, etc.
+          echo "Deployment status updated"

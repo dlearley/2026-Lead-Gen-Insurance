@@ -1,0 +1,413 @@
+name: Dependabot Updates
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+
+jobs:
+  # Auto-merge minor and patch updates
+  auto-merge-dependencies:
+    name: Auto-merge Minor & Patch Updates
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge patch updates
+        if: ${{ steps.metadata.outputs.update-type == 'version-update:semver-patch' }}
+        run: |
+          echo "Auto-merging patch update: ${{ steps.metadata.outputs.dependency-name }}"
+          
+          # Check for breaking changes
+          if grep -r "BREAKING CHANGE" .; then
+            echo "Breaking change detected, skipping auto-merge"
+            exit 1
+          fi
+          
+          # Approve PR
+          gh pr review ${{ github.event.pull_request.number }} --approve
+          
+          # Auto-merge
+          gh pr merge --auto --merge ${{ github.event.pull_request.number }}
+
+      - name: Auto-merge minor updates
+        if: ${{ steps.metadata.outputs.update-type == 'version-update:semver-minor' }}
+        run: |
+          echo "Auto-merging minor update: ${{ steps.metadata.outputs.dependency-name }}"
+          
+          # Check for breaking changes
+          if grep -r "BREAKING CHANGE" .; then
+            echo "Breaking change detected, skipping auto-merge"
+            exit 1
+          fi
+          
+          # Get PR information
+          PR_INFO=$(gh pr view ${{ github.event.pull_request.number }} --json title,body)
+          PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
+          PR_BODY=$(echo "$PR_INFO" | jq -r '.body')
+          
+          # Check if it's a security update
+          if echo "$PR_BODY" | grep -i "security\|vulnerability"; then
+            echo "Security update detected, auto-merging"
+            gh pr review ${{ github.event.pull_request.number }} --approve
+            gh pr merge --auto --merge ${{ github.event.pull_request.number }}
+          else
+            echo "Non-security minor update, requiring manual review"
+          fi
+
+  # Manual review required for major updates
+  major-updates-review:
+    name: Major Updates Review
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Review major updates
+        if: ${{ steps.metadata.outputs.update-type == 'version-update:semver-major' }}
+        run: |
+          echo "Major update detected: ${{ steps.metadata.outputs.dependency-name }}"
+          echo "Current version: ${{ steps.metadata.outputs.dependency-version }}"
+          echo "New version: ${{ steps.metadata.outputs.updated-version }}"
+          
+          # Add review comment
+          gh pr comment ${{ github.event.pull_request.number }} --body "
+          ## 🚨 Major Version Update Review Required
+          
+          **Dependency:** ${{ steps.metadata.outputs.dependency-name }}
+          **Update:** ${{ steps.metadata.outputs.dependency-version }} → ${{ steps.metadata.outputs.updated-version }}
+          
+          This is a **major version update** and requires careful review:
+          
+          ### Review Checklist
+          - [ ] Check breaking changes in release notes
+          - [ ] Update API usage if needed
+          - [ ] Test locally with updated version
+          - [ ] Update documentation if needed
+          - [ ] Update migration scripts if needed
+          
+          ### Action Required
+          Please review this PR manually and test thoroughly before merging.
+          "
+          
+          # Request review from maintainers
+          gh pr review ${{ github.event.pull_request.number }} --request-changes --body "Major version update requires thorough testing and review"
+
+  # Weekly security updates
+  weekly-security-updates:
+    name: Weekly Security Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run security audit
+        run: |
+          echo "Running weekly security audit..."
+          
+          # Install dependencies
+          npm install -g pnpm@${{ env.PNPM_VERSION }}
+          pnpm install --frozen-lockfile
+          
+          # Run npm audit
+          pnpm audit --audit-level moderate
+          
+          # Check for known vulnerabilities
+          pnpm audit --json > audit-report.json
+          
+          # Extract summary
+          jq '.metadata.vulnerabilities' audit-report.json
+
+      - name: Check for outdated security packages
+        run: |
+          echo "Checking for outdated security packages..."
+          
+          # Check for packages with known vulnerabilities
+          pnpm outdated --json | jq -r '.[] | select(.latest | test("vuln|security")) | "\(.name): \(.current) -> \(.latest)"' || echo "No outdated security packages found"
+
+      - name: Create security issue if needed
+        if: failure()
+        run: |
+          echo "Creating security issue..."
+          
+          # Get vulnerability summary
+          VULNS=$(jq '.metadata.vulnerabilities' audit-report.json)
+          
+          # Create GitHub issue
+          gh issue create \
+            --title "🚨 Weekly Security Audit - Action Required" \
+            --body "## Weekly Security Audit Results
+            
+            **Date:** $(date)
+            
+            ### Vulnerability Summary
+            \`\`\`json
+            $VULNS
+            \`\`\`
+            
+            ### Action Items
+            - [ ] Review vulnerability details
+            - [ ] Update affected packages
+            - [ ] Test after updates
+            - [ ] Merge security updates
+            
+            ### Affected Packages
+            Please check the audit report and update packages with known vulnerabilities.
+            
+            **Automated Report Generated by GitHub Actions**
+            " \
+            --label "security,dependencies,automated"
+
+  # Monthly dependency health check
+  monthly-dependency-health:
+    name: Monthly Dependency Health Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Comprehensive dependency analysis
+        run: |
+          echo "Running comprehensive dependency health check..."
+          
+          # Check for outdated packages
+          echo "### Outdated Packages"
+          pnpm outdated --json | jq -r 'to_entries[] | "\(.key): \(.value.current) -> \(.value.latest)"' | head -20
+          
+          # Check for packages with no recent updates
+          echo "### Packages with No Recent Updates"
+          # This would check package.json and check for stale dependencies
+          
+          # Check for duplicate dependencies
+          echo "### Duplicate Dependencies"
+          pnpm list --json | jq -r '.graph | to_entries[] | select(.value.dependencies | length > 1) | .key' | sort -u
+          
+          # Check dependency tree health
+          echo "### Dependency Tree Health"
+          pnpm ls --json | jq '.projects | map({name, issues: (.issues // []) | length}) | .[] | select(.issues > 0)'
+
+      - name: Generate dependency report
+        run: |
+          echo "Generating monthly dependency health report..."
+          
+          # Create comprehensive report
+          cat > dependency-health-report.md << EOF
+          # Monthly Dependency Health Report
+          
+          **Date:** $(date)
+          **Repository:** ${{ github.repository }}
+          
+          ## Summary
+          
+          This report provides a comprehensive overview of the dependency health for the project.
+          
+          ### Statistics
+          - Total dependencies: $(pnpm list --depth=0 --json | jq '.projects[0].dependencies | length')
+          - Development dependencies: $(pnpm list --depth=0 --json | jq '.projects[0].devDependencies | length')
+          - Outdated packages: $(pnpm outdated --json | jq 'keys | length')
+          
+          ### Outdated Packages (Top 10)
+          $(pnpm outdated --json | jq -r 'to_entries[0:10] | .[] | "- \(.key): \(.value.current) -> \(.value.latest)"')
+          
+          ### Recommendations
+          1. Review and update outdated packages
+          2. Remove unused dependencies
+          3. Check for security vulnerabilities
+          4. Update Node.js version if needed
+          5. Review major version updates manually
+          
+          ### Next Actions
+          - [ ] Update patch and minor versions
+          - [ ] Review major version updates
+          - [ ] Clean up unused dependencies
+          - [ ] Update documentation
+          EOF
+          
+          echo "Report generated: dependency-health-report.md"
+
+      - name: Upload dependency report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-health-report
+          path: dependency-health-report.md
+
+  # Cleanup old branches from dependency updates
+  cleanup-dependabot-branches:
+    name: Cleanup Dependabot Branches
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List and cleanup old branches
+        run: |
+          echo "Cleaning up old Dependabot branches..."
+          
+          # Get all closed PRs from dependabot
+          gh pr list --state closed --author "dependabot[bot]" --json number,title,headRefName,mergedAt | jq -r '.[] | select(.mergedAt != null) | "\(.number) \(.headRefName)"' > merged-prs.txt
+          
+          # Delete branches for merged PRs older than 7 days
+          while read pr_num branch_name; do
+            if [[ -n "$branch_name" && "$branch_name" != "dependabot/"* ]]; then
+              echo "Checking branch: $branch_name"
+              
+              # Check if branch exists locally and remotely
+              if git show-ref --verify --quiet refs/heads/"$branch_name"; then
+                # Check if merged more than 7 days ago
+                merge_date=$(gh pr view "$pr_num" --json mergedAt -q '.mergedAt')
+                merge_timestamp=$(date -d "$merge_date" +%s 2>/dev/null || echo "0")
+                current_timestamp=$(date +%s)
+                days_old=$(( (current_timestamp - merge_timestamp) / 86400 ))
+                
+                if [[ $days_old -gt 7 ]]; then
+                  echo "Deleting old branch: $branch_name (merged $days_old days ago)"
+                  git branch -D "$branch_name" 2>/dev/null || true
+                fi
+              fi
+            fi
+          done < merged-prs.txt
+
+  # Notify about dependency updates
+  dependency-notifications:
+    name: Dependency Update Notifications
+    runs-on: ubuntu-latest
+    needs: [auto-merge-dependencies, weekly-security-updates, monthly-dependency-health]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create dependency summary
+        run: |
+          echo "## Dependabot Updates Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "**Event:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Update Process" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Auto-merge Dependencies | ${{ needs.auto-merge-dependencies.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Major Updates Review | ${{ needs.major-updates-review.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Weekly Security Updates | ${{ needs.weekly-security-updates.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Monthly Health Check | ${{ needs.monthly-dependency-health.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch Cleanup | ${{ needs.cleanup-dependabot-branches.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Next Actions" >> $GITHUB_STEP_SUMMARY
+          echo "- Review any major version updates manually" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor security vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          echo "- Keep dependencies up to date" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send Slack notification for major updates
+        if: needs.major-updates-review.result == 'success' || contains(github.event.pull_request.title, 'major')
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "⚠️ Major Dependency Update Requires Review",
+              attachments: [{
+                color: "warning",
+                fields: [{
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }, {
+                  title: "Update Type",
+                  value: "Major version update",
+                  short: true
+                }, {
+                  title: "Action Required",
+                  value: "Manual review and testing",
+                  short: true
+                }]
+              }]
+            }
+          channel: '#dependencies'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send security alert
+        if: needs.weekly-security-updates.result == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🚨 Security Vulnerabilities Detected",
+              attachments: [{
+                color: "danger",
+                fields: [{
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }, {
+                  title: "Action Required",
+                  value: "Update packages with vulnerabilities",
+                  short: true
+                }]
+              }]
+            }
+          channel: '#security'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

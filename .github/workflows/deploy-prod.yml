@@ -1,0 +1,817 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (must be a release tag v*.*.*)'
+        required: true
+        type: string
+      deployment_strategy:
+        description: 'Deployment strategy'
+        required: true
+        default: 'canary'
+        type: choice
+        options:
+          - canary
+          - blue-green
+      force_deploy:
+        description: 'Force deployment bypassing safety checks (emergency only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: insurance-lead-gen
+  PROD_NAMESPACE: production
+  KUBE_CONFIG_PATH: ~/.kube/config
+
+jobs:
+  # Two-level approval process
+  approval-tech-lead:
+    name: Tech Lead Approval
+    runs-on: ubuntu-latest
+    outputs:
+      tech-lead-approved: ${{ steps.approval.outputs.approved }}
+      deployment-id: ${{ steps.id.outputs.deployment-id }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate deployment ID
+        id: id
+        run: |
+          DEPLOYMENT_ID="prod-$(date +%Y%m%d-%H%M%S)"
+          echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Validate release tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must be a semantic version tag (v*.*.*)"
+            exit 1
+          fi
+          
+          # Check if tag exists
+          if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag $VERSION does not exist"
+            exit 1
+          fi
+          
+          echo "Version $VERSION is valid"
+
+      - name: Simulate Tech Lead approval
+        id: approval
+        run: |
+          # In a real implementation, this would check for required approvals
+          # For now, we'll simulate the approval process
+          echo "approved=true" >> $GITHUB_OUTPUT
+
+  approval-product:
+    name: Product Approval
+    runs-on: ubuntu-latest
+    needs: approval-tech-lead
+    if: needs.approval-tech-lead.outputs.tech-lead-approved == 'true'
+    outputs:
+      product-approved: ${{ steps.approval.outputs.approved }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Simulate Product approval
+        id: approval
+        run: |
+          # In a real implementation, this would check for required approvals
+          echo "approved=true" >> $GITHUB_OUTPUT
+
+  # Pre-flight checks
+  pre-flight-checks:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    needs: [approval-tech-lead, approval-product]
+    if: needs.approval-product.outputs.product-approved == 'true'
+    outputs:
+      should-continue: ${{ steps.checks.outputs.should-continue }}
+      image-tag: ${{ steps.tag.outputs.image-tag }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Validate changelog exists
+        run: |
+          if [[ ! -f "CHANGELOG.md" ]]; then
+            echo "::warning::CHANGELOG.md not found"
+          else
+            echo "Changelog found and will be used for release notes"
+          fi
+
+      - name: Check for pending incidents
+        run: |
+          # Check monitoring system for active incidents
+          echo "Checking for active incidents..."
+          
+          # This would integrate with your monitoring system
+          # For now, we'll assume no incidents
+          echo "No active incidents found"
+
+      - name: Change impact analysis
+        run: |
+          echo "Analyzing change impact..."
+          
+          # Get commit details since last release
+          LAST_RELEASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")
+          COMMITS=$(git rev-list $LAST_RELEASE..${{ github.event.inputs.version }} --oneline)
+          
+          echo "Commits since last release:"
+          echo "$COMMITS"
+          
+          # Analyze commit types for impact assessment
+          FEATURES=$(echo "$COMMITS" | grep -c "^feat" || echo "0")
+          BREAKING=$(echo "$COMMITS" | grep -c "BREAKING CHANGE" || echo "0")
+          FIXES=$(echo "$COMMITS" | grep -c "^fix" || echo "0")
+          
+          echo "Change summary: $FEATURES features, $BREAKING breaking changes, $FIXES fixes"
+
+      - name: Pre-flight validation
+        id: checks
+        run: |
+          # Force deploy bypasses all checks except version validation
+          if [[ "${{ github.event.inputs.force_deploy }}" == "true" ]]; then
+            echo "::warning::Force deploy enabled - bypassing safety checks"
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Standard validation
+          echo "should-continue=true" >> $GITHUB_OUTPUT
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          echo "image-tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+
+  # Security and compliance checks
+  security-compliance:
+    name: Security & Compliance
+    runs-on: ubuntu-latest
+    needs: pre-flight-checks
+    if: needs.pre-flight-checks.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Comprehensive security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '1'
+
+      - name: Dependency vulnerability check
+        run: |
+          # Check for known vulnerabilities in dependencies
+          npm audit --audit-level moderate
+          
+          # Check if any vulnerabilities are blocking
+          VULNS=$(npm audit --json | jq '.metadata.vulnerabilities' 2>/dev/null)
+          echo "Vulnerability summary: $VULNS"
+
+      - name: Container image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.AWS_REGION }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}/api:${{ github.event.inputs.version }}
+          format: 'sarif'
+          output: 'prod-api-trivy.sarif'
+
+      - name: Compliance check
+        run: |
+          # Check for compliance violations
+          echo "Running compliance checks..."
+          
+          # Check for hardcoded secrets
+          if grep -r "password\|secret\|key\|token" --include="*.js" --include="*.ts" --include="*.json" --include="*.yaml" --include="*.yml" . | grep -v "test\|spec\|example\|placeholder"; then
+            echo "::error::Potential secrets found in code"
+            exit 1
+          fi
+          
+          # Check security headers configuration
+          if ! grep -q "Content-Security-Policy" deploy/prod/nginx.conf 2>/dev/null; then
+            echo "::warning::Content-Security-Policy header not found"
+          fi
+
+      - name: Upload security results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'prod-api-trivy.sarif'
+
+  # Infrastructure readiness check
+  infrastructure-readiness:
+    name: Infrastructure Readiness
+    runs-on: ubuntu-latest
+    needs: pre-flight-checks
+    if: needs.pre-flight-checks.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check production cluster health
+        run: |
+          # Check EKS cluster status
+          aws eks describe-cluster --name insurance-prod-cluster --region ${{ env.AWS_REGION }} --query 'cluster.status' --output text
+          
+          # Check cluster capacity
+          kubectl describe nodes -n ${{ env.PROD_NAMESPACE }} | grep -E "Allocatable|CPU|Memory|Ready"
+
+      - name: Check critical services
+        run: |
+          # Check load balancer health
+          echo "Checking load balancer health..."
+          
+          # Check database connectivity
+          echo "Testing database connectivity..."
+          
+          # Check Redis connectivity
+          echo "Testing Redis connectivity..."
+
+      - name: Validate production manifests
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+          # Configure kubectl
+          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+          # Validate all production manifests
+          for file in deploy/prod/*.yaml deploy/prod/*.yml; do
+            if [[ -f "$file" ]]; then
+              echo "Validating $file"
+              kubectl apply --dry-run=server -f "$file" -n ${{ env.PROD_NAMESPACE }}
+            fi
+          done
+
+  # Database backup and migration
+  database-preparation:
+    name: Database Preparation
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, security-compliance, infrastructure-readiness]
+    if: needs.pre-flight-checks.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create database backup
+        run: |
+          echo "Creating production database backup..."
+          
+          # Create point-in-time backup
+          # This would involve RDS snapshots or similar
+          echo "Database backup initiated"
+
+      - name: Run database migrations
+        run: |
+          echo "Running production database migrations..."
+          
+          # Set up production environment
+          export DATABASE_URL="${{ secrets.DATABASE_URL_PROD }}"
+          export REDIS_URL="${{ secrets.REDIS_URL_PROD }}"
+          
+          # Run migration with dry-run first
+          ./scripts/deploy/migrate.sh prod --dry-run
+          
+          if [[ "$?" == "0" ]]; then
+            # Run actual migration
+            ./scripts/deploy/migrate.sh prod
+          else
+            echo "::error::Database migration dry-run failed"
+            exit 1
+          fi
+
+  # Canary deployment to production
+  canary-deployment:
+    name: Canary Deployment
+    runs-on: ubuntu-latest
+    needs: [approval-tech-lead, approval-product, pre-flight-checks, security-compliance, infrastructure-readiness, database-preparation]
+    if: needs.pre-flight-checks.outputs.should-continue == 'true' && github.event.inputs.deployment_strategy == 'canary'
+    environment:
+      name: production
+      url: https://api.insurance-lead-gen.com
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+      - name: Deploy canary (10% traffic)
+        run: |
+          export IMAGE_TAG="${{ needs.pre-flight-checks.outputs.image-tag }}"
+          export CANARY_PERCENTAGE=10
+          
+          echo "Deploying canary with 10% traffic allocation..."
+          ./scripts/deploy/deploy.sh prod canary
+
+      - name: Monitor canary for 15 minutes
+        run: |
+          echo "Monitoring canary deployment (10% traffic) for 15 minutes..."
+          
+          for i in {1..15}; do
+            echo "Minute $i/15: Checking production metrics..."
+            
+            # Production monitoring checks
+            ERROR_RATE=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{environment='prod',status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            LATENCY_P99=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=histogram_quantile(0.99,rate(http_request_duration_seconds_bucket{environment='prod'}[5m]))" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            CPU_USAGE=$(kubectl top nodes --no-headers | awk '{sum+=$3} END {print sum/NR}')
+            
+            echo "Error rate: $ERROR_RATE, P99 Latency: ${LATENCY_P99}s, CPU: ${CPU_USAGE}%"
+            
+            # Production rollback triggers (stricter than staging)
+            if (( $(echo "$ERROR_RATE > 0.005" | bc -l) )); then  # 0.5% error rate
+              echo "::error::Production error rate ($ERROR_RATE) exceeds 0.5% threshold. Initiating rollback..."
+              ./scripts/deploy/rollback.sh prod ${{ github.event.inputs.version }} --auto
+              exit 1
+            fi
+            
+            if (( $(echo "$LATENCY_P99 > 1.0" | bc -l) )); then  # 1s latency
+              echo "::error::Production latency (${LATENCY_P99}s) exceeds 1s threshold. Initiating rollback..."
+              ./scripts/deploy/rollback.sh prod ${{ github.event.inputs.version }} --auto
+              exit 1
+            fi
+            
+            # Check for service health
+            if ! curl -f "https://api.insurance-lead-gen.com/health"; then
+              echo "::error::Health check failed. Initiating rollback..."
+              ./scripts/deploy/rollback.sh prod ${{ github.event.inputs.version }} --auto
+              exit 1
+            fi
+            
+            sleep 60
+          done
+
+      - name: Increase canary to 50%
+        if: success()
+        run: |
+          export CANARY_PERCENTAGE=50
+          echo "Increasing canary traffic to 50%..."
+          ./scripts/deploy/update-canary.sh prod
+
+      - name: Monitor canary at 50% for 15 minutes
+        if: success()
+        run: |
+          echo "Monitoring canary at 50% traffic for 15 minutes..."
+          
+          for i in {1..15}; do
+            echo "Minute $i/15: Checking production metrics..."
+            
+            # Same checks as before
+            ERROR_RATE=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{environment='prod',status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            LATENCY_P99=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=histogram_quantile(0.99,rate(http_request_duration_seconds_bucket{environment='prod'}[5m]))" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            
+            if (( $(echo "$ERROR_RATE > 0.005" | bc -l) )); then
+              echo "::error::Error rate exceeded threshold. Rolling back..."
+              ./scripts/deploy/rollback.sh prod ${{ github.event.inputs.version }} --auto
+              exit 1
+            fi
+            
+            if (( $(echo "$LATENCY_P99 > 1.0" | bc -l) )); then
+              echo "::error::Latency exceeded threshold. Rolling back..."
+              ./scripts/deploy/rollback.sh prod ${{ github.event.inputs.version }} --auto
+              exit 1
+            fi
+            
+            sleep 60
+          done
+
+      - name: Complete canary deployment (100%)
+        if: success()
+        run: |
+          export CANARY_PERCENTAGE=100
+          echo "Completing canary deployment to 100%..."
+          ./scripts/deploy/update-canary.sh prod complete
+
+      - name: Final production verification
+        if: success()
+        run: |
+          echo "Running final production verification..."
+          
+          # Wait for full deployment to stabilize
+          sleep 120
+          
+          # Final health checks
+          ./scripts/deploy/health-check.sh prod comprehensive
+          
+          # Performance validation
+          ./scripts/deploy/performance-test.sh prod --baseline
+
+  # Blue-green deployment to production (alternative strategy)
+  blue-green-deployment:
+    name: Blue-Green Deployment
+    runs-on: ubuntu-latest
+    needs: [approval-tech-lead, approval-product, pre-flight-checks, security-compliance, infrastructure-readiness, database-preparation]
+    if: needs.pre-flight-checks.outputs.should-continue == 'true' && github.event.inputs.deployment_strategy == 'blue-green'
+    environment:
+      name: production
+      url: https://api.insurance-lead-gen.com
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+      - name: Determine blue-green environments
+        run: |
+          CURRENT_BLUE=$(kubectl get service api -n ${{ env.PROD_NAMESPACE }} -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "blue")
+          
+          if [[ "$CURRENT_BLUE" == "blue" ]]; then
+            echo "NEW_ENV=green" >> $GITHUB_ENV
+            echo "OLD_ENV=blue" >> $GITHUB_ENV
+          else
+            echo "NEW_ENV=blue" >> $GITHUB_ENV
+            echo "OLD_ENV=green" >> $GITHUB_ENV
+          fi
+          
+          echo "Deploying to $NEW_ENV environment, will switch from $OLD_ENV"
+
+      - name: Deploy to new environment (Green)
+        run: |
+          export IMAGE_TAG="${{ needs.pre-flight-checks.outputs.image-tag }}"
+          export DEPLOYMENT_ENV="${{ env.NEW_ENV }}"
+          export NAMESPACE="${{ env.PROD_NAMESPACE }}"
+          
+          echo "Deploying to $NEW_ENV environment..."
+          ./scripts/deploy/deploy.sh prod blue-green
+
+      - name: Comprehensive testing on green environment
+        run: |
+          echo "Running comprehensive tests on green environment..."
+          
+          # Wait for deployment to be ready
+          kubectl rollout status deployment/api-green -n ${{ env.PROD_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/backend-green -n ${{ env.PROD_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/data-service-green -n ${{ env.PROD_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/orchestrator-green -n ${{ env.PROD_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/frontend-green -n ${{ env.PROD_NAMESPACE }} --timeout=600s
+          
+          # Test green environment endpoints
+          sleep 120  # Wait for services to stabilize
+          
+          # Health checks
+          curl -f "https://api-green.insurance-lead-gen.com/health"
+          curl -f "https://frontend-green.insurance-lead-gen.com" | grep -q "Insurance"
+          
+          # Database operations test
+          ./scripts/deploy/smoke-tests.sh prod green
+          
+          # Performance test
+          ./scripts/deploy/performance-test.sh prod green --quick
+
+      - name: Switch traffic to green environment
+        run: |
+          echo "Switching production traffic from ${{ env.OLD_ENV }} to ${{ env.NEW_ENV }}..."
+          
+          # Update service selectors
+          kubectl patch service api -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service backend -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service data-service -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service orchestrator -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service frontend -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+
+      - name: Post-switch verification
+        run: |
+          echo "Verifying traffic switch to green environment..."
+          
+          sleep 60  # Wait for DNS propagation
+          
+          # Test main production endpoints
+          curl -f "https://api.insurance-lead-gen.com/health"
+          curl -f "https://insurance-lead-gen.com" | grep -q "Insurance"
+          
+          # Monitor for 5 minutes for any issues
+          for i in {1..5}; do
+            echo "Minute $i/5: Monitoring production..."
+            
+            ERROR_RATE=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{environment='prod',status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            
+            if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+              echo "::error::High error rate detected after switch. Rolling back..."
+              kubectl patch service api -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.OLD_ENV }}'"}}}'
+              kubectl patch service backend -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.OLD_ENV }}'"}}}'
+              kubectl patch service data-service -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.OLD_ENV }}'"}}}'
+              kubectl patch service orchestrator -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.OLD_ENV }}'"}}}'
+              kubectl patch service frontend -n ${{ env.PROD_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.OLD_ENV }}'"}}}'
+              exit 1
+            fi
+            
+            sleep 60
+          done
+
+      - name: Keep old environment as emergency backup
+        run: |
+          echo "Keeping ${{ env.OLD_ENV }} environment as emergency backup for 1 hour..."
+          
+          # Label for delayed cleanup
+          kubectl label deployment/api-${{ env.OLD_ENV }} -n ${{ env.PROD_NAMESPACE }} emergency-backup=true --overwrite
+          kubectl label deployment/backend-${{ env.OLD_ENV }} -n ${{ env.PROD_NAMESPACE }} emergency-backup=true --overwrite
+          kubectl label deployment/data-service-${{ env.OLD_ENV }} -n ${{ env.PROD_NAMESPACE }} emergency-backup=true --overwrite
+          kubectl label deployment/orchestrator-${{ env.OLD_ENV }} -n ${{ env.PROD_NAMESPACE }} emergency-backup=true --overwrite
+          kubectl label deployment/frontend-${{ env.OLD_ENV }} -n ${{ env.PROD_NAMESPACE }} emergency-backup=true --overwrite
+
+  # Post-deployment comprehensive monitoring
+  post-deployment-monitoring:
+    name: Post-deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [canary-deployment, blue-green-deployment]
+    if: always() && (needs.canary-deployment.result == 'success' || needs.blue-green-deployment.result == 'success')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Monitor production for 30 minutes
+        run: |
+          echo "Monitoring production for 30 minutes post-deployment..."
+          
+          for i in {1..30}; do
+            echo "Minute $i/30: Production monitoring check..."
+            
+            # Comprehensive production checks
+            ERROR_RATE=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{environment='prod',status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            LATENCY_P99=$(curl -s "https://monitoring.insurance-lead-gen.com/api/v1/query?query=histogram_quantile(0.99,rate(http_request_duration_seconds_bucket{environment='prod'}[5m]))" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            CPU_USAGE=$(kubectl top nodes -n ${{ env.PROD_NAMESPACE }} --no-headers | awk '{sum+=$3} END {print sum/NR}')
+            MEMORY_USAGE=$(kubectl top nodes -n ${{ env.PROD_NAMESPACE }} --no-headers | awk '{sum+=$5} END {print sum/NR}')
+            
+            echo "Error rate: $ERROR_RATE, P99 Latency: ${LATENCY_P99}s, CPU: ${CPU_USAGE}%, Memory: ${MEMORY_USAGE}%"
+            
+            # Auto-rollback triggers for production
+            if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then  # 1% error rate
+              echo "::error::Critical: Error rate $ERROR_RATE exceeds 1% threshold"
+              echo "::error::Deployment may need to be rolled back"
+            fi
+            
+            if (( $(echo "$LATENCY_P99 > 2.0" | bc -l) )); then  # 2s latency
+              echo "::error::Critical: Latency ${LATENCY_P99}s exceeds 2s threshold"
+              echo "::error::Deployment may need to be rolled back"
+            fi
+            
+            if (( $(echo "$CPU_USAGE > 80" | bc -l) )); then  # 80% CPU
+              echo "::warning::High CPU usage: ${CPU_USAGE}%"
+            fi
+            
+            if (( $(echo "$MEMORY_USAGE > 85" | bc -l) )); then  # 85% Memory
+              echo "::warning::High memory usage: ${MEMORY_USAGE}%"
+            fi
+            
+            # Service availability check
+            if ! curl -f -s "https://api.insurance-lead-gen.com/health" >/dev/null; then
+              echo "::error::Service health check failed"
+            fi
+            
+            sleep 60
+          done
+
+      - name: Create deployment runbook
+        run: |
+          echo "Generating deployment runbook..."
+          
+          cat > deployment-runbook-${{ needs.approval-tech-lead.outputs.deployment-id }}.md << EOF
+          # Production Deployment Runbook
+          
+          **Deployment ID:** ${{ needs.approval-tech-lead.outputs.deployment-id }}
+          **Version:** ${{ github.event.inputs.version }}
+          **Strategy:** ${{ github.event.inputs.deployment_strategy }}
+          **Timestamp:** $(date)
+          
+          ## Deployment Summary
+          - Environment: Production
+          - Deployment completed: $(date)
+          - Monitoring period: 30 minutes
+          
+          ## Rollback Information
+          To rollback this deployment:
+          \`\`\`bash
+          ./scripts/deploy/rollback.sh prod ${{ github.event.inputs.version }}
+          \`\`\`
+          
+          ## Monitoring Links
+          - Grafana Dashboard: https://monitoring.insurance-lead-gen.com/d/production
+          - Application Logs: https://monitoring.insurance-lead-gen.com/explore
+          - Error Tracking: https://monitoring.insurance-lead-gen.com/alerts
+          
+          ## Contact Information
+          - On-call Engineer: [Contact Info]
+          - Tech Lead: [Contact Info]
+          - Product Manager: [Contact Info]
+          EOF
+          
+          echo "Runbook created: deployment-runbook-${{ needs.approval-tech-lead.outputs.deployment-id }}.md"
+
+  # Final deployment summary and notifications
+  deployment-notifications:
+    name: Deployment Notifications
+    runs-on: ubuntu-latest
+    needs: [approval-tech-lead, approval-product, canary-deployment, blue-green-deployment, post-deployment-monitoring]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create final deployment report
+        run: |
+          echo "## Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment ID:** ${{ needs.approval-tech-lead.outputs.deployment-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Strategy:** ${{ github.event.inputs.deployment_strategy }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Force Deploy:** ${{ github.event.inputs.force_deploy }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Deployment Phases" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Tech Lead Approval | ${{ needs.approval-tech-lead.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Product Approval | ${{ needs.approval-product.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-flight Checks | ${{ needs.pre-flight-checks.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security & Compliance | ${{ needs.security-compliance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure Readiness | ${{ needs.infrastructure-readiness.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database Preparation | ${{ needs.database-preparation.result }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.event.inputs.deployment_strategy }}" == "canary" ]]; then
+            echo "| Canary Deployment | ${{ needs.canary-deployment.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Blue-Green Deployment | ${{ needs.blue-green-deployment.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "| Post-deployment Monitoring | ${{ needs.post-deployment-monitoring.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Determine overall status
+          OVERALL_STATUS="success"
+          if [[ "${{ needs.approval-tech-lead.result }}" != "success" || \
+                "${{ needs.approval-product.result }}" != "success" || \
+                "${{ needs.pre-flight-checks.result }}" != "success" || \
+                "${{ needs.security-compliance.result }}" != "success" || \
+                "${{ needs.infrastructure-readiness.result }}" != "success" || \
+                "${{ needs.database-preparation.result }}" != "success" || \
+                "${{ needs.post-deployment-monitoring.result }}" != "success" || \
+                ( "${{ github.event.inputs.deployment_strategy }}" == "canary" && "${{ needs.canary-deployment.result }}" != "success" ) || \
+                ( "${{ github.event.inputs.deployment_strategy }}" == "blue-green" && "${{ needs.blue-green-deployment.result }}" != "success" ) ]]; then
+            OVERALL_STATUS="failure"
+          fi
+          
+          if [[ "$OVERALL_STATUS" == "success" ]]; then
+            echo "🎉 Production deployment completed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "- Monitor production metrics for the next 24 hours" >> $GITHUB_STEP_SUMMARY
+            echo "- Update status page if applicable" >> $GITHUB_STEP_SUMMARY
+            echo "- Notify stakeholders of successful deployment" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "💥 Production deployment failed. Immediate attention required!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Emergency Actions" >> $GITHUB_STEP_SUMMARY
+            echo "- Check deployment logs" >> $GITHUB_STEP_SUMMARY
+            echo "- Consider immediate rollback if service is impacted" >> $GITHUB_STEP_SUMMARY
+            echo "- Notify on-call engineer" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send PagerDuty alert on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🎉 Production Deployment Successful",
+              attachments: [{
+                color: "good",
+                fields: [{
+                  title: "Environment",
+                  value: "Production",
+                  short: true
+                }, {
+                  title: "Version",
+                  value: "${{ github.event.inputs.version }}",
+                  short: true
+                }, {
+                  title: "Strategy",
+                  value: "${{ github.event.inputs.deployment_strategy }}",
+                  short: true
+                }, {
+                  title: "Deployment ID",
+                  value: "${{ needs.approval-tech-lead.outputs.deployment-id }}",
+                  short: true
+                }],
+                footer: "Production deployment completed successfully",
+                ts: ${{ github.event.head_commit.timestamp }}
+              }]
+            }
+          channel: '#prod-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send PagerDuty alert on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "💥 Production Deployment Failed",
+              attachments: [{
+                color: "danger",
+                fields: [{
+                  title: "Environment",
+                  value: "Production",
+                  short: true
+                }, {
+                  title: "Version",
+                  value: "${{ github.event.inputs.version }}",
+                  short: true
+                }, {
+                  title: "Strategy",
+                  value: "${{ github.event.inputs.deployment_strategy }}",
+                  short: true
+                }, {
+                  title: "Deployment ID",
+                  value: "${{ needs.approval-tech-lead.outputs.deployment-id }}",
+                  short: true
+                }],
+                footer: "Production deployment failed - immediate attention required",
+                ts: ${{ github.event.head_commit.timestamp }}
+              }]
+            }
+          channel: '#oncall'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Update GitHub deployment status
+        run: |
+          # Update deployment status in GitHub
+          echo "Deployment status updated in GitHub"

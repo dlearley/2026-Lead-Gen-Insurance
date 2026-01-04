@@ -1,0 +1,603 @@
+name: Performance Testing
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '*.js'
+      - '*.ts'
+      - '*.json'
+      - '*.yaml'
+      - '*.yml'
+      - 'docker-compose*.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test'
+        required: true
+        default: 'load'
+        type: choice
+        options:
+          - load
+          - stress
+          - spike
+          - endurance
+          - volume
+      environment:
+        description: 'Test environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      duration:
+        description: 'Test duration (minutes)'
+        required: false
+        type: string
+        default: '5'
+      users:
+        description: 'Number of virtual users'
+        required: false
+        type: string
+        default: '50'
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+  K6_VERSION: '0.47.0'
+
+jobs:
+  # Pre-performance test setup
+  pre-test-setup:
+    name: Pre-test Setup
+    runs-on: ubuntu-latest
+    outputs:
+      test-id: ${{ steps.id.outputs.test-id }}
+      baseline-exists: ${{ steps.baseline.outputs.exists }}
+      environment-url: ${{ steps.env.outputs.url }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate test ID
+        id: id
+        run: |
+          TEST_ID="perf-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}"
+          echo "test-id=$TEST_ID" >> $GITHUB_OUTPUT
+
+      - name: Determine environment URL
+        id: env
+        run: |
+          case "${{ github.event.inputs.environment || 'staging' }}" in
+            "staging")
+              echo "url=https://staging.insurance-lead-gen.com" >> $GITHUB_OUTPUT
+              ;;
+            "production")
+              echo "url=https://insurance-lead-gen.com" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Check for performance baseline
+        id: baseline
+        run: |
+          if [[ -f "performance-baseline.json" ]]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Performance baseline found"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No performance baseline found - will create one"
+          fi
+
+      - name: Install dependencies
+        run: |
+          npm install -g pnpm@${{ env.PNPM_VERSION }}
+          pnpm install --frozen-lockfile
+
+      - name: Build application
+        if: github.event_name == 'push'
+        run: |
+          pnpm build
+
+  # Install and setup performance testing tools
+  setup-performance-tools:
+    name: Setup Performance Tools
+    runs-on: ubuntu-latest
+    needs: pre-test-setup
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Install additional performance tools
+        run: |
+          # Install wrk for HTTP benchmarking
+          sudo apt-get install wrk
+          
+          # Install curl with HTTP/2 support
+          sudo apt-get install curl
+          
+          # Install jq for JSON processing
+          sudo apt-get install jq
+
+      - name: Verify k6 installation
+        run: |
+          k6 version
+          echo "k6 installation verified"
+
+  # Load testing
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    needs: [pre-test-setup, setup-performance-tools]
+    if: github.event.inputs.test_type == 'load' || github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure environment access
+        run: |
+          echo "Testing against: ${{ needs.pre-test-setup.outputs.environment-url }}"
+          
+          # Set up test environment variables
+          echo "TEST_ENVIRONMENT_URL=${{ needs.pre-test-setup.outputs.environment-url }}" >> $GITHUB_ENV
+
+      - name: Create load test script
+        run: |
+          cat > load-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate } from 'k6/metrics';
+          
+          // Custom metrics
+          const errorRate = new Rate('errors');
+          
+          export const options = {
+            stages: [
+              { duration: '2m', target: ${{ github.event.inputs.users || 50 }}}, // Ramp up
+              { duration: '${{ github.event.inputs.duration || 5 }}m', target: ${{ github.event.inputs.users || 50 }}}, // Stay at load
+              { duration: '2m', target: 0 }, // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<2000'], // 95% of requests under 2s
+              http_req_failed: ['rate<0.05'], // Error rate under 5%
+              errors: ['rate<0.05'],
+            },
+          };
+          
+          export default function() {
+            const baseUrl = __ENV.TEST_ENVIRONMENT_URL;
+            
+            // Test API health endpoint
+            const healthResponse = http.get(`${baseUrl}/health`);
+            check(healthResponse, {
+              'health check status is 200': (r) => r.status === 200,
+              'health response time < 500ms': (r) => r.timings.duration < 500,
+            }) || errorRate.add(1);
+            
+            // Test main API endpoints
+            const apiEndpoints = [
+              '/api/v1/leads',
+              '/api/v1/analytics',
+              '/api/v1/health',
+            ];
+            
+            apiEndpoints.forEach(endpoint => {
+              const response = http.get(`${baseUrl}${endpoint}`);
+              check(response, {
+                [`${endpoint} status is 200`]: (r) => r.status === 200,
+                [`${endpoint} response time < 1000ms`]: (r) => r.timings.duration < 1000,
+              }) || errorRate.add(1);
+            });
+            
+            sleep(1);
+          }
+          
+          export function handleSummary(data) {
+            return {
+              'load-test-results.json': JSON.stringify(data),
+              'load-test-results.html': htmlReport(data),
+            };
+          }
+          
+          function htmlReport(data) {
+            return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Load Test Results</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .metric { margin: 10px 0; padding: 10px; border-left: 4px solid #007bff; }
+                .error { border-left-color: #dc3545; }
+                .success { border-left-color: #28a745; }
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+              </style>
+            </head>
+            <body>
+              <h1>Load Test Results</h1>
+              <div class="metric ${data.metrics.http_req_failed.values.rate < 0.05 ? 'success' : 'error'}">
+                <h3>Error Rate: ${(data.metrics.http_req_failed.values.rate * 100).toFixed(2)}%</h3>
+                <p>Threshold: < 5%</p>
+              </div>
+              <div class="metric ${data.metrics.http_req_duration.values['p(95)'] < 2000 ? 'success' : 'error'}">
+                <h3>95th Percentile Response Time: ${data.metrics.http_req_duration.values['p(95)'].toFixed(2)}ms</h3>
+                <p>Threshold: < 2000ms</p>
+              </div>
+              <h2>Summary</h2>
+              <table>
+                <tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Total Requests</td><td>${data.metrics.http_reqs.values.count}</td></tr>
+                <tr><td>Average Response Time</td><td>${data.metrics.http_req_duration.values.avg.toFixed(2)}ms</td></tr>
+                <tr><td>Min Response Time</td><td>${data.metrics.http_req_duration.values.min.toFixed(2)}ms</td></tr>
+                <tr><td>Max Response Time</td><td>${data.metrics.http_req_duration.values.max.toFixed(2)}ms</td></tr>
+              </table>
+            </body>
+            </html>
+            `;
+          }
+          EOF
+
+      - name: Run load test
+        run: |
+          echo "Running load test with ${{ github.event.inputs.users || 50 }} users for ${{ github.event.inputs.duration || 5 }} minutes..."
+          
+          k6 run --out json=load-test-results.json load-test.js
+
+      - name: Analyze results
+        run: |
+          echo "Analyzing load test results..."
+          
+          # Extract key metrics
+          if [[ -f "load-test-results.json" ]]; then
+            TOTAL_REQUESTS=$(jq '.metrics.http_reqs.values.count' load-test-results.json)
+            AVG_RESPONSE_TIME=$(jq '.metrics.http_req_duration.values.avg' load-test-results.json)
+            P95_RESPONSE_TIME=$(jq '.metrics.http_req_duration.values["p(95)"]' load-test-results.json)
+            ERROR_RATE=$(jq '.metrics.http_req_failed.values.rate * 100' load-test-results.json)
+            
+            echo "Total Requests: $TOTAL_REQUESTS"
+            echo "Average Response Time: ${AVG_RESPONSE_TIME}ms"
+            echo "95th Percentile Response Time: ${P95_RESPONSE_TIME}ms"
+            echo "Error Rate: ${ERROR_RATE}%"
+          fi
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: |
+            load-test-results.json
+            load-test-results.html
+
+  # Stress testing
+  stress-testing:
+    name: Stress Testing
+    runs-on: ubuntu-latest
+    needs: [pre-test-setup, setup-performance-tools]
+    if: github.event.inputs.test_type == 'stress'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create stress test script
+        run: |
+          cat > stress-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate } from 'k6/metrics';
+          
+          const errorRate = new Rate('errors');
+          
+          export const options = {
+            stages: [
+              { duration: '2m', target: 100 },   // Ramp up to 100 users
+              { duration: '5m', target: 100 },   // Stay at 100 users
+              { duration: '2m', target: 200 },   // Spike to 200 users
+              { duration: '5m', target: 200 },   // Stay at 200 users
+              { duration: '2m', target: 0 },     // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<3000'], // More lenient during stress
+              http_req_failed: ['rate<0.10'],    // Allow higher error rate
+            },
+          };
+          
+          export default function() {
+            const baseUrl = __ENV.TEST_ENVIRONMENT_URL;
+            
+            // Test critical endpoints under stress
+            const response = http.get(`${baseUrl}/health`);
+            check(response, {
+              'health check under stress': (r) => r.status === 200,
+            }) || errorRate.add(1);
+            
+            sleep(1);
+          }
+          EOF
+
+      - name: Run stress test
+        run: |
+          echo "Running stress test..."
+          k6 run stress-test.js
+
+  # Baseline comparison
+  baseline-comparison:
+    name: Baseline Comparison
+    runs-on: ubuntu-latest
+    needs: [pre-test-setup, load-testing]
+    if: needs.pre-test-setup.outputs.baseline-exists == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download baseline results
+        uses: actions/download-artifact@v3
+        with:
+          name: performance-baseline
+          path: baseline/
+
+      - name: Compare with baseline
+        run: |
+          echo "Comparing current results with baseline..."
+          
+          # Load current results
+          CURRENT_ERROR_RATE=$(jq '.metrics.http_req_failed.values.rate * 100' load-test-results.json)
+          CURRENT_P95=$(jq '.metrics.http_req_duration.values["p(95)"]' load-test-results.json)
+          
+          # Load baseline results
+          BASELINE_ERROR_RATE=$(jq '.metrics.http_req_failed.values.rate * 100' baseline/load-test-results.json)
+          BASELINE_P95=$(jq '.metrics.http_req_duration.values["p(95)"]' baseline/load-test-results.json)
+          
+          echo "Current Error Rate: ${CURRENT_ERROR_RATE}%"
+          echo "Baseline Error Rate: ${BASELINE_ERROR_RATE}%"
+          echo "Current P95 Response Time: ${CURRENT_P95}ms"
+          echo "Baseline P95 Response Time: ${BASELINE_P95}ms"
+          
+          # Calculate performance degradation
+          ERROR_RATE_CHANGE=$(echo "$CURRENT_ERROR_RATE - $BASELINE_ERROR_RATE" | bc)
+          P95_CHANGE=$(echo "$CURRENT_P95 - $BASELINE_P95" | bc)
+          
+          echo "Error Rate Change: ${ERROR_RATE_CHANGE}%"
+          echo "P95 Response Time Change: ${P95_CHANGE}ms"
+          
+          # Determine if performance has degraded
+          DEGRADATION_THRESHOLD=10  # 10% degradation
+          
+          ERROR_DEGRADATION=$(echo "$ERROR_RATE_CHANGE > $DEGRADATION_THRESHOLD" | bc)
+          RESPONSE_DEGRADATION=$(echo "$P95_CHANGE > 500" | bc)  # 500ms increase
+          
+          if [[ "$ERROR_DEGRADATION" == "1" || "$RESPONSE_DEGRADATION" == "1" ]]; then
+            echo "::error::Performance degradation detected!"
+            echo "ERROR_RATE_DEGRADATION=$ERROR_DEGRADATION" >> $GITHUB_ENV
+            echo "RESPONSE_TIME_DEGRADATION=$RESPONSE_DEGRADATION" >> $GITHUB_ENV
+          else
+            echo "Performance is within acceptable limits"
+          fi
+
+  # Performance regression detection
+  performance-regression:
+    name: Performance Regression Detection
+    runs-on: ubuntu-latest
+    needs: [pre-test-setup, load-testing, baseline-comparison]
+    if: always() && needs.load-testing.result == 'success'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Analyze performance impact
+        run: |
+          echo "Analyzing performance impact..."
+          
+          # Get current metrics
+          ERROR_RATE=$(jq '.metrics.http_req_failed.values.rate * 100' load-test-results.json)
+          P95_RESPONSE=$(jq '.metrics.http_req_duration.values["p(95)"]' load-test-results.json)
+          AVG_RESPONSE=$(jq '.metrics.http_req_duration.values.avg' load-test-results.json)
+          TOTAL_REQUESTS=$(jq '.metrics.http_reqs.values.count' load-test-results.json)
+          
+          echo "=== Performance Test Results ==="
+          echo "Total Requests: $TOTAL_REQUESTS"
+          echo "Error Rate: ${ERROR_RATE}%"
+          echo "Average Response Time: ${AVG_RESPONSE}ms"
+          echo "95th Percentile Response Time: ${P95_RESPONSE}ms"
+          
+          # Performance thresholds
+          MAX_ERROR_RATE=5.0
+          MAX_P95_RESPONSE=2000  # 2 seconds
+          MAX_AVG_RESPONSE=1000  # 1 second
+          
+          PERFORMANCE_ISSUES=""
+          
+          if (( $(echo "$ERROR_RATE > $MAX_ERROR_RATE" | bc -l) )); then
+            echo "::error::Error rate (${ERROR_RATE}%) exceeds threshold (${MAX_ERROR_RATE}%)"
+            PERFORMANCE_ISSUES="${PERFORMANCE_ISSUES}High error rate; "
+          fi
+          
+          if (( $(echo "$P95_RESPONSE > $MAX_P95_RESPONSE" | bc -l) )); then
+            echo "::error::95th percentile response time (${P95_RESPONSE}ms) exceeds threshold (${MAX_P95_RESPONSE}ms)"
+            PERFORMANCE_ISSUES="${PERFORMANCE_ISSUES}High response time; "
+          fi
+          
+          if (( $(echo "$AVG_RESPONSE > $MAX_AVG_RESPONSE" | bc -l) )); then
+            echo "::warning::Average response time (${AVG_RESPONSE}ms) exceeds threshold (${MAX_AVG_RESPONSE}ms)"
+            PERFORMANCE_ISSUES="${PERFORMANCE_ISSUES}Elevated response time; "
+          fi
+          
+          # Set output for GitHub
+          if [[ -n "$PERFORMANCE_ISSUES" ]]; then
+            echo "performance-issues=$PERFORMANCE_ISSUES" >> $GITHUB_OUTPUT
+            echo "performance-status=failed" >> $GITHUB_OUTPUT
+          else
+            echo "performance-status=passed" >> $GITHUB_OUTPUT
+          fi
+
+  # Update baseline if needed
+  update-baseline:
+    name: Update Performance Baseline
+    runs-on: ubuntu-latest
+    needs: [pre-test-setup, load-testing, performance-regression]
+    if: needs.pre-test-setup.outputs.baseline-exists == 'false' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update baseline
+        run: |
+          echo "Updating performance baseline..."
+          
+          # Copy current results as new baseline
+          cp load-test-results.json performance-baseline.json
+          
+          # Commit baseline update
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add performance-baseline.json
+          git commit -m "chore: update performance baseline
+
+          - Test ID: ${{ needs.pre-test-setup.outputs.test-id }}
+          - Error Rate: $(jq '.metrics.http_req_failed.values.rate * 100' performance-baseline.json)%
+          - P95 Response: $(jq '.metrics.http_req_duration.values["p(95)"]' performance-baseline.json)ms
+          
+          Automated update by GitHub Actions"
+          
+          # Only push on main branch
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            git push origin main
+          fi
+
+  # Performance test summary
+  performance-summary:
+    name: Performance Test Summary
+    runs-on: ubuntu-latest
+    needs: [pre-test-setup, load-testing, stress-testing, baseline-comparison, performance-regression, update-baseline]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create performance report
+        run: |
+          echo "## Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test ID:** ${{ needs.pre-test-setup.outputs.test-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Test Type:** ${{ github.event.inputs.test_type || 'load' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Duration:** ${{ github.event.inputs.duration || '5' }} minutes" >> $GITHUB_STEP_SUMMARY
+          echo "**Virtual Users:** ${{ github.event.inputs.users || 50 }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-test Setup | ${{ needs.pre-test-setup.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Testing | ${{ needs.load-testing.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stress Testing | ${{ needs.stress-testing.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Baseline Comparison | ${{ needs.baseline-comparison.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Regression Check | ${{ needs.performance-regression.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Update Baseline | ${{ needs.update-baseline.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add performance metrics if available
+          if [[ -f "load-test-results.json" ]]; then
+            ERROR_RATE=$(jq '.metrics.http_req_failed.values.rate * 100' load-test-results.json)
+            P95_RESPONSE=$(jq '.metrics.http_req_duration.values["p(95)"]' load-test-results.json)
+            AVG_RESPONSE=$(jq '.metrics.http_req_duration.values.avg' load-test-results.json)
+            TOTAL_REQUESTS=$(jq '.metrics.http_reqs.values.count' load-test-results.json)
+            
+            echo "### Performance Metrics" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value | Threshold | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Requests | $TOTAL_REQUESTS | - | ✅ |" >> $GITHUB_STEP_SUMMARY
+            echo "| Error Rate | ${ERROR_RATE}% | < 5% | $(echo "$ERROR_RATE < 5.0" | bc -l | sed 's/1/✅/; s/0/❌/') |" >> $GITHUB_STEP_SUMMARY
+            echo "| Average Response | ${AVG_RESPONSE}ms | < 1000ms | $(echo "$AVG_RESPONSE < 1000" | bc -l | sed 's/1/✅/; s/0/❌/') |" >> $GITHUB_STEP_SUMMARY
+            echo "| P95 Response | ${P95_RESPONSE}ms | < 2000ms | $(echo "$P95_RESPONSE < 2000" | bc -l | sed 's/1/✅/; s/0/❌/') |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Determine overall status
+          OVERALL_STATUS="success"
+          if [[ "${{ needs.performance-regression.outputs.performance-status }}" == "failed" || \
+                "${{ needs.load-testing.result }}" == "failure" || \
+                "${{ needs.stress-testing.result }}" == "failure" ]]; then
+            OVERALL_STATUS="failure"
+          fi
+          
+          if [[ "$OVERALL_STATUS" == "success" ]]; then
+            echo "✅ Performance tests passed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "- Performance is within acceptable limits" >> $GITHUB_STEP_SUMMARY
+            echo "- Consider merging the PR or deploying to production" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Performance tests failed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Performance Issues Detected" >> $GITHUB_STEP_SUMMARY
+            echo "${{ needs.performance-regression.outputs.performance-issues || 'Unknown performance issues' }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Actions Required" >> $GITHUB_STEP_SUMMARY
+            echo "- Investigate performance bottlenecks" >> $GITHUB_STEP_SUMMARY
+            echo "- Optimize code or infrastructure" >> $GITHUB_STEP_SUMMARY
+            echo "- Re-run tests after fixes" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Block merge if performance degraded
+          if [[ "${{ github.event_name }}" == "pull_request" && "$OVERALL_STATUS" == "failure" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚠️ Merge Blocked" >> $GITHUB_STEP_SUMMARY
+            echo "Performance regression detected. This PR should not be merged until performance issues are resolved." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send performance alert
+        if: needs.performance-regression.outputs.performance-status == 'failed'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🚨 Performance Regression Detected",
+              attachments: [{
+                color: "danger",
+                fields: [{
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }, {
+                  title: "Branch",
+                  value: "${{ github.ref_name }}",
+                  short: true
+                }, {
+                  title: "Issues",
+                  value: "${{ needs.performance-regression.outputs.performance-issues }}",
+                  short: false
+                }]
+              }]
+            }
+          channel: '#performance'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

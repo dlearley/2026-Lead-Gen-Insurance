@@ -1,0 +1,424 @@
+# Canary Deployment Strategy Configuration
+# This strategy gradually shifts traffic to new version while monitoring for issues
+
+strategy:
+  name: "canary"
+  description: "Gradual traffic shifting with automated rollback capabilities"
+
+# Canary Configuration
+canary:
+  # Traffic allocation percentages
+  stages:
+    - stage: "canary_10"
+      traffic_percentage: 10
+      duration: 900      # 15 minutes
+      min_requests: 1000
+      success_criteria:
+        error_rate: < 0.01
+        latency_p95: < 2000ms
+        availability: > 0.99
+    
+    - stage: "canary_50"
+      traffic_percentage: 50
+      duration: 900      # 15 minutes
+      min_requests: 5000
+      success_criteria:
+        error_rate: < 0.005
+        latency_p95: < 1500ms
+        availability: > 0.995
+    
+    - stage: "production_100"
+      traffic_percentage: 100
+      duration: 1800     # 30 minutes
+      min_requests: 10000
+      success_criteria:
+        error_rate: < 0.001
+        latency_p95: < 1000ms
+        availability: > 0.999
+
+# Deployment Configuration
+deployment:
+  # Canary deployment settings
+  canary_deployment:
+    replicas:
+      canary: 1
+      stable: 3
+    
+    resource_allocation:
+      canary:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      stable:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "2000m"
+          memory: "2Gi"
+  
+  # Deployment strategy
+  strategy:
+    type: "RollingUpdate"
+    rolling_update:
+      max_surge: 1
+      max_unavailable: 0
+  
+  # Health checks
+  health_check:
+    initial_delay: 30
+    period: 10
+    timeout: 5
+    failure_threshold: 3
+
+# Service Mesh Configuration
+service_mesh:
+  enabled: true
+  type: "istio"
+  
+  # VirtualService for traffic splitting
+  virtual_service:
+    name: "api-canary"
+    http_routes:
+      - name: "stable-route"
+        destination:
+          host: "api-stable"
+          subset: "v1"
+        weight: 100  # Initial 100% to stable
+      - name: "canary-route"
+        destination:
+          host: "api-canary"
+          subset: "v2"
+        weight: 0    # Initial 0% to canary
+  
+  # DestinationRule for subset definitions
+  destination_rule:
+    name: "api-subsets"
+    subsets:
+      - name: "v1"
+        labels:
+          version: "stable"
+          deployment: "stable"
+      - name: "v2"
+        labels:
+          version: "canary"
+          deployment: "canary"
+
+# Traffic Management
+traffic_management:
+  # Traffic splitting rules
+  traffic_splitting:
+    algorithm: "weighted"
+    session_affinity: "cookie"
+    consistent_hash: false
+  
+  # Load balancer configuration
+  load_balancer:
+    algorithm: "least_requests"
+    health_check:
+      enabled: true
+      path: "/health"
+      interval: 10s
+      timeout: 5s
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+  
+  # Circuit breaker settings
+  circuit_breaker:
+    enabled: true
+    consecutive_errors: 5
+    interval: 30s
+    base_ejection_time: 30s
+    max_ejection_percent: 50
+
+# Monitoring and Metrics
+monitoring:
+  # Canary-specific metrics
+  canary_metrics:
+    - name: "canary_error_rate"
+      query: "rate(http_requests_total{deployment='canary',status=~'5..'}[5m])"
+      threshold: 0.01
+      alert: true
+    
+    - name: "canary_latency_p95"
+      query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{deployment='canary'}[5m]))"
+      threshold: 2000
+      alert: true
+    
+    - name: "canary_availability"
+      query: "up{deployment='canary'}"
+      threshold: 0.99
+      alert: true
+    
+    - name: "traffic_split_accuracy"
+      query: "rate(http_requests_total{deployment='canary'}[5m]) / rate(http_requests_total[5m]) * 100"
+      threshold: "±5%"  # Within 5% of target
+      alert: true
+  
+  # Comparison metrics (canary vs stable)
+  comparison_metrics:
+    - name: "error_rate_comparison"
+      canary_query: "rate(http_requests_total{deployment='canary',status=~'5..'}[5m])"
+      stable_query: "rate(http_requests_total{deployment='stable',status=~'5..'}[5m])"
+      threshold_ratio: 2.0  # Canary error rate should not be 2x stable
+    
+    - name: "latency_comparison"
+      canary_query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{deployment='canary'}[5m]))"
+      stable_query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{deployment='stable'}[5m]))"
+      threshold_ratio: 1.5  # Canary latency should not be 1.5x stable
+  
+  # Business metrics
+  business_metrics:
+    - name: "conversion_rate"
+      canary_query: "rate(conversions_total{deployment='canary'}[5m]) / rate(visits_total{deployment='canary'}[5m])"
+      stable_query: "rate(conversions_total{deployment='stable'}[5m]) / rate(visits_total{deployment='stable'}[5m])"
+      threshold_ratio: 0.95  # Maintain 95% of stable conversion rate
+    
+    - name: "revenue_impact"
+      query: "rate(revenue_total{deployment='canary'}[5m])"
+      threshold_absolute: 0  # Should not be negative
+
+# Automated Rollback Triggers
+rollback_triggers:
+  # Metric-based triggers
+  metrics:
+    - trigger: "high_error_rate"
+      condition: "canary_error_rate > 0.01"
+      action: "immediate_rollback"
+      severity: "critical"
+    
+    - trigger: "high_latency"
+      condition: "canary_latency_p95 > 2000"
+      action: "immediate_rollback"
+      severity: "critical"
+    
+    - trigger: "low_availability"
+      condition: "canary_availability < 0.99"
+      action: "immediate_rollback"
+      severity: "critical"
+    
+    - trigger: "error_rate_degradation"
+      condition: "error_rate_comparison > 2.0"
+      action: "rollback_to_previous_stage"
+      severity: "warning"
+    
+    - trigger: "latency_degradation"
+      condition: "latency_comparison > 1.5"
+      action: "rollback_to_previous_stage"
+      severity: "warning"
+    
+    - trigger: "conversion_rate_drop"
+      condition: "conversion_rate < 0.95"
+      action: "immediate_rollback"
+      severity: "warning"
+  
+  # Time-based triggers
+  time_based:
+    - trigger: "stage_timeout"
+      condition: "stage_duration > configured_timeout"
+      action: "rollback_to_previous_stage"
+      severity: "info"
+  
+  # Manual triggers
+  manual:
+    - trigger: "manual_rollback"
+      condition: "manual_intervention"
+      action: "immediate_rollback"
+      severity: "manual"
+
+# Rollback Procedures
+rollback_procedures:
+  # Immediate rollback
+  immediate:
+    steps:
+      1. "Stop traffic to canary (set weight to 0%)"
+      2. "Scale down canary deployment"
+      3. "Verify stable environment health"
+      4. "Send rollback notifications"
+      5. "Create incident report"
+  
+  # Stage rollback
+  stage_rollback:
+    steps:
+      1. "Reduce canary traffic to previous stage percentage"
+      2. "Monitor for recovery (5 minutes)"
+      3. "If recovered, continue with current stage"
+      4. "If not recovered, execute immediate rollback"
+  
+  # Rollback timing
+  timing:
+    immediate_rollback_time: 30    # 30 seconds
+    stage_rollback_time: 60        # 1 minute
+    verification_time: 300         # 5 minutes
+
+# Progressive Delivery Configuration
+progressive_delivery:
+  # Feature flags integration
+  feature_flags:
+    enabled: true
+    service: "launchdarkly"  # or "unleash"
+    canary_flag_name: "api-canary-deployment"
+  
+  # A/B testing integration
+  ab_testing:
+    enabled: true
+    allocation: "user_based"
+    stickiness_cookie: "ab_test_id"
+  
+  # Dark launching
+  dark_launch:
+    enabled: true
+    shadow_traffic: true
+    log_only: true
+    sampling_rate: 0.1
+
+# Database Considerations
+database:
+  # Schema changes
+  schema_changes:
+    strategy: "expand_contract"
+    backwards_compatibility: true
+    migration_validation: true
+  
+  # Data consistency
+  data_consistency:
+    read_replica_sync: true
+    write_consistency_level: "quorum"
+    conflict_resolution: "last_write_wins"
+  
+  # Performance impact
+  performance_impact:
+    connection_pool_sizing: true
+    query_optimization: true
+    index_impact_analysis: true
+
+# Security Considerations
+security:
+  # Access control
+  access_control:
+    canary_deployment_access: "restricted"
+    rollback_access: "admin_only"
+    monitoring_access: "team_leads"
+  
+  # Data protection
+  data_protection:
+    pii_redaction: true
+    audit_logging: true
+    encryption: "end_to_end"
+  
+  # Network security
+  network_security:
+    service_mesh_mtls: true
+    network_policies: true
+    pod_security_standards: "restricted"
+
+# Environment-specific Overrides
+environment_overrides:
+  development:
+    canary_stages:
+      - traffic_percentage: 50
+        duration: 300      # 5 minutes
+      - traffic_percentage: 100
+        duration: 600      # 10 minutes
+    resources:
+      canary:
+        replicas: 1
+      stable:
+        replicas: 1
+  
+  staging:
+    canary_stages:
+      - traffic_percentage: 25
+        duration: 600      # 10 minutes
+      - traffic_percentage: 75
+        duration: 900      # 15 minutes
+      - traffic_percentage: 100
+        duration: 1200     # 20 minutes
+    resources:
+      canary:
+        replicas: 1
+      stable:
+        replicas: 2
+  
+  production:
+    canary_stages:
+      - traffic_percentage: 10
+        duration: 900      # 15 minutes
+      - traffic_percentage: 50
+        duration: 900      # 15 minutes
+      - traffic_percentage: 100
+        duration: 1800     # 30 minutes
+    resources:
+      canary:
+        replicas: 1
+      stable:
+        replicas: 3
+
+# Automation and Orchestration
+automation:
+  # Deployment orchestration
+  orchestration:
+    automated: true
+    approval_required: true
+    approval_timeout: 1800  # 30 minutes
+    auto_approve_insights: true
+  
+  # Monitoring automation
+  monitoring:
+    automated: true
+    alert_escalation: true
+    incident_creation: true
+  
+  # Rollback automation
+  rollback_automation:
+    automated: true
+    conditions: "all_critical_triggers"
+    human_intervention_timeout: 300  # 5 minutes
+
+# Cost Optimization
+cost_optimization:
+  # Resource optimization
+  resource_optimization:
+    canary_resource_rightsizing: true
+    stable_resource_monitoring: true
+    cost_allocation: "deployment_based"
+  
+  # Traffic cost optimization
+  traffic_optimization:
+    bandwidth_monitoring: true
+    cdn_optimization: true
+    request_aggregation: true
+
+# Documentation and Runbooks
+documentation:
+  runbook: "canary-deployment.md"
+  troubleshooting_guide: "canary-troubleshooting.md"
+  rollback_guide: "canary-rollback.md"
+  monitoring_guide: "canary-monitoring.md"
+
+# Success Criteria
+success_criteria:
+  # Technical criteria
+  technical:
+    error_rate: "< 0.001"
+    latency_p95: "< 1000ms"
+    availability: "> 0.999"
+    cpu_utilization: "< 80%"
+    memory_utilization: "< 80%"
+  
+  # Business criteria
+  business:
+    conversion_rate: "> 95% of baseline"
+    user_satisfaction: "no degradation"
+    revenue_impact: "neutral to positive"
+    performance_impact: "within 10% of baseline"
+  
+  # Operational criteria
+  operational:
+    deployment_success_rate: "100%"
+    rollback_success_rate: "100%"
+    monitoring_coverage: "100%"
+    alert_accuracy: "> 95%"

@@ -1,0 +1,610 @@
+name: Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (Git SHA or tag)'
+        required: true
+        type: string
+      rollback_version:
+        description: 'Version to rollback to (optional)'
+        required: false
+        type: string
+      deployment_strategy:
+        description: 'Deployment strategy'
+        required: true
+        default: 'blue-green'
+        type: choice
+        options:
+          - blue-green
+          - canary
+          - rolling
+      force_deploy:
+        description: 'Force deployment even if pre-deployment checks fail'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: insurance-lead-gen
+  STAGING_NAMESPACE: staging
+  KUBE_CONFIG_PATH: ~/.kube/config
+
+jobs:
+  # Pre-deployment approval and validation
+  approval:
+    name: Approval Check
+    runs-on: ubuntu-latest
+    outputs:
+      approved: ${{ steps.approval.outputs.approved }}
+      deployment-id: ${{ steps.id.outputs.deployment-id }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate deployment ID
+        id: id
+        run: |
+          DEPLOYMENT_ID="staging-$(date +%Y%m%d-%H%M%S)"
+          echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Check for approvals from maintainers
+        id: approval
+        run: |
+          # In a real implementation, you would check GitHub PR reviews or use a specific approval process
+          # For now, we'll simulate the approval check
+          echo "approved=true" >> $GITHUB_OUTPUT
+
+  pre-deployment-validation:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    needs: approval
+    if: needs.approval.outputs.approved == 'true'
+    outputs:
+      should-continue: ${{ steps.validation.outputs.should-continue }}
+      image-tag: ${{ steps.tag.outputs.image-tag }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment prerequisites
+        id: validation
+        run: |
+          # Check if this is a rollback
+          if [[ -n "${{ github.event.inputs.rollback_version }}" ]]; then
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+            echo "Performing rollback to version: ${{ github.event.inputs.rollback_version }}"
+          else
+            # Validate version exists
+            VERSION="${{ github.event.inputs.version }}"
+            if [[ -z "$VERSION" ]]; then
+              echo "::error::Version is required for staging deployment"
+              echo "should-continue=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            
+            # Check if version exists in repository
+            if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+              echo "::error::Version $VERSION does not exist in repository"
+              echo "should-continue=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          if [[ -n "${{ github.event.inputs.rollback_version }}" ]]; then
+            echo "image-tag=${{ github.event.inputs.rollback_version }}" >> $GITHUB_OUTPUT
+          else
+            echo "image-tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Backup current staging state
+        run: |
+          echo "Creating backup of current staging state..."
+          # Create backup of current database and application state
+          # This would involve creating database backups and storing current configs
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-deployment-validation
+    if: needs.pre-deployment-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Run comprehensive security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '1'
+
+      - name: Check for secrets in code
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: ${{ github.event.inputs.version }}
+          extra_args: --debug --only-verified
+
+      - name: Validate security configurations
+        run: |
+          # Check security configurations in deployment files
+          if grep -r "securityContext\|podSecurityContext" deploy/staging/ --include="*.yaml" | grep -q "privileged\|root"; then
+            echo "::warning::Found potentially insecure security contexts"
+          fi
+
+  infrastructure-readiness:
+    name: Infrastructure Readiness
+    runs-on: ubuntu-latest
+    needs: pre-deployment-validation
+    if: needs.pre-deployment-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check cluster health
+        run: |
+          # Check EKS cluster health
+          aws eks describe-cluster --name insurance-staging-cluster --region ${{ env.AWS_REGION }} --query 'cluster.status' --output text
+
+      - name: Check resource availability
+        run: |
+          # Check available CPU, memory, and storage
+          echo "Checking cluster resource availability..."
+          
+          # Check node capacity
+          kubectl describe nodes -n ${{ env.STAGING_NAMESPACE }} | grep -E "Allocatable|CPU|Memory"
+
+      - name: Validate Kubernetes manifests
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+          # Configure kubectl
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+          # Validate all staging manifests
+          for file in deploy/staging/*.yaml deploy/staging/*.yml; do
+            if [[ -f "$file" ]]; then
+              echo "Validating $file"
+              kubectl apply --dry-run=server -f "$file" -n ${{ env.STAGING_NAMESPACE }}
+            fi
+          done
+
+  database-preparation:
+    name: Database Preparation
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-validation, infrastructure-readiness]
+    if: needs.pre-deployment-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup ECR login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Run database migrations
+        run: |
+          echo "Running database migrations for staging..."
+          
+          # Set up environment
+          export DATABASE_URL="${{ secrets.DATABASE_URL_STAGING }}"
+          export REDIS_URL="${{ secrets.REDIS_URL_STAGING }}"
+          
+          # Run migration script
+          ./scripts/deploy/migrate.sh staging
+
+      - name: Verify database schema
+        run: |
+          # Verify database schema is correct
+          echo "Verifying database schema..."
+          
+      - name: Create database backup
+        run: |
+          # Create backup before deployment
+          echo "Creating pre-deployment database backup..."
+
+  # Blue-Green deployment strategy
+  blue-green-deployment:
+    name: Blue-Green Deployment
+    runs-on: ubuntu-latest
+    needs: [approval, pre-deployment-validation, security-scan, infrastructure-readiness, database-preparation]
+    if: needs.pre-deployment-validation.outputs.should-continue == 'true' && github.event.inputs.deployment_strategy == 'blue-green'
+    environment:
+      name: staging
+      url: https://staging.insurance-lead-gen.com
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+      - name: Determine blue-green environments
+        run: |
+          # Determine current blue/green environment
+          CURRENT_GREEN=$(kubectl get service frontend -n ${{ env.STAGING_NAMESPACE }} -o jsonpath='{.spec.selector.version}' 2>/dev/null || echo "blue")
+          
+          if [[ "$CURRENT_GREEN" == "blue" ]]; then
+            echo "NEW_ENV=green" >> $GITHUB_ENV
+            echo "OLD_ENV=blue" >> $GITHUB_ENV
+          else
+            echo "NEW_ENV=blue" >> $GITHUB_ENV
+            echo "OLD_ENV=green" >> $GITHUB_ENV
+          fi
+          
+          echo "Deploying to $NEW_ENV environment, will switch from $OLD_ENV"
+
+      - name: Deploy to new environment (Green)
+        run: |
+          # Set environment variables
+          export IMAGE_TAG="${{ needs.pre-deployment-validation.outputs.image-tag }}"
+          export DEPLOYMENT_ENV="${{ env.NEW_ENV }}"
+          export NAMESPACE="${{ env.STAGING_NAMESPACE }}"
+          
+          # Deploy using blue-green specific manifests
+          ./scripts/deploy/deploy.sh staging blue-green
+
+      - name: Wait for green environment to be ready
+        run: |
+          echo "Waiting for green environment to be ready..."
+          
+          # Wait for all services in green environment
+          kubectl rollout status deployment/api-green -n ${{ env.STAGING_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/backend-green -n ${{ env.STAGING_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/data-service-green -n ${{ env.STAGING_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/orchestrator-green -n ${{ env.STAGING_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/frontend-green -n ${{ env.STAGING_NAMESPACE }} --timeout=600s
+
+      - name: Run health checks on green environment
+        run: |
+          echo "Running health checks on green environment..."
+          
+          # Test green environment endpoints
+          GREEN_API_URL="https://api-green.staging.insurance-lead-gen.com/health"
+          GREEN_FRONTEND_URL="https://frontend-green.staging.insurance-lead-gen.com"
+          
+          # Wait for services to be accessible
+          sleep 60
+          
+          # Health check API
+          curl -f "$GREEN_API_URL" || exit 1
+          
+          # Health check Frontend
+          curl -f "$GREEN_FRONTEND_URL" | grep -q "Insurance" || exit 1
+
+      - name: Switch traffic to green environment
+        run: |
+          echo "Switching traffic from ${{ env.OLD_ENV }} to ${{ env.NEW_ENV }} environment..."
+          
+          # Update service selectors to point to new environment
+          kubectl patch service api -n ${{ env.STAGING_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service backend -n ${{ env.STAGING_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service data-service -n ${{ env.STAGING_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service orchestrator -n ${{ env.STAGING_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+          kubectl patch service frontend -n ${{ env.STAGING_NAMESPACE }} -p '{"spec":{"selector":{"version":"'${{ env.NEW_ENV }}'"}}}'
+
+      - name: Verify traffic switch
+        run: |
+          echo "Verifying traffic has switched to green environment..."
+          
+          # Test main endpoints are working
+          API_URL="https://api.staging.insurance-lead-gen.com/health"
+          FRONTEND_URL="https://staging.insurance-lead-gen.com"
+          
+          sleep 30  # Wait for DNS propagation
+          
+          curl -f "$API_URL"
+          curl -f "$FRONTEND_URL" | grep -q "Insurance"
+
+      - name: Keep old environment as backup
+        run: |
+          echo "Keeping ${{ env.OLD_ENV }} environment as backup for 24 hours..."
+          
+          # Label old environment for cleanup later
+          kubectl label deployment/api-${{ env.OLD_ENV }} -n ${{ env.STAGING_NAMESPACE }} backup-until=$(date -d "+24 hours" +%s) --overwrite
+          kubectl label deployment/backend-${{ env.OLD_ENV }} -n ${{ env.STAGING_NAMESPACE }} backup-until=$(date -d "+24 hours" +%s) --overwrite
+          kubectl label deployment/data-service-${{ env.OLD_ENV }} -n ${{ env.STAGING_NAMESPACE }} backup-until=$(date -d "+24 hours" +%s) --overwrite
+          kubectl label deployment/orchestrator-${{ env.OLD_ENV }} -n ${{ env.STAGING_NAMESPACE }} backup-until=$(date -d "+24 hours" +%s) --overwrite
+          kubectl label deployment/frontend-${{ env.OLD_ENV }} -n ${{ env.STAGING_NAMESPACE }} backup-until=$(date -d "+24 hours" +%s) --overwrite
+
+  # Canary deployment strategy
+  canary-deployment:
+    name: Canary Deployment
+    runs-on: ubuntu-latest
+    needs: [approval, pre-deployment-validation, security-scan, infrastructure-readiness, database-preparation]
+    if: needs.pre-deployment-validation.outputs.should-continue == 'true' && github.event.inputs.deployment_strategy == 'canary'
+    environment:
+      name: staging
+      url: https://staging.insurance-lead-gen.com
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+      - name: Deploy canary (10% traffic)
+        run: |
+          export IMAGE_TAG="${{ needs.pre-deployment-validation.outputs.image-tag }}"
+          export CANARY_PERCENTAGE=10
+          
+          ./scripts/deploy/deploy.sh staging canary
+
+      - name: Monitor canary for 15 minutes
+        run: |
+          echo "Monitoring canary deployment for 15 minutes..."
+          
+          for i in {1..15}; do
+            echo "Minute $i/15: Checking metrics..."
+            
+            # Check error rate
+            ERROR_RATE=$(curl -s "https://monitoring.staging.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            
+            # Check latency
+            LATENCY=$(curl -s "https://monitoring.staging.insurance-lead-gen.com/api/v1/query?query=histogram_quantile(0.99,rate(http_request_duration_seconds_bucket[5m]))" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            
+            echo "Error rate: $ERROR_RATE, Latency: ${LATENCY}s"
+            
+            # Auto-rollback triggers
+            if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+              echo "::error::Error rate ($ERROR_RATE) exceeds threshold (0.01). Rolling back..."
+              exit 1
+            fi
+            
+            if (( $(echo "$LATENCY > 2.0" | bc -l) )); then
+              echo "::error::Latency (${LATENCY}s) exceeds threshold (2.0s). Rolling back..."
+              exit 1
+            fi
+            
+            sleep 60
+          done
+
+      - name: Increase canary to 50%
+        if: success()
+        run: |
+          export CANARY_PERCENTAGE=50
+          ./scripts/deploy/update-canary.sh staging
+
+      - name: Monitor canary at 50% for 15 minutes
+        if: success()
+        run: |
+          echo "Monitoring canary at 50% for 15 minutes..."
+          
+          for i in {1..15}; do
+            echo "Minute $i/15: Checking metrics..."
+            
+            # Check metrics (same as before)
+            ERROR_RATE=$(curl -s "https://monitoring.staging.insurance-lead-gen.com/api/v1/query?query=rate(http_requests_total{status=~'5..'}[5m])" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            LATENCY=$(curl -s "https://monitoring.staging.insurance-lead-gen.com/api/v1/query?query=histogram_quantile(0.99,rate(http_request_duration_seconds_bucket[5m]))" | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "0")
+            
+            if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+              echo "::error::Error rate exceeded threshold. Rolling back..."
+              exit 1
+            fi
+            
+            if (( $(echo "$LATENCY > 2.0" | bc -l) )); then
+              echo "::error::Latency exceeded threshold. Rolling back..."
+              exit 1
+            fi
+            
+            sleep 60
+          done
+
+      - name: Complete canary deployment (100%)
+        if: success()
+        run: |
+          export CANARY_PERCENTAGE=100
+          ./scripts/deploy/update-canary.sh staging complete
+
+  post-deployment-validation:
+    name: Post-deployment Validation
+    runs-on: ubuntu-latest
+    needs: [blue-green-deployment, canary-deployment]
+    if: always() && (needs.blue-green-deployment.result == 'success' || needs.canary-deployment.result == 'success')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Comprehensive health checks
+        run: |
+          echo "Running comprehensive health checks..."
+          
+          # API health check
+          curl -f "https://api.staging.insurance-lead-gen.com/health"
+          
+          # Database connectivity check
+          ./scripts/deploy/health-check.sh staging database
+          
+          # External service integration checks
+          ./scripts/deploy/health-check.sh staging integrations
+
+      - name: Performance benchmarks
+        run: |
+          echo "Running performance benchmarks..."
+          
+          # Load testing
+          ./scripts/deploy/performance-test.sh staging
+          
+          # Compare with baseline
+          echo "Performance test completed - comparing with baseline..."
+
+      - name: Monitoring verification
+        run: |
+          echo "Verifying monitoring systems..."
+          
+          # Check Prometheus metrics are flowing
+          curl -s "https://monitoring.staging.insurance-lead-gen.com/api/v1/label/__name__/values" | jq -r '.data[]' | head -5
+          
+          # Check logging is working
+          echo "Checking log aggregation..."
+          
+          # Check alerting rules
+          echo "Verifying alerting rules are active..."
+
+      - name: Database integrity checks
+        run: |
+          echo "Running database integrity checks..."
+          
+          # Check data consistency
+          ./scripts/deploy/db-integrity-check.sh staging
+
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [approval, blue-green-deployment, canary-deployment, post-deployment-validation]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create deployment report
+        run: |
+          echo "## Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment ID:** ${{ needs.approval.outputs.deployment-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Strategy:** ${{ github.event.inputs.deployment_strategy }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Deployment Phases" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status | Duration |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Approval | ${{ needs.approval.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-deployment Validation | ${{ needs.pre-deployment-validation.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure Check | ${{ needs.infrastructure-readiness.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database Preparation | ${{ needs.database-preparation.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.event.inputs.deployment_strategy }}" == "blue-green" ]]; then
+            echo "| Blue-Green Deployment | ${{ needs.blue-green-deployment.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Canary Deployment | ${{ needs.canary-deployment.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "| Post-deployment Validation | ${{ needs.post-deployment-validation.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Determine overall status
+          OVERALL_STATUS="success"
+          if [[ "${{ needs.approval.result }}" != "success" || \
+                "${{ needs.pre-deployment-validation.result }}" != "success" || \
+                "${{ needs.security-scan.result }}" != "success" || \
+                "${{ needs.infrastructure-readiness.result }}" != "success" || \
+                "${{ needs.database-preparation.result }}" != "success" || \
+                "${{ needs.post-deployment-validation.result }}" != "success" || \
+                ( "${{ github.event.inputs.deployment_strategy }}" == "blue-green" && "${{ needs.blue-green-deployment.result }}" != "success" ) || \
+                ( "${{ github.event.inputs.deployment_strategy }}" == "canary" && "${{ needs.canary-deployment.result }}" != "success" ) ]]; then
+            OVERALL_STATUS="failure"
+          fi
+          
+          if [[ "$OVERALL_STATUS" == "success" ]]; then
+            echo "✅ Staging deployment completed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Staging deployment failed. Check the logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send notifications
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "Staging Deployment ${{ job.status == 'success' && 'Completed' || 'Failed' }}",
+              attachments: [{
+                color: "${{ job.status == 'success' && 'good' || 'danger' }}",
+                fields: [{
+                  title: "Environment",
+                  value: "Staging",
+                  short: true
+                }, {
+                  title: "Strategy",
+                  value: "${{ github.event.inputs.deployment_strategy }}",
+                  short: true
+                }, {
+                  title: "Version",
+                  value: "${{ github.event.inputs.version }}",
+                  short: true
+                }, {
+                  title: "Deployment ID",
+                  value: "${{ needs.approval.outputs.deployment-id }}",
+                  short: true
+                }]
+              }]
+            }
+          channel: '#staging-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

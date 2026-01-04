@@ -1,0 +1,489 @@
+# Rolling Update Deployment Strategy Configuration
+# This strategy updates services one at a time with zero downtime
+
+strategy:
+  name: "rolling"
+  description: "Zero-downtime deployment with gradual replacement of instances"
+
+# Rolling Update Configuration
+rolling_update:
+  # Update strategy settings
+  strategy:
+    type: "RollingUpdate"
+    rolling_update:
+      max_surge: 1        # Maximum number of pods that can be created over desired number
+      max_unavailable: 0  # Maximum number of pods that can be unavailable during update
+  
+  # Update behavior
+  behavior:
+    # How many pods to update at once
+    batch_size: 1
+    
+    # Time to wait between batches
+    batch_pause: 30s
+    
+    # Timeout for pod to become ready
+    readiness_timeout: 300s
+    
+    # Time to wait before marking pod as failed
+    failure_timeout: 600s
+  
+  # Health check configuration
+  health_checks:
+    # Liveness probe during updates
+    liveness_probe:
+      enabled: true
+      initial_delay: 30
+      period: 10
+      timeout: 5
+      failure_threshold: 3
+    
+    # Readiness probe during updates
+    readiness_probe:
+      enabled: true
+      initial_delay: 5
+      period: 5
+      timeout: 3
+      failure_threshold: 3
+    
+    # Startup probe for slow-starting pods
+    startup_probe:
+      enabled: true
+      initial_delay: 10
+      period: 10
+      timeout: 5
+      failure_threshold: 30
+
+# Deployment Configuration
+deployment:
+  # Service-specific settings
+  services:
+    api:
+      replicas: 3
+      max_surge: 1
+      max_unavailable: 0
+      health_check_path: "/health"
+      readiness_check_path: "/ready"
+    
+    backend:
+      replicas: 3
+      max_surge: 1
+      max_unavailable: 0
+      health_check_path: "/health"
+      readiness_check_path: "/ready"
+    
+    data-service:
+      replicas: 2
+      max_surge: 1
+      max_unavailable: 0
+      health_check_path: "/health"
+      readiness_check_path: "/ready"
+    
+    orchestrator:
+      replicas: 2
+      max_surge: 1
+      max_unavailable: 0
+      health_check_path: "/health"
+      readiness_check_path: "/ready"
+    
+    frontend:
+      replicas: 2
+      max_surge: 1
+      max_unavailable: 0
+      health_check_path: "/health"
+      readiness_check_path: "/ready"
+
+# Resource Management
+resource_management:
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  
+  # Resource allocation during updates
+  allocation:
+    # Reserve resources for update operations
+    update_reservation:
+      cpu: "1000m"
+      memory: "1Gi"
+    
+    # Resource thresholds for update initiation
+    update_thresholds:
+      cpu_utilization: 80
+      memory_utilization: 80
+      disk_utilization: 85
+
+# Pre-deployment Validation
+pre_deployment:
+  # Validation checks
+  checks:
+    - name: "cluster_health"
+      command: "kubectl get nodes"
+      threshold: "all_nodes_ready"
+    
+    - name: "current_deployment_health"
+      command: "kubectl rollout status"
+      threshold: "deployment_complete"
+    
+    - name: "resource_availability"
+      command: "kubectl describe nodes"
+      threshold: "sufficient_resources"
+    
+    - name: "image_availability"
+      command: "aws ecr describe-images"
+      threshold: "image_exists"
+  
+  # Pre-update backup
+  backup:
+    enabled: true
+    type: "configuration_snapshot"
+    scope: "deployment_state"
+    retention: "24h"
+  
+  # Database considerations
+  database:
+    # Schema compatibility check
+    schema_check: true
+    
+    # Data migration strategy
+    migration_strategy: "backwards_compatible"
+    
+    # Connection pool management
+    connection_management:
+      drain_timeout: 300s
+      max_connections_during_update: "reduced"
+
+# Update Process
+update_process:
+  # Phases of the rolling update
+  phases:
+    1. "Pre-update validation"
+    2. "Resource allocation"
+    3. "Update initiation"
+    4. "Pod replacement cycle"
+    5. "Health verification"
+    6. "Post-update validation"
+  
+  # Pod replacement cycle
+  pod_replacement:
+    # Steps in the cycle
+    steps:
+      1. "Create new pod with updated image"
+      2. "Wait for new pod to be ready"
+      3. "Verify new pod health"
+      4. "Terminate old pod"
+      5. "Move to next pod"
+    
+    # Timing configuration
+    timing:
+      pod_creation_timeout: 300s
+      readiness_check_interval: 10s
+      health_verification_time: 60s
+      termination_grace_period: 30s
+  
+  # Error handling
+  error_handling:
+    # Failure threshold
+    failure_threshold: 1  # Abort after 1 failure
+    
+    # Retry configuration
+    retry:
+      enabled: true
+      max_attempts: 3
+      backoff: "exponential"
+      initial_delay: 30s
+  
+  # Rollback triggers
+  rollback_triggers:
+    - trigger: "pod_creation_failure"
+      condition: "new_pod_not_ready_after_timeout"
+      action: "rollback_immediate"
+    
+    - trigger: "health_check_failure"
+      condition: "health_check_fails_3_times"
+      action: "rollback_immediate"
+    
+    - trigger: "resource_exhaustion"
+      condition: "node_resources_exceeded"
+      action: "pause_and_resume"
+    
+    - trigger: "high_error_rate"
+      condition: "error_rate > 5%"
+      action: "rollback_immediate"
+
+# Monitoring and Observability
+monitoring:
+  # Update-specific metrics
+  metrics:
+    - name: "rollout_progress"
+      description: "Progress of rolling update"
+      query: "kube_deployment_status_replicas - kube_deployment_status_replicas_updated"
+    
+    - name: "pod_ready_time"
+      description: "Time for pods to become ready during update"
+      query: "histogram_quantile(0.95, kube_pod_start_time_seconds)"
+    
+    - name: "update_error_rate"
+      description: "Error rate during update"
+      query: "rate(http_requests_total{update_phase='rolling'}[5m])"
+    
+    - name: "resource_utilization_during_update"
+      description: "Resource usage during update"
+      query: "rate(container_cpu_usage_seconds_total{update_phase='rolling'}[5m])"
+  
+  # Health checks during update
+  health_checks:
+    - name: "service_availability"
+      check: "http_endpoint"
+      endpoint: "/health"
+      threshold: "100%_availability"
+    
+    - name: "response_time"
+      check: "latency_measurement"
+      threshold: "< 2s_p95"
+    
+    - name: "error_rate"
+      check: "error_rate_calculation"
+      threshold: "< 1%"
+    
+    - name: "database_connectivity"
+      check: "database_health"
+      threshold: "all_connections_healthy"
+  
+  # Alerting
+  alerting:
+    - alert: "RollingUpdateStuck"
+      condition: "rollout_progress_no_change_for_5m"
+      severity: "warning"
+      action: "investigate_and_intervene"
+    
+    - alert: "UpdateHealthFailure"
+      condition: "health_check_failure_rate > 50%"
+      severity: "critical"
+      action: "rollback_immediate"
+    
+    - alert: "HighErrorRateDuringUpdate"
+      condition: "error_rate_during_update > 5%"
+      severity: "critical"
+      action: "rollback_immediate"
+
+# Performance Considerations
+performance:
+  # Update impact minimization
+  impact_minimization:
+    # Connection draining
+    connection_draining: true
+    draining_timeout: 30s
+    
+    # Graceful shutdown
+    graceful_shutdown: true
+    shutdown_timeout: 30s
+    
+    # Session affinity maintenance
+    session_affinity: true
+  
+  # Resource optimization
+  resource_optimization:
+    # Pre-warming new instances
+    pre_warming: false  # Disabled for rolling updates
+    
+    # Caching strategy
+    cache_warming: false  # Cache persists across updates
+    
+    # Database connection pooling
+    connection_pooling: true
+    pool_sizing_during_update: "maintained"
+  
+  # Traffic management
+  traffic_management:
+    # Load balancer configuration
+    load_balancer:
+      algorithm: "round_robin"
+      health_check_interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+    
+    # Traffic routing during update
+    routing:
+      stickiness: "cookie"
+      failover: "automatic"
+
+# Environment-specific Configuration
+environment_overrides:
+  development:
+    replicas: 1
+    max_surge: 1
+    max_unavailable: 0
+    batch_size: 1
+    batch_pause: 10s
+    readiness_timeout: 120s
+  
+  staging:
+    replicas: 2
+    max_surge: 1
+    max_unavailable: 0
+    batch_size: 1
+    batch_pause: 30s
+    readiness_timeout: 180s
+  
+  production:
+    replicas: 3
+    max_surge: 1
+    max_unavailable: 0
+    batch_size: 1
+    batch_pause: 60s
+    readiness_timeout: 300s
+
+# Security Considerations
+security:
+  # Access control
+  access_control:
+    deployment_permission: "admin"
+    rollback_permission: "admin"
+    monitoring_permission: "operator"
+  
+  # Security during updates
+  security_measures:
+    # Network policies
+    network_policies: true
+    
+    # Pod security standards
+    pod_security: "restricted"
+    
+    # Secret management
+    secret_rotation: "post_update"
+    
+    # Audit logging
+    audit_logging: true
+
+# Rollback Procedures
+rollback_procedures:
+  # Immediate rollback
+  immediate_rollback:
+    steps:
+      1. "Stop current rollout"
+      2. "Revert to previous deployment"
+      3. "Wait for rollback to complete"
+      4. "Verify system health"
+      5. "Send notification"
+    
+    timing:
+      rollback_initiation: 10s
+      rollback_completion: 300s
+      health_verification: 60s
+  
+  # Manual intervention
+  manual_intervention:
+    triggers:
+      - "update_stuck_for_10m"
+      - "health_checks_consistently_failing"
+      - "resource_exhaustion_detected"
+      - "manual_pause_requested"
+    
+    intervention_steps:
+      1. "Pause the rollout"
+      2. "Investigate the issue"
+      3. "Fix the underlying problem"
+      4. "Resume or rollback"
+  
+  # Rollback automation
+  automation:
+    conditions: "all_critical_triggers"
+    timeout: 300s  # Auto-rollback after 5 minutes of issues
+    notification: true
+
+# Cost Optimization
+cost_optimization:
+  # Resource efficiency
+  efficiency:
+    # Right-sizing during updates
+    rightsizing: true
+    
+    # Resource monitoring
+    monitoring: true
+    
+    # Waste detection
+    waste_detection: true
+  
+  # Update cost management
+  update_costs:
+    # Bandwidth optimization
+    bandwidth_optimization: true
+    
+    # Image layer optimization
+    layer_optimization: true
+    
+    # Update scheduling
+    scheduling: "off_peak_hours"
+
+# Compliance and Governance
+compliance:
+  # Change management
+  change_management:
+    approval_required: true
+    change_window: "maintenance_window"
+    documentation_required: true
+  
+  # Audit requirements
+  audit:
+    logging_enabled: true
+    retention_period: "7y"
+    compliance_frameworks: ["SOC2", "GDPR"]
+  
+  # Quality gates
+  quality_gates:
+    - gate: "all_health_checks_pass"
+    - gate: "performance_metrics_acceptable"
+    - gate: "security_scan_clean"
+    - gate: "rollback_plan_validated"
+
+# Automation
+automation:
+  # Deployment automation
+  deployment:
+    automated: true
+    approval_required: true
+    auto_approve_insights: true
+  
+  # Monitoring automation
+  monitoring:
+    automated: true
+    alert_escalation: true
+    incident_automation: true
+  
+  # Rollback automation
+  rollback:
+    automated: true
+    human_intervention_timeout: 300s
+
+# Documentation
+documentation:
+  runbook: "rolling-deployment.md"
+  troubleshooting: "rolling-update-troubleshooting.md"
+  rollback_procedures: "rolling-deployment-rollback.md"
+  monitoring_guide: "rolling-update-monitoring.md"
+
+# Success Criteria
+success_criteria:
+  # Technical success
+  technical:
+    update_completion: "100%"
+    zero_downtime: true
+    health_checks: "100%_pass"
+    performance_degradation: "< 10%"
+  
+  # Operational success
+  operational:
+    rollback_success_rate: "100%"
+    monitoring_coverage: "100%"
+    alert_accuracy: "> 95%"
+  
+  # Business success
+  business:
+    user_impact: "none"
+    service_availability: "100%"
+    performance_maintenance: "within_10%_baseline"

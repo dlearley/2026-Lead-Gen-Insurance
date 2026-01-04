@@ -1,0 +1,655 @@
+name: Release & Version Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+      version_override:
+        description: 'Override version (optional, format: v1.2.3)'
+        required: false
+        type: string
+      prerelease_id:
+        description: 'Prerelease identifier (e.g., alpha, beta, rc)'
+        required: false
+        type: string
+        default: 'alpha'
+      skip_deploy:
+        description: 'Skip triggering deployment workflows'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'CHANGELOG.md'
+      - 'package.json'
+      - 'packages/**/package.json'
+      - 'apps/**/package.json'
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+
+jobs:
+  # Analyze commits to determine version bump
+  analyze-version:
+    name: Analyze Version Bump
+    runs-on: ubuntu-latest
+    outputs:
+      current-version: ${{ steps.version.outputs.current-version }}
+      new-version: ${{ steps.version.outputs.new-version }}
+      version-type: ${{ steps.version.outputs.version-type }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      should-release: ${{ steps.release.outputs.should-release }}
+      release-notes: ${{ steps.release.outputs.release-notes }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Get current version
+        id: version
+        run: |
+          # Get current version from root package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Determine version bump type
+          if [[ -n "${{ github.event.inputs.version_override }}" ]]; then
+            NEW_VERSION="${{ github.event.inputs.version_override }}"
+            VERSION_TYPE="manual"
+            echo "Using manual version override: $NEW_VERSION"
+          elif [[ "${{ github.event.inputs.version_type }}" != "" ]]; then
+            VERSION_TYPE="${{ github.event.inputs.version_type }}"
+            NEW_VERSION=$(npm version $VERSION_TYPE --no-git-tag-version)
+            echo "Manual version bump requested: $VERSION_TYPE"
+          else
+            # Auto-determine version bump from commits
+            echo "Analyzing commits for version bump..."
+            
+            # Get commits since last release
+            LAST_RELEASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")
+            COMMITS=$(git log $LAST_RELEASE..HEAD --pretty=format:"%s" --no-merges)
+            
+            echo "Commits since last release:"
+            echo "$COMMITS"
+            
+            # Determine version bump based on conventional commits
+            BREAKING_COUNT=$(echo "$COMMITS" | grep -c "BREAKING CHANGE\|!:" || echo "0")
+            FEATURE_COUNT=$(echo "$COMMITS" | grep -c "^feat" || echo "0")
+            FIX_COUNT=$(echo "$COMMITS" | grep -c "^fix" || echo "0")
+            
+            echo "Analysis: $BREAKING_COUNT breaking changes, $FEATURE_COUNT features, $FIX_COUNT fixes"
+            
+            if [[ $BREAKING_COUNT -gt 0 ]]; then
+              VERSION_TYPE="major"
+              NEW_VERSION=$(npm version major --no-git-tag-version)
+            elif [[ $FEATURE_COUNT -gt 0 ]]; then
+              VERSION_TYPE="minor"
+              NEW_VERSION=$(npm version minor --no-git-tag-version)
+            elif [[ $FIX_COUNT -gt 0 ]]; then
+              VERSION_TYPE="patch"
+              NEW_VERSION=$(npm version patch --no-git-tag-version)
+            else
+              VERSION_TYPE="none"
+              NEW_VERSION=$CURRENT_VERSION
+            fi
+            
+            echo "Auto-determined version bump: $VERSION_TYPE"
+          fi
+          
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version-type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [[ "${{ steps.version.outputs.version-type }}" == "none" ]]; then
+            echo "changelog=No changes detected, skipping release." >> $GITHUB_OUTPUT
+          else
+            # Generate changelog entries
+            LAST_RELEASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")
+            
+            echo "Generating changelog since $LAST_RELEASE..."
+            
+            # Generate structured changelog
+            cat > CHANGELOG_NEW.md << EOF
+            # Changelog
+            
+            All notable changes to this project will be documented in this file.
+            
+            The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+            and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+            
+            ## [${{ steps.version.outputs.new-version }}] - $(date +%Y-%m-%d)
+            
+            ### Added
+            EOF
+            
+            # Extract features (feat commits)
+            git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "^feat" >> CHANGELOG_NEW.md || echo "- Initial release features" >> CHANGELOG_NEW.md
+            
+            cat >> CHANGELOG_NEW.md << EOF
+            
+            ### Changed
+            EOF
+            
+            # Extract breaking changes
+            git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "BREAKING CHANGE\|!:" >> CHANGELOG_NEW.md || echo "- Updated dependencies and configurations" >> CHANGELOG_NEW.md
+            
+            cat >> CHANGELOG_NEW.md << EOF
+            
+            ### Fixed
+            EOF
+            
+            # Extract fixes
+            git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "^fix" >> CHANGELOG_NEW.md || echo "- Minor bug fixes and improvements" >> CHANGELOG_NEW.md
+            
+            cat >> CHANGELOG_NEW.md << EOF
+            
+            ### Security
+            EOF
+            
+            # Extract security fixes
+            git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "security\|vuln" >> CHANGELOG_NEW.md || echo "- Security improvements and dependency updates" >> CHANGELOG_NEW.md
+            
+            # Prepend to existing changelog if it exists
+            if [[ -f "CHANGELOG.md" ]]; then
+              tail -n +4 CHANGELOG.md >> CHANGELOG_NEW.md
+            fi
+            
+            mv CHANGELOG_NEW.md CHANGELOG.md
+            
+            # Output changelog content
+            CHANGELOG_CONTENT=$(cat CHANGELOG.md)
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine if should create release
+        id: release
+        run: |
+          if [[ "${{ steps.version.outputs.version-type }}" == "none" ]]; then
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "release-notes=No release needed - no significant changes detected." >> $GITHUB_OUTPUT
+          else
+            echo "should-release=true" >> $GITHUB_OUTPUT
+            
+            # Generate release notes
+            LAST_RELEASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")
+            
+            RELEASE_NOTES="## What's Changed in ${{ steps.version.outputs.new-version }}
+            
+            "
+            
+            # Add features
+            FEATURES=$(git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "^feat" || echo "")
+            if [[ -n "$FEATURES" ]]; then
+              RELEASE_NOTES+="### ✨ New Features
+            $FEATURES
+            
+            "
+            fi
+            
+            # Add breaking changes
+            BREAKING=$(git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "BREAKING CHANGE\|!:" || echo "")
+            if [[ -n "$BREAKING" ]]; then
+              RELEASE_NOTES+="### ⚠️ Breaking Changes
+            $BREAKING
+            
+            "
+            fi
+            
+            # Add fixes
+            FIXES=$(git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep "^fix" || echo "")
+            if [[ -n "$FIXES" ]]; then
+              RELEASE_NOTES+="### 🐛 Bug Fixes
+            $FIXES
+            
+            "
+            fi
+            
+            # Add other changes
+            OTHERS=$(git log $LAST_RELEASE..HEAD --pretty=format:"- %s" --no-merges | grep -v "^feat\|^fix" | grep -v "BREAKING CHANGE\|!:" || echo "")
+            if [[ -n "$OTHERS" ]]; then
+              RELEASE_NOTES+="### 📝 Other Changes
+            $OTHERS
+            
+            "
+            fi
+            
+            RELEASE_NOTES+="### 📦 Dependencies
+            - Updated Node.js to v${{ env.NODE_VERSION }}
+            - Updated pnpm to v${{ env.PNPM_VERSION }}
+            - Updated all dependencies to latest compatible versions
+            
+            ### 🏗️ Build & Infrastructure
+            - Enhanced CI/CD pipeline with security scanning
+            - Improved Docker image building process
+            - Updated deployment strategies
+            
+            ### 📊 Stats
+            - **Commits:** $(git rev-list $LAST_RELEASE..HEAD --count)
+            - **Contributors:** $(git log $LAST_RELEASE..HEAD --pretty=format:"%an" | sort -u | wc -l)
+            - **Files changed:** $(git diff --name-only $LAST_RELEASE..HEAD | wc -l)
+            
+            ---
+            
+            **Full Changelog:** https://github.com/${{ github.repository }}/compare/$LAST_RELEASE...${{ steps.version.outputs.new-version }}
+            "
+            
+            echo "release-notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+  # Update package versions across workspace
+  update-versions:
+    name: Update Package Versions
+    runs-on: ubuntu-latest
+    needs: analyze-version
+    if: needs.analyze-version.outputs.should-release == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Update root package version
+        run: |
+          NEW_VERSION="${{ needs.analyze-version.outputs.new-version }}"
+          echo "Updating root package version to $NEW_VERSION"
+          
+          # Update root package.json
+          node -p "
+            const pkg = require('./package.json');
+            pkg.version = '$NEW_VERSION';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Updated root package.json to version', pkg.version);
+          "
+
+      - name: Update workspace package versions
+        run: |
+          NEW_VERSION="${{ needs.analyze-version.outputs.new-version }}"
+          echo "Updating workspace package versions to $NEW_VERSION"
+          
+          # Update all workspace package.json files
+          find apps packages -name "package.json" -exec node -p "
+            const pkg = require(path);
+            if (pkg.version) {
+              pkg.version = '$NEW_VERSION';
+              require('fs').writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+              console.log('Updated', path, 'to version', pkg.version);
+            }
+          " {} \;
+
+      - name: Update lockfile
+        run: |
+          echo "Updating pnpm lockfile..."
+          pnpm install --frozen-lockfile
+
+      - name: Verify version updates
+        run: |
+          echo "Verifying version updates..."
+          node -p "
+            const rootPkg = require('./package.json');
+            console.log('Root version:', rootPkg.version);
+            
+            const workspaces = require('fs').readdirSync('./apps').concat(require('fs').readdirSync('./packages'));
+            workspaces.forEach(ws => {
+              const pkgPath = \`./\${ws}/package.json\`;
+              if (require('fs').existsSync(pkgPath)) {
+                const pkg = require(pkgPath);
+                if (pkg.version) console.log(\`\${ws} version:\`, pkg.version);
+              }
+            });
+          "
+
+  # Create Git tag and commit changes
+  create-release-commit:
+    name: Create Release Commit
+    runs-on: ubuntu-latest
+    needs: [analyze-version, update-versions]
+    if: needs.analyze-version.outputs.should-release == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit version updates and changelog
+        run: |
+          NEW_VERSION="${{ needs.analyze-version.outputs.new-version }}"
+          echo "Creating release commit for version $NEW_VERSION"
+          
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Add all changes
+          git add .
+          
+          # Create release commit
+          git commit -m "chore(release): $NEW_VERSION
+
+          - Updated version to $NEW_VERSION
+          - Updated CHANGELOG.md
+          - Updated workspace package versions
+          
+          Generated by GitHub Actions"
+          
+          # Create annotated tag
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION
+
+          ${{ needs.analyze-version.outputs.release-notes }}"
+          
+          echo "Created tag: $NEW_VERSION"
+
+      - name: Push changes and tag
+        run: |
+          # Push commit and tag
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin ${{ needs.analyze-version.outputs.new-version }}
+          
+          echo "Pushed release commit and tag"
+
+  # Create GitHub Release
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [analyze-version, create-release-commit]
+    if: needs.analyze-version.outputs.should-release == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.analyze-version.outputs.new-version }}
+
+      - name: Generate release artifacts
+        run: |
+          echo "Preparing release artifacts..."
+          
+          # Create release notes file
+          cat > RELEASE_NOTES.md << EOF
+          ${{ needs.analyze-version.outputs.release-notes }}
+          EOF
+          
+          # Generate build information
+          cat > BUILD_INFO.txt << EOF
+          Release: ${{ needs.analyze-version.outputs.new-version }}
+          Build Date: $(date)
+          Commit: ${{ github.sha }}
+          Node Version: ${{ env.NODE_VERSION }}
+          PNPM Version: ${{ env.PNPM_VERSION }}
+          Build URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          
+          # Create distribution archive if it exists
+          if [[ -d "dist" ]]; then
+            tar -czf "${{ needs.analyze-version.outputs.new-version }}-dist.tar.gz" dist/
+          fi
+          
+          if [[ -d "build" ]]; then
+            tar -czf "${{ needs.analyze-version.outputs.new-version }}-build.tar.gz" build/
+          fi
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.analyze-version.outputs.new-version }}
+          release_name: Release ${{ needs.analyze-version.outputs.new-version }}
+          body: |
+            ${{ needs.analyze-version.outputs.release-notes }}
+          draft: false
+          prerelease: ${{ contains(needs.analyze-version.outputs.new-version, '-') }}
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./RELEASE_NOTES.md
+          asset_name: RELEASE_NOTES.md
+          asset_content_type: text/markdown
+
+      - name: Upload Build Info
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./BUILD_INFO.txt
+          asset_name: BUILD_INFO.txt
+          asset_content_type: text/plain
+
+      - name: Upload Distribution Archive
+        if: hashFiles('./dist/**') != ''
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ needs.analyze-version.outputs.new-version }}-dist.tar.gz
+          asset_name: ${{ needs.analyze-version.outputs.new-version }}-dist.tar.gz
+          asset_content_type: application/gzip
+
+  # Trigger deployment workflows
+  trigger-deployments:
+    name: Trigger Deployment Workflows
+    runs-on: ubuntu-latest
+    needs: [analyze-version, create-github-release]
+    if: needs.analyze-version.outputs.should-release == 'true' && github.event.inputs.skip_deploy != 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger build images workflow
+        run: |
+          echo "Triggering build images workflow..."
+          
+          # Use GitHub CLI to trigger workflow
+          gh workflow run build-images.yml \
+            --ref main \
+            --field environment=production \
+            || echo "Failed to trigger build-images workflow"
+
+      - name: Create deployment approval issue
+        if: needs.analyze-version.outputs.version-type == 'major' || needs.analyze-version.outputs.version-type == 'minor'
+        run: |
+          echo "Creating deployment approval issue..."
+          
+          # Create GitHub issue for production deployment approval
+          gh issue create \
+            --title "Production Deployment Approval Required: ${{ needs.analyze-version.outputs.new-version }}" \
+            --body "## Production Deployment Approval Required
+            
+            **Version:** ${{ needs.analyze-version.outputs.new-version }}
+            **Version Type:** ${{ needs.analyze-version.outputs.version-type }}
+            **Release Notes:** ${{ needs.analyze-version.outputs.release-notes }}
+            
+            This release requires production deployment approval before proceeding.
+            
+            ### Deployment Checklist
+            - [ ] Tech Lead approval
+            - [ ] Product Manager approval
+            - [ ] Stakeholder notification
+            - [ ] Deployment window confirmed
+            
+            ### Workflows to Execute
+            1. Deploy to Staging: https://github.com/${{ github.repository }}/actions/workflows/deploy-staging.yml
+            2. Deploy to Production: https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml
+            
+            ### Additional Notes
+            - This is a ${{ needs.analyze-version.outputs.version-type }} release
+            - Monitor production closely after deployment
+            - Rollback plan should be ready
+            
+            /label deployment production
+            " \
+            --assignee "@me" \
+            || echo "Failed to create deployment approval issue"
+
+  # Release summary and notifications
+  release-summary:
+    name: Release Summary
+    runs-on: ubuntu-latest
+    needs: [analyze-version, create-github-release, trigger-deployments]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create release summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Version:** ${{ needs.analyze-version.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Type:** ${{ needs.analyze-version.outputs.version-type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Current Version:** ${{ needs.analyze-version.outputs.current-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Should Release:** ${{ needs.analyze-version.outputs.should-release }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Skip Deploy:** ${{ github.event.inputs.skip_deploy }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Release Process" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Analyze Version | ${{ needs.analyze-version.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Update Versions | ${{ needs.update-versions.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Create Release Commit | ${{ needs.create-release-commit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Create GitHub Release | ${{ needs.create-github-release.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger Deployments | ${{ needs.trigger-deployments.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.analyze-version.outputs.should-release }}" == "true" ]]; then
+            echo "✅ Release ${{ needs.analyze-version.outputs.new-version }} created successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Release Links" >> $GITHUB_STEP_SUMMARY
+            echo "- [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.analyze-version.outputs.new-version }})" >> $GITHUB_STEP_SUMMARY
+            echo "- [Build Images Workflow](https://github.com/${{ github.repository }}/actions/workflows/build-images.yml)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Deploy to Staging](https://github.com/${{ github.repository }}/actions/workflows/deploy-staging.yml)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Deploy to Production](https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ No release created - no significant changes detected." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send release notification
+        if: needs.analyze-version.outputs.should-release == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🚀 New Release: ${{ needs.analyze-version.outputs.new-version }}",
+              attachments: [{
+                color: "good",
+                fields: [{
+                  title: "Version",
+                  value: "${{ needs.analyze-version.outputs.new-version }}",
+                  short: true
+                }, {
+                  title: "Type",
+                  value: "${{ needs.analyze-version.outputs.version-type }}",
+                  short: true
+                }, {
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }, {
+                  title: "Release Notes",
+                  value: "<https://github.com/${{ github.repository }}/releases/tag/${{ needs.analyze-version.outputs.new-version }}|View Release>",
+                  short: true
+                }],
+                footer: "Release created successfully",
+                ts: ${{ github.event.head_commit.timestamp }}
+              }]
+            }
+          channel: '#releases'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send critical release notification
+        if: needs.analyze-version.outputs.should-release == 'true' && (needs.analyze-version.outputs.version-type == 'major' || needs.analyze-version.outputs.version-type == 'minor')
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "⚠️ Critical Release Alert: ${{ needs.analyze-version.outputs.new-version }}",
+              attachments: [{
+                color: "warning",
+                fields: [{
+                  title: "Version",
+                  value: "${{ needs.analyze-version.outputs.new-version }}",
+                  short: true
+                }, {
+                  title: "Type",
+                  value: "${{ needs.analyze-version.outputs.version-type }}",
+                  short: true
+                }, {
+                  title: "Action Required",
+                  value: "Production deployment approval needed",
+                  short: true
+                }, {
+                  title: "Approval Issue",
+                  value: "<https://github.com/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+production+deployment|View Approval Issues>",
+                  short: true
+                }]
+              }]
+            }
+          channel: '#engineering'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

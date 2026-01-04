@@ -1,0 +1,432 @@
+# Production Environment Deployment Configuration
+
+namespace: production
+replicas: 3
+
+# Resource limits for production environment (high availability)
+resource_limits:
+  cpu: "2000m"
+  memory: "4Gi"
+
+# Health check configuration
+health_checks:
+  liveness_probe:
+    initial_delay_seconds: 60
+    period_seconds: 30
+    timeout_seconds: 10
+    failure_threshold: 3
+  readiness_probe:
+    initial_delay_seconds: 15
+    period_seconds: 10
+    timeout_seconds: 5
+    failure_threshold: 3
+
+# Service configuration
+services:
+  api:
+    port: 3000
+    target_port: 3000
+    replicas: 3
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    
+  backend:
+    port: 3001
+    target_port: 3001
+    replicas: 3
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    
+  data-service:
+    port: 3002
+    target_port: 3002
+    replicas: 3
+    resources:
+      requests:
+        cpu: "1000m"
+        memory: "1Gi"
+      limits:
+        cpu: "4000m"
+        memory: "4Gi"
+    
+  orchestrator:
+    port: 3003
+    target_port: 3003
+    replicas: 2
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    
+  frontend:
+    port: 80
+    target_port: 3000
+    replicas: 3
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+# Environment variables
+environment_variables:
+  NODE_ENV: production
+  LOG_LEVEL: warn
+  ENABLE_CORS: true
+  ENABLE_RATE_LIMITING: true
+  RATE_LIMIT_WINDOW: 15
+  RATE_LIMIT_MAX: 1000
+  DATABASE_POOL_SIZE: 25
+  REDIS_TTL: 900
+  SESSION_SECRET: "prod-session-secret-$(date)"
+  JWT_SECRET: "prod-jwt-secret-$(date)"
+  DATABASE_SSL_MODE: require
+  DATABASE_SSL_CERT: /app/ssl/server.crt
+  DATABASE_SSL_KEY: /app/ssl/server.key
+  DATABASE_SSL_CA: /app/ssl/ca.crt
+
+# Security configuration
+security:
+  security_context:
+    run_as_non_root: true
+    run_as_user: 1000
+    read_only_root_filesystem: true
+    allow_privilege_escalation: false
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - NET_BIND_SERVICE
+  pod_security_standard: "restricted"
+  network_policy:
+    enabled: true
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                name: ingress-nginx
+        ports:
+          - protocol: TCP
+            port: 3000
+    egress:
+      - to: []
+        ports:
+          - protocol: TCP
+            port: 5432  # PostgreSQL
+          - protocol: TCP
+            port: 6379  # Redis
+          - protocol: TCP
+            port: 443   # HTTPS
+          - protocol: TCP
+            port: 80    # HTTP
+
+# Ingress configuration
+ingress:
+  enabled: true
+  class_name: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: insurance-lead-gen.com
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: api.insurance-lead-gen.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: prod-tls
+      hosts:
+        - insurance-lead-gen.com
+        - api.insurance-lead-gen.com
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  service_monitor:
+    enabled: true
+    interval: 15s
+  prometheus_rule:
+    enabled: true
+    rules:
+      - alert: ProductionServiceDown
+        expr: up{namespace="production"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Production service is down"
+          description: "Service {{ $labels.job }} in production namespace has been down for more than 30 seconds"
+      
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{namespace="production",status=~"5.."}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} requests per second"
+      
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace="production"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected"
+          description: "95th percentile latency is {{ $value }} seconds"
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storage_class: "gp3"
+  access_mode: "ReadWriteOnce"
+  size: "50Gi"
+  volumeBindingMode: "WaitForFirstConsumer"
+  reclaimPolicy: "Retain"
+
+# Auto-scaling configuration
+autoscaling:
+  enabled: true
+  min_replicas: 3
+  max_replicas: 20
+  target_cpu_utilization_percentage: 65
+  target_memory_utilization_percentage: 75
+  behavior:
+    scale_down:
+      stabilization_window_seconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          period_seconds: 60
+    scale_up:
+      stabilization_window_seconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          period_seconds: 60
+
+# Database configuration
+database:
+  connection_pool:
+    min_connections: 10
+    max_connections: 50
+    connection_timeout: 30000
+    idle_timeout: 600000
+    max_lifetime: 1800000
+  backup:
+    enabled: true
+    schedule: "0 1 * * *"  # Daily at 1 AM
+    retention_days: 90
+    encryption: true
+    cross_region_replication: true
+  monitoring:
+    enabled: true
+    slow_query_log: true
+    performance_insights: true
+
+# Redis configuration
+redis:
+  enabled: true
+  cluster_mode: true
+  nodes: 6
+  replicas_per_node: 1
+  max_memory_policy: "allkeys-lru"
+  timeout: 300
+  tcp_keepalive: 300
+  databases: 16
+
+# CDN configuration
+cdn:
+  enabled: true
+  cloudfront:
+    distribution_id: "E0987654321DEF"
+    cache_ttl: 86400
+    compression: true
+    geo_restriction: "none"
+  custom_cache_behaviors:
+    - path: "/api/*"
+      ttl: 300
+    - path: "/static/*"
+      ttl: 31536000  # 1 year
+
+# Load balancer configuration
+load_balancer:
+  type: "ApplicationLoadBalancer"
+  cross_zone_load_balancing: true
+  connection_draining: true
+  connection_draining_timeout: 300
+  health_check:
+    healthy_threshold: 2
+    interval: 30
+    timeout: 5
+    unhealthy_threshold: 3
+  ssl_policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+
+# Backup and disaster recovery
+backup:
+  enabled: true
+  schedule: "0 1 * * *"  # Daily at 1 AM
+  retention_policy:
+    hourly: 24
+    daily: 30
+    weekly: 12
+    monthly: 12
+    yearly: 7
+  storage:
+    type: "s3"
+    bucket: "insurance-prod-backups"
+    encryption: true
+    replication:
+      enabled: true
+      regions: ["us-east-1", "us-west-2"]
+  testing:
+    enabled: true
+    schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+
+# Disaster recovery
+disaster_recovery:
+  enabled: true
+  rpo: "1h"  # Recovery Point Objective
+  rto: "4h"  # Recovery Time Objective
+  cross_region_deployment: true
+  backup_validation: true
+  failover_testing: "monthly"
+
+# Security configuration
+security:
+  image_scanning: true
+  dependency_scanning: true
+  runtime_security: true
+  audit_logging: true
+  secrets_management: "external-secrets"
+  encryption:
+    at_rest: true
+    in_transit: true
+    key_rotation: "automatic"
+  vulnerability_management:
+    scanning_frequency: "daily"
+    patch_management: "automated"
+
+# Compliance and governance
+compliance:
+  gdpr:
+    enabled: true
+    data_retention: "7y"
+    right_to_be_forgotten: true
+  hipaa:
+    enabled: false
+  soc2:
+    enabled: true
+    logging: "comprehensive"
+  pci_dss:
+    enabled: false
+
+# Performance optimization
+performance:
+  connection_pooling: true
+  query_optimization: true
+  caching:
+    enabled: true
+    ttl: 600
+    max_size: "1GB"
+  compression:
+    enabled: true
+    min_size: 1024
+    algorithms: ["gzip", "brotli"]
+  http2:
+    enabled: true
+  keep_alive:
+    enabled: true
+    timeout: 75
+
+# Feature flags for production
+feature_flags:
+  NEW_UI: true
+  ADVANCED_ANALYTICS: true
+  BETA_FEATURES: false
+  EXPERIMENTAL_FEATURES: false
+  A_B_TESTING: true
+  CANARY_RELEASES: true
+
+# Notification configuration
+notifications:
+  slack:
+    enabled: true
+    webhook_url: "https://hooks.slack.com/services/YOUR/PROD/WEBHOOK"
+    channels:
+      - "#prod-alerts"
+      - "#prod-deployments"
+  email:
+    enabled: true
+    smtp_server: "email-smtp.us-east-1.amazonaws.com"
+    from_address: "alerts@insurance-lead-gen.com"
+    recipients:
+      - "ops-team@insurance-lead-gen.com"
+      - "management@insurance-lead-gen.com"
+  pagerduty:
+    enabled: true
+    integration_key: "YOUR_PAGERDUTY_INTEGRATION_KEY"
+  webhook:
+    enabled: true
+    endpoints:
+      - url: "https://hooks.slack.com/services/YOUR/WEBHOOK"
+        events: ["deployment", "failure", "recovery"]
+
+# Service mesh configuration
+service_mesh:
+  enabled: true
+  type: "istio"
+  mtls: true
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    timeout: 30s
+  retry_policy:
+    enabled: true
+    max_attempts: 3
+    per_try_timeout: 10s
+
+# Cost optimization
+cost_optimization:
+  reserved_instances: true
+  spot_instances: false  # Disabled for production
+  auto_scaling_optimization: true
+  resource_rightsizing: true
+  storage_optimization: true
+
+# Operational excellence
+operations:
+  runbooks:
+    enabled: true
+    automation: true
+  incident_response:
+    enabled: true
+    escalation_policy: "prod-critical"
+  change_management:
+    enabled: true
+    approval_required: true
+    change_window: "weekend"

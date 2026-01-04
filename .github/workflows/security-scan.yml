@@ -1,0 +1,683 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC for comprehensive security scanning
+    - cron: '0 2 * * *'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'src/**'
+      - 'Dockerfile*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/security-scan.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'src/**'
+      - 'Dockerfile*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: true
+        default: 'comprehensive'
+        type: choice
+        options:
+          - comprehensive
+          - dependencies
+          - containers
+          - infrastructure
+          - secrets
+      severity_threshold:
+        description: 'Minimum severity level to report'
+        required: false
+        default: 'medium'
+        type: choice
+        options:
+          - critical
+          - high
+          - medium
+          - low
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+  SEVERITY_THRESHOLD: ${{ github.event.inputs.severity_threshold || 'medium' }}
+
+jobs:
+  # Pre-scan setup and validation
+  pre-scan-setup:
+    name: Pre-scan Setup
+    runs-on: ubuntu-latest
+    outputs:
+      scan-id: ${{ steps.id.outputs.scan-id }}
+      should-continue: ${{ steps.validation.outputs.should-continue }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate scan ID
+        id: id
+        run: |
+          SCAN_ID="sec-scan-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}"
+          echo "scan-id=$SCAN_ID" >> $GITHUB_OUTPUT
+
+      - name: Validate scan prerequisites
+        id: validation
+        run: |
+          # Check if we have the necessary secrets for scanning
+          if [[ -n "${{ secrets.SNYK_TOKEN }}" ]]; then
+            echo "Snyk token available"
+          else
+            echo "::warning::Snyk token not available - some scans will be skipped"
+          fi
+          
+          if [[ -n "${{ secrets.GITHUB_TOKEN }}" ]]; then
+            echo "GitHub token available"
+          else
+            echo "::error::GitHub token is required"
+            exit 1
+          fi
+          
+          echo "should-continue=true" >> $GITHUB_OUTPUT
+
+  # Dependency vulnerability scanning
+  dependency-scanning:
+    name: Dependency Vulnerability Scanning
+    runs-on: ubuntu-latest
+    needs: pre-scan-setup
+    if: needs.pre-scan-setup.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run npm audit
+        run: |
+          echo "Running npm audit with severity threshold: ${{ env.SEVERITY_THRESHOLD }}"
+          
+          # Run npm audit with different severity levels
+          case "${{ env.SEVERITY_THRESHOLD }}" in
+            "critical")
+              AUDIT_LEVEL="critical"
+              ;;
+            "high")
+              AUDIT_LEVEL="high"
+              ;;
+            "medium")
+              AUDIT_LEVEL="moderate"
+              ;;
+            "low")
+              AUDIT_LEVEL="low"
+              ;;
+          esac
+          
+          pnpm audit --audit-level $AUDIT_LEVEL
+
+      - name: Generate audit report
+        run: |
+          echo "Generating audit report..."
+          
+          # Create detailed audit report
+          pnpm audit --json > audit-report.json
+          
+          # Extract vulnerability summary
+          jq '.metadata.vulnerabilities' audit-report.json > audit-summary.json
+          
+          # Check if we have any high/critical vulnerabilities
+          CRITICAL_VULNS=$(jq '.metadata.vulnerabilities.critical' audit-summary.json)
+          HIGH_VULNS=$(jq '.metadata.vulnerabilities.high' audit-summary.json)
+          MEDIUM_VULNS=$(jq '.metadata.vulnerabilities.moderate' audit-summary.json)
+          LOW_VULNS=$(jq '.metadata.vulnerabilities.low' audit-summary.json)
+          
+          echo "Vulnerability Summary:"
+          echo "Critical: $CRITICAL_VULNS"
+          echo "High: $HIGH_VULNS"
+          echo "Medium: $MEDIUM_VULNS"
+          echo "Low: $LOW_VULNS"
+          
+          # Fail build on critical vulnerabilities
+          if [[ "$CRITICAL_VULNS" != "0" ]]; then
+            echo "::error::Critical vulnerabilities found: $CRITICAL_VULNS"
+            exit 1
+          fi
+
+      - name: Snyk vulnerability scan
+        if: env.SNYK_TOKEN != ''
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: >
+            --severity-threshold=${{ env.SEVERITY_THRESHOLD }}
+            --json
+            --file=package.json
+
+      - name: Snyk container scan
+        if: env.SNYK_TOKEN != '' && hashFiles('Dockerfile*') != ''
+        uses: snyk/actions/container@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.AWS_REGION }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}/api:${{ github.sha }}
+          args: --severity-threshold=${{ env.SEVERITY_THRESHOLD }}
+
+      - name: Upload dependency scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-scan-results
+          path: |
+            audit-report.json
+            audit-summary.json
+
+  # Container image security scanning
+  container-scanning:
+    name: Container Security Scanning
+    runs-on: ubuntu-latest
+    needs: pre-scan-setup
+    if: needs.pre-scan-setup.outputs.should-continue == 'true' && hashFiles('Dockerfile*') != ''
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test Docker image
+        run: |
+          echo "Building test image for scanning..."
+          docker build -t security-scan-test:latest .
+
+      - name: Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'security-scan-test:latest'
+          format: 'sarif'
+          output: 'trivy-container-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Run Hadolint Dockerfile linting
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile*
+          format: sarif
+          output-file: hadolint-results.sarif
+
+      - name: Upload container scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: container-scan-results
+          path: |
+            trivy-container-results.sarif
+            hadolint-results.sarif
+
+  # Infrastructure security scanning
+  infrastructure-scanning:
+    name: Infrastructure Security Scanning
+    runs-on: ubuntu-latest
+    needs: pre-scan-setup
+    if: needs.pre-scan-setup.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Checkov infrastructure scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: ./
+          framework: dockerfile,kubernetes,terraform
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+
+      - name: Run KICS IaC security scan
+        if: hashFiles('**/*.yaml', '**/*.yml', '**/*.tf') != ''
+        uses: checkmarx/kics-action@v2.0.0
+        with:
+          path: ./
+          output_formats: json,sarif
+          output_name: kics-results
+
+      - name: Upload infrastructure scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: infrastructure-scan-results
+          path: |
+            checkov-results.sarif
+            kics-results-*.sarif
+
+  # Secret scanning
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    needs: pre-scan-setup
+    if: needs.pre-scan-setup.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog secret scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: GitHub secret scanning
+        uses: github/secret-scanning@v0.3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Custom secret patterns scan
+        run: |
+          echo "Running custom secret pattern scanning..."
+          
+          # Define common secret patterns
+          SECRET_PATTERNS=(
+            "AKIA[0-9A-Z]{16}"                    # AWS Access Key
+            "sk_live_[0-9a-zA-Z]{24}"            # Stripe secret key
+            "xoxp-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32}" # Slack token
+            "xoxb-[0-9]{12}-[0-9]{12}-[a-z0-9]{32}" # Slack bot token
+            "ghp_[0-9a-zA-Z]{36}"                # GitHub Personal Access Token
+            "gho_[0-9a-zA-Z]{36}"                # GitHub OAuth token
+            "ghs_[0-9a-zA-Z]{36}"                # GitHub App token
+            "[0-9a-f]{32}"                       # Generic 32-char hex (MD5)
+            "[0-9a-f]{40}"                       # Generic 40-char hex (SHA1)
+          )
+          
+          VIOLATIONS=0
+          
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            echo "Scanning for pattern: $pattern"
+            if grep -r -E --include="*.js" --include="*.ts" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.md" --include="*.txt" --exclude-dir=node_modules --exclude-dir=.git . "$pattern" 2>/dev/null; then
+              echo "::warning::Potential secret found with pattern: $pattern"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+          
+          if [[ $VIOLATIONS -gt 0 ]]; then
+            echo "::error::Found $VIOLATIONS potential secret violations"
+            exit 1
+          fi
+
+  # SAST (Static Application Security Testing)
+  sast-scanning:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    needs: pre-scan-setup
+    if: needs.pre-scan-setup.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, typescript, python
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+      - name: Run Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/dockerfile
+            p/javascript
+            p/typescript
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  # Security compliance check
+  compliance-check:
+    name: Security Compliance Check
+    runs-on: ubuntu-latest
+    needs: [pre-scan-setup, dependency-scanning, container-scanning, infrastructure-scanning, secret-scanning, sast-scanning]
+    if: always() && needs.pre-scan-setup.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all scan results
+        uses: actions/download-artifact@v3
+
+      - name: Security compliance assessment
+        run: |
+          echo "Running security compliance assessment..."
+          
+          COMPLIANCE_ISSUES=""
+          SEVERITY_LEVELS=("critical" "high" "medium" "low")
+          
+          # Check dependency vulnerabilities
+          if [[ -f "dependency-scan-results/audit-summary.json" ]]; then
+            CRITICAL=$(jq '.metadata.vulnerabilities.critical' dependency-scan-results/audit-summary.json 2>/dev/null || echo "0")
+            HIGH=$(jq '.metadata.vulnerabilities.high' dependency-scan-results/audit-summary.json 2>/dev/null || echo "0")
+            
+            if [[ "$CRITICAL" != "0" ]]; then
+              COMPLIANCE_ISSUES="${COMPLIANCE_ISSUES}Critical dependency vulnerabilities: $CRITICAL; "
+            fi
+            
+            if [[ "$HIGH" != "0" ]]; then
+              COMPLIANCE_ISSUES="${COMPLIANCE_ISSUES}High dependency vulnerabilities: $HIGH; "
+            fi
+          fi
+          
+          # Check container vulnerabilities
+          if [[ -f "container-scan-results/trivy-container-results.sarif" ]]; then
+            echo "Container scan results available"
+            # Parse SARIF for vulnerabilities
+          fi
+          
+          # Check infrastructure issues
+          if [[ -f "infrastructure-scan-results/checkov-results.sarif" ]]; then
+            echo "Infrastructure scan results available"
+            # Parse SARIF for infrastructure issues
+          fi
+          
+          # Set compliance status
+          if [[ -n "$COMPLIANCE_ISSUES" ]]; then
+            echo "compliance-status=failed" >> $GITHUB_OUTPUT
+            echo "compliance-issues=$COMPLIANCE_ISSUES" >> $GITHUB_OUTPUT
+            echo "::error::Security compliance issues found: $COMPLIANCE_ISSUES"
+            exit 1
+          else
+            echo "compliance-status=passed" >> $GITHUB_OUTPUT
+            echo "compliance-issues=none" >> $GITHUB_OUTPUT
+          fi
+
+  # Generate security report
+  generate-security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [pre-scan-setup, dependency-scanning, container-scanning, infrastructure-scanning, secret-scanning, sast-scanning, compliance-check]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all scan results
+        uses: actions/download-artifact@v3
+
+      - name: Generate comprehensive security report
+        run: |
+          echo "Generating comprehensive security report..."
+          
+          REPORT_FILE="security-report-${{ needs.pre-scan-setup.outputs.scan-id }}.md"
+          
+          cat > "$REPORT_FILE" << EOF
+          # Security Scan Report
+          
+          **Scan ID:** ${{ needs.pre-scan-setup.outputs.scan-id }}
+          **Date:** $(date)
+          **Repository:** ${{ github.repository }}
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+          **Trigger:** ${{ github.event_name }}
+          **Severity Threshold:** ${{ env.SEVERITY_THRESHOLD }}
+          
+          ## Executive Summary
+          
+          This report provides a comprehensive security assessment of the codebase and infrastructure.
+          
+          ### Compliance Status
+          **Overall Status:** ${{ needs.compliance-check.outputs.compliance-status }}
+          
+          $(if [[ "${{ needs.compliance-check.outputs.compliance-status }}" == "failed" ]]; then
+            echo "**Issues Found:** ${{ needs.compliance-check.outputs.compliance-issues }}"
+          else
+            echo "No critical security issues detected."
+          fi)
+          
+          ## Detailed Findings
+          
+          ### 1. Dependency Vulnerabilities
+          **Status:** ${{ needs.dependency-scanning.result }}
+          
+          $(if [[ -f "dependency-scan-results/audit-summary.json" ]]; then
+            echo "#### Vulnerability Summary"
+            jq -r '"Critical: " + (.metadata.vulnerabilities.critical | tostring)' dependency-scan-results/audit-summary.json
+            jq -r '"High: " + (.metadata.vulnerabilities.high | tostring)' dependency-scan-results/audit-summary.json
+            jq -r '"Medium: " + (.metadata.vulnerabilities.moderate | tostring)' dependency-scan-results/audit-summary.json
+            jq -r '"Low: " + (.metadata.vulnerabilities.low | tostring)' dependency-scan-results/audit-summary.json
+          fi)
+          
+          ### 2. Container Security
+          **Status:** ${{ needs.container-scanning.result }}
+          
+          $(if [[ -f "container-scan-results/trivy-container-results.sarif" ]]; then
+            echo "Container image scan completed with Trivy"
+            echo "Hadolint Dockerfile linting completed"
+          else
+            echo "No container scanning performed (no Dockerfiles found)"
+          fi)
+          
+          ### 3. Infrastructure Security
+          **Status:** ${{ needs.infrastructure-scanning.result }}
+          
+          $(if [[ -f "infrastructure-scan-results/checkov-results.sarif" ]]; then
+            echo "Infrastructure as Code security scan completed"
+            echo "KICS scan completed for configuration files"
+          else
+            echo "No infrastructure scanning performed"
+          fi)
+          
+          ### 4. Secret Scanning
+          **Status:** ${{ needs.secret-scanning.result }}
+          
+          - TruffleHog secret scanning completed
+          - GitHub secret scanning completed
+          - Custom pattern scanning completed
+          
+          ### 5. Static Application Security Testing (SAST)
+          **Status:** ${{ needs.sast-scanning.result }}
+          
+          - CodeQL analysis completed
+          - Semgrep SAST rules applied
+          
+          ## Recommendations
+          
+          $(if [[ "${{ needs.compliance-check.outputs.compliance-status }}" == "failed" ]]; then
+            echo "### Immediate Actions Required"
+            echo "1. Address critical and high-severity vulnerabilities"
+            echo "2. Review and fix compliance issues"
+            echo "3. Update dependencies with known vulnerabilities"
+            echo "4. Implement security best practices"
+          else
+            echo "### Maintenance Actions"
+            echo "1. Continue regular security scanning"
+            echo "2. Keep dependencies up to date"
+            echo "3. Monitor for new vulnerabilities"
+            echo "4. Review security policies and procedures"
+          fi)
+          
+          ## Next Steps
+          
+          1. Review all findings in detail
+          2. Prioritize fixes based on severity
+          3. Implement recommended security improvements
+          4. Schedule next security scan
+          
+          ---
+          
+          **Report generated by GitHub Actions Security Scanning Workflow**
+          EOF
+          
+          echo "Security report generated: $REPORT_FILE"
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: security-report-${{ needs.pre-scan-setup.outputs.scan-id }}.md
+
+      - name: Upload all SARIF results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: |
+            container-scan-results/trivy-container-results.sarif
+            container-scan-results/hadolint-results.sarif
+            infrastructure-scan-results/checkov-results.sarif
+            infrastructure-scan-results/kics-results-*.sarif
+
+  # Security notifications
+  security-notifications:
+    name: Security Notifications
+    runs-on: ubuntu-latest
+    needs: [pre-scan-setup, dependency-scanning, container-scanning, infrastructure-scanning, secret-scanning, sast-scanning, compliance-check, generate-security-report]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create security summary
+        run: |
+          echo "## Security Scanning Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan ID:** ${{ needs.pre-scan-setup.outputs.scan-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Type:** ${{ github.event.inputs.scan_type || 'comprehensive' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Severity Threshold:** ${{ env.SEVERITY_THRESHOLD }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compliance Status:** ${{ needs.compliance-check.outputs.compliance-status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Scanning | ${{ needs.dependency-scanning.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scanning | ${{ needs.container-scanning.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure Scanning | ${{ needs.infrastructure-scanning.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scanning | ${{ needs.secret-scanning.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST Scanning | ${{ needs.sast-scanning.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compliance Check | ${{ needs.compliance-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.compliance-check.outputs.compliance-status }}" == "failed" ]]; then
+            echo "🚨 **Security Issues Detected**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "${{ needs.compliance-check.outputs.compliance-issues }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Actions Required" >> $GITHUB_STEP_SUMMARY
+            echo "1. Review security report" >> $GITHUB_STEP_SUMMARY
+            echo "2. Fix critical and high-severity issues" >> $GITHUB_STEP_SUMMARY
+            echo "3. Re-run security scan after fixes" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Security Scan Passed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No critical security issues detected." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send critical security alert
+        if: needs.compliance-check.outputs.compliance-status == 'failed'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🚨 Security Scan Failed - Immediate Attention Required",
+              attachments: [{
+                color: "danger",
+                fields: [{
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }, {
+                  title: "Branch",
+                  value: "${{ github.ref_name }}",
+                  short: true
+                }, {
+                  title: "Issues",
+                  value: "${{ needs.compliance-check.outputs.compliance-issues }}",
+                  short: false
+                }, {
+                  title: "Severity",
+                  value: "Critical/High",
+                  short: true
+                }],
+                footer: "Security scan completed with violations",
+                ts: ${{ github.event.head_commit.timestamp }}
+              }]
+            }
+          channel: '#security'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send security scan summary
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "Security Scan ${{ needs.compliance-check.outputs.compliance-status == 'passed' && 'Completed Successfully' || 'Failed' }}",
+              attachments: [{
+                color: "${{ needs.compliance-check.outputs.compliance-status == 'passed' && 'good' || 'warning' }}",
+                fields: [{
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }, {
+                  title: "Scan Type",
+                  value: "${{ github.event.inputs.scan_type || 'comprehensive' }}",
+                  short: true
+                }, {
+                  title: "Status",
+                  value: "${{ needs.compliance-check.outputs.compliance-status }}",
+                  short: true
+                }, {
+                  title: "Report",
+                  value: "View detailed report in GitHub Actions",
+                  short: false
+                }]
+              }]
+            }
+          channel: '#dev-security'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
