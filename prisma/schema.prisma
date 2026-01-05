@@ -183,6 +183,318 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
+// ========================================
+// REGULATORY REPORTING & SUBMISSIONS (Phase 25.1F)
+// ========================================
+
+model ComplianceReport {
+  id                  String   @id @default(cuid())
+  reportId            String   @unique
+  reportType          String
+  jurisdiction        String
+  reportPeriod        String
+  startDate           DateTime
+  endDate             DateTime
+
+  title               String
+  summary             String
+  reportContent       String
+  attachments         String[]
+
+  metrics             String
+  keyFindings         String[]
+  violations          Int      @default(0)
+  violations_critical Int      @default(0)
+  violations_high     Int      @default(0)
+  violations_medium   Int      @default(0)
+  violations_low      Int      @default(0)
+
+  remediationActions  String?
+  completedRemediation Int     @default(0)
+  pendingRemediation  Int      @default(0)
+
+  status              String
+  generatedDate       DateTime @default(now())
+  approvedDate        DateTime?
+  approvedBy          String?
+  submittedDate       DateTime?
+  submittedTo         String?
+  submissionRef       String?
+
+  generateType        String
+  generatedBy         String
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  submissions         RegulatorySubmission[]
+  reportMetrics       ComplianceReportMetrics[]
+
+  @@index([reportType])
+  @@index([jurisdiction])
+  @@index([status])
+  @@index([startDate])
+}
+
+model RegulatorySubmission {
+  id                     String   @id @default(cuid())
+  submissionId           String   @unique
+  reportId               String
+  reportType             String
+
+  regulatoryBody         String
+  jurisdiction           String
+  submissionUrl          String
+  submissionMethod       String
+  submissionDate         DateTime @default(now())
+
+  status                 String
+  referenceNumber        String?
+  acknowledgmentDate     DateTime?
+  acknowledgmentDocument String?
+
+  regulatoryResponse     String?
+  responseDate           DateTime?
+  requiredActions        String?
+  deadline               DateTime?
+
+  submittedBy            String
+  notes                  String?
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  report                 ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([submissionDate])
+}
+
+model DataBreachNotification {
+  id                        String   @id @default(cuid())
+  breachId                  String   @unique
+  breachDate                DateTime
+  discoveryDate             DateTime
+
+  breachType                String
+  description               String
+  affectedDataTypes         String[]
+  affectedRecords           Int
+  affectedIndividuals       Int
+
+  systemsAffected           String[]
+  severity                  String
+  potentialHarm             String
+  remediation               String
+  preventionMeasures        String?
+
+  notificationSent          Boolean  @default(false)
+  notificationDate          DateTime?
+  notificationMethod        String?
+  templateUsed              String?
+  individualsNotified       Int      @default(0)
+
+  regulatorNotified         Boolean  @default(false)
+  regulatorNotificationDate DateTime?
+  regulators                String[]
+  regulatoryRef             String?
+  filingRequired            Boolean  @default(true)
+
+  investigationStart        DateTime?
+  investigationComplete     DateTime?
+  rootCause                 String?
+  investigationNotes        String?
+  resolutionDate            DateTime?
+
+  status                    String
+
+  complianceRequirements    String[]
+  legalCounsel              String?
+  insuranceClaim            String?
+
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  recipients                BreachNotificationRecipient[]
+
+  @@index([breachDate])
+  @@index([status])
+}
+
+model BreachNotificationRecipient {
+  id                  String   @id @default(cuid())
+  breachId            String
+  leadId              String
+  email               String?
+  phone               String?
+  mailingAddress      String?
+
+  notificationSent    Boolean  @default(false)
+  notificationMethod  String?
+  notificationDate    DateTime?
+  readDate            DateTime?
+  responseDate        DateTime?
+  acknowledged        Boolean  @default(false)
+
+  proof               String?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  breach              DataBreachNotification @relation(fields: [breachId], references: [breachId], onDelete: Cascade)
+  lead                Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([breachId, leadId])
+}
+
+model RegulatoryReportTemplate {
+  id                  String   @id @default(cuid())
+  templateName        String   @unique
+  jurisdiction        String
+  reportType          String
+  description         String?
+
+  sections            String
+  requiredMetrics     String[]
+  formatRequirements  String?
+  frequency           String
+  dueDate             String?
+
+  regulatoryBody      String
+  contactInfo         String?
+  submissionURL       String?
+  submissionEmail     String?
+
+  status              String   @default("Active")
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model ScheduledReport {
+  id              String   @id @default(cuid())
+  reportType      String
+  jurisdiction    String
+
+  schedule        String
+  frequency       String
+  nextRunDate     DateTime
+  lastRunDate     DateTime?
+
+  autoGenerate    Boolean  @default(true)
+  autoSubmit      Boolean  @default(false)
+  requireApproval Boolean  @default(true)
+  notifyOn        String[]
+
+  status          String   @default("Active")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([reportType, jurisdiction])
+}
+
+model RegulatoryFilingChecklist {
+  id               String   @id @default(cuid())
+  filingId         String   @unique
+  reportType       String
+  jurisdiction     String
+  dueDate          DateTime
+
+  items            String
+  completionStatus Int
+
+  status           String
+  submittedDate    DateTime?
+  notes            String?
+
+  assignedTo       String
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model RegulatoryFilingArchive {
+  id                    String   @id @default(cuid())
+  filingId              String   @unique
+  reportId              String
+  reportType            String
+  jurisdiction          String
+  filingYear            Int
+
+  archivedDate          DateTime
+  archiveLocation       String
+  retention             String
+  retentionExpiry       DateTime?
+  checksum              String
+
+  retrievalInstructions String?
+
+  createdAt             DateTime @default(now())
+
+  report                ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model RegulatoryDeadline {
+  id                String     @id @default(cuid())
+  deadlineId         String     @unique
+  reportType         String
+  jurisdiction       String
+
+  description        String
+  dueDate            DateTime
+  reminderDates      DateTime[]
+
+  isRecurring        Boolean    @default(false)
+  recurrencePattern  String?
+
+  status             String     @default("Upcoming")
+  completionDate     DateTime?
+
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([dueDate])
+}
+
+model ComplianceReportMetrics {
+  id         String   @id @default(cuid())
+  reportId   String
+  metricType String
+
+  data       String
+  trend      String?
+
+  createdAt  DateTime @default(now())
+
+  report     ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model RegulatoryCommLog {
+  id               String   @id @default(cuid())
+  commId           String   @unique
+  regulatoryBody   String
+  jurisdiction     String
+
+  commType         String
+  subject          String
+  content          String
+
+  sentDate         DateTime
+  sentBy           String
+  sentTo           String
+  deliveryProof    String?
+
+  responseReceived Boolean  @default(false)
+  responseDate     DateTime?
+  responseContent  String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([sentDate])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
