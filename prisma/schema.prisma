@@ -183,6 +183,360 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
+// Document Management Models
+
+// Document Registry model
+model Document {
+  id                String      @id @default(cuid())
+  documentId        String      @unique // External identifier for audit
+  leadId            String?     // Associated lead
+  agentId           String?     // Associated agent
+  documentType      String      // "Quote", "Policy", "Claim", "ID", "ProofOfAddress", "IncomeVerification", "ConsentForm", "Disclosure", "Other"
+  category          String      // "Financial", "Identity", "Medical", "Legal", "Regulatory", "Operational"
+  filename          String      // Original filename
+  fileSize          Int         // Size in bytes
+  mimeType          String      // Content type
+  storageLocation   String      // Path in S3/MinIO
+  storageProvider   String      // "S3", "MinIO", "LocalStorage"
+  encryptionKey     String?     // Reference to encryption key
+  checksum          String      // SHA-256 hash for integrity
+  description       String?     // Human description
+  tags              String[]    // Array of tags for organization
+  jurisdiction      String?     // Relevant jurisdiction/state
+  status            String      @default("Active") // "Active", "Archived", "Deleted", "PendingDeletion"
+  
+  // Lifecycle Management
+  uploadedDate      DateTime    @default(now())
+  uploadedBy        String      // User/system that uploaded
+  lastAccessedDate  DateTime?
+  archivedDate      DateTime?
+  deletionScheduledDate DateTime?
+  deletionDate      DateTime?
+  
+  // Retention
+  retentionCategory String      // Reference to retention policy
+  retentionPeriodDays Int?      // Override global retention if set
+  expiryDate        DateTime?   // Auto-calculated from retention policy
+  legalHoldApplied  Boolean     @default(false)
+  legalHoldReason   String?
+  
+  // Metadata
+  version           Int         @default(1) // Document version
+  parentDocumentId  String?     // For versioned documents
+  relatedDocuments  String[]    // Array of related document IDs
+  
+  // Classification
+  sensitivity       String      // "Public", "Internal", "Confidential", "Secret"
+  piiDetected       Boolean     @default(false) // PII detected by scanning
+  piiFields        String[]    // Array of detected PII fields
+  requiresRedaction Boolean     @default(false)
+  redacted          Boolean     @default(false)
+  
+  // Compliance
+  complianceRelevant Boolean    @default(false) // Subject to specific regulation
+  regulations       String[]    // Array of applicable regulations
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  versions          DocumentVersion[]
+  accessLogs        DocumentAccessLog[]
+  shares            DocumentShare[]
+  integrityChecks   DocumentIntegrityCheck[]
+  retentionPolicy   DocumentRetentionPolicy? @relation(fields: [retentionCategory], references: [policyName])
+  deletionRequests  DocumentDeletionRequest[]
+  expirationEvents  DocumentExpirationEvent[]
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([documentType])
+  @@index([status])
+  @@index([expiryDate])
+  @@index([legalHoldApplied])
+  @@index([retentionCategory])
+}
+
+// Document Access Audit Trail
+model DocumentAccessLog {
+  id                String      @id @default(cuid())
+  documentId        String
+  userId            String
+  action            String      // "View", "Download", "Print", "Share", "Delete", "Restore"
+  ipAddress         String?
+  userAgent         String?
+  accessReason      String?     // Why they accessed
+  timestamp         DateTime    @default(now())
+  success           Boolean     @default(true)
+  failureReason     String?     // If access denied
+
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// Document Versions
+model DocumentVersion {
+  id                String      @id @default(cuid())
+  documentId        String
+  versionNumber     Int
+  storageLocation   String      // Where this version is stored
+  checksum          String      // SHA-256 of this version
+  uploadedDate      DateTime    @default(now())
+  uploadedBy        String
+  changeDescription String?
+  changes           String?     // JSON of what changed
+  fileSize          Int
+
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+}
+
+// Document Classification Rules
+model DocumentClassificationRule {
+  id                String      @id @default(cuid())
+  name              String      @unique
+  description       String?
+  pattern           String      // Regex pattern to match filenames
+  documentType      String?     // Associated document type
+  category          String      // Document category
+  sensitivity       String      // "P", "I", "C", "S" for Public, Internal, Confidential, Secret
+  requiresRedaction Boolean     @default(false)
+  retentionCategory String?     // Reference to retention policy
+  jurisdiction      String[]    // Applicable jurisdictions
+  status            String      @default("Active")
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retentionPolicy   DocumentRetentionPolicy? @relation(fields: [retentionCategory], references: [policyName])
+
+  @@index([status])
+  @@index([category])
+}
+
+// PII (Personally Identifiable Information) Detection Rules
+model PIIDetectionRule {
+  id                String      @id @default(cuid())
+  fieldName         String      @unique // e.g., "SSN", "CreditCard", "BankAccount", "DriversLicense"
+  pattern           String      // Regex pattern to detect
+  dataType          String      // "Number", "Email", "Phone", "Address", "Name"
+  severity          String      // "Critical", "High", "Medium"
+  redactionMethod   String      // "Mask", "Hash", "Remove", "Encrypt"
+  redactionFormat   String?     // e.g., "XXX-XX-1234" for SSN
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+// Document Retention Policies (Enhanced)
+model DocumentRetentionPolicy {
+  id                String      @id @default(cuid())
+  policyName        String      @unique
+  documentTypes     String[]    // Document types covered
+  retentionDays     Int         // Days to retain
+  archiveDays       Int?        // Days before archiving
+  jurisdiction      String      // State code or "Federal"
+  reason            String      // Why retention required
+  regulations       String[]    // Applicable regulations
+  legalHolds        String[]    // Legal hold reasons
+  deletionMethod    String      // "SecureDelete", "Shred", "Anonymize"
+  notificationDays  Int         // Days before expiry to notify
+  status            String      @default("Active")
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  documents         Document[]
+  classificationRules DocumentClassificationRule[]
+
+  @@index([status])
+}
+
+// Encryption Keys Management
+model EncryptionKey {
+  id                String      @id @default(cuid())
+  keyId             String      @unique
+  keyType           String      // "AES256", "RSA2048", "RSA4096"
+  algorithm         String      // "AES-GCM", "RSA-OAEP"
+  creationDate      DateTime    @default(now())
+  expiryDate        DateTime?
+  status            String      @default("Active") // "Active", "Rotated", "Disabled"
+  rotationDate      DateTime?
+  lastUsedDate      DateTime?
+  keySource         String      // "AWS-KMS", "HashiCorp-Vault", "Local"
+  metadata          String?     // JSON with additional key info
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+// Document Sharing/Access Control
+model DocumentShare {
+  id                String      @id @default(cuid())
+  documentId        String
+  grantedToUserId   String
+  grantedBy         String      // Who gave access
+  permission        String      // "View", "Download", "Edit", "Share"
+  shareType         String      // "Direct", "Role", "Team", "Public"
+  expiryDate        DateTime?   // Access expires
+  requiresPassword  Boolean     @default(false)
+  password          String?     // Hashed password
+  accessCount       Int         @default(0) // Number of times accessed
+  status            String      @default("Active")
+  
+  grantedDate       DateTime    @default(now())
+  revokedDate       DateTime?
+  revokedReason     String?
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, grantedToUserId])
+  @@index([documentId])
+  @@index([grantedToUserId])
+}
+
+// Document Search Index (for fast search)
+model DocumentIndex {
+  id                String      @id @default(cuid())
+  documentId        String      @unique
+  content           String      // Full text for search
+  extractedText     String?     // OCR'd text
+  keywords          String[]    // Extracted keywords
+  entities          String[]    // Named entities
+  lastIndexedDate   DateTime    @default(now())
+  
+  createdAt         DateTime    @default(now())
+  
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@fulltext([content])
+}
+
+// Document Deletion Request & Audit
+model DocumentDeletionRequest {
+  id                String      @id @default(cuid())
+  documentId        String
+  documentType      String
+  requestedBy       String
+  requestReason     String
+  status            String      @default("Pending") // "Pending", "Approved", "InProgress", "Completed", "Failed"
+  requestDate       DateTime    @default(now())
+  approvedDate      DateTime?
+  approvedBy        String?
+  executionDate     DateTime?
+  completionDetails String?     // JSON with deletion proof
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([status])
+  @@index([requestDate])
+}
+
+// Document Archival
+model ArchivedDocument {
+  id                String      @id @default(cuid())
+  documentId        String      // Reference to original
+  originalStorageLocation String
+  archiveLocation   String      // Where archived
+  archiveFormat     String      // "TAR.GZ", "ZIP", "BAG"
+  archiveDate       DateTime    @default(now())
+  archivedBy        String
+  checksum          String      // Integrity check
+  retrievalInstructions String? // How to retrieve
+  expiryDate        DateTime?   // When archive can be deleted
+  
+  createdAt         DateTime    @default(now())
+
+  // Relations
+  document          Document?   @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([archiveDate])
+  @@index([expiryDate])
+}
+
+// Legal Hold / Litigation Hold
+model LitigationHold {
+  id                String      @id @default(cuid())
+  holdId            String      @unique
+  caseNumber        String?     // Related case/matter number
+  description       String
+  reason            String      // Why hold was placed
+  appliedDate       DateTime    @default(now())
+  appliedBy         String
+  targetDocuments   String[]    // Array of document types or IDs
+  jurisdiction      String?     // Jurisdiction of hold
+  status            String      @default("Active") // "Active", "Lifted", "Expired"
+  liftedDate        DateTime?
+  liftedBy          String?
+  liftReason        String?
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([holdId])
+  @@index([status])
+  @@index([appliedDate])
+}
+
+// Document Integrity Verification
+model DocumentIntegrityCheck {
+  id                String      @id @default(cuid())
+  documentId        String
+  checkDate         DateTime    @default(now())
+  storedChecksum    String      // Original checksum
+  currentChecksum   String      // Current computed checksum
+  isIntact          Boolean     // Checksums match
+  encryptionValid   Boolean     // Encryption still valid
+  accessible        Boolean     // Can still be retrieved
+  issues            String[]    // Any issues found
+  
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([checkDate])
+}
+
+// Document Expiration Events
+model DocumentExpirationEvent {
+  id                String      @id @default(cuid())
+  documentId        String
+  eventType         String      // "WillExpireIn30Days", "WillExpireIn7Days", "Expired", "DeletedAfterExpiration"
+  scheduledDate     DateTime
+  executedDate      DateTime?
+  status            String      @default("Scheduled") // "Scheduled", "Executed", "Cancelled"
+  notificationSent  Boolean     @default(false)
+  
+  createdAt         DateTime    @default(now())
+  
+  // Relations
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([scheduledDate])
+  @@index([status])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
