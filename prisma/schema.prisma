@@ -223,3 +223,140 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// Compliance Framework Models
+
+// Compliance Policies and Rules
+model CompliancePolicy {
+  id                String      @id @default(cuid())
+  name              String      // e.g., "GDPR Data Processing", "HIPAA Privacy Rules"
+  description       String?
+  domain            String      // "GDPR", "HIPAA", "CCPA", "GLBA", "Insurance", etc.
+  jurisdiction      String?     // "EU", "US", "CA", "state-specific"
+  riskLevel         String      // "Critical", "High", "Medium", "Low"
+  status            String      @default("Active") // "Active", "Draft", "Archived"
+  requirements      RequiredField[]
+  violations        ComplianceViolation[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([domain])
+  @@index([jurisdiction])
+  @@index([status])
+}
+
+model RequiredField {
+  id                String      @id @default(cuid())
+  policyId          String
+  policy            CompliancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  name              String      // e.g., "Consent Required", "Data Retention"
+  description       String?
+  validationRule    String      // JSON schema or custom validation logic
+  enforcementLevel  String      // "Mandatory", "Recommended"
+  createdAt         DateTime    @default(now())
+
+  @@index([policyId])
+}
+
+// Compliance Violations and Alerts
+model ComplianceViolation {
+  id                String      @id @default(cuid())
+  policyId          String
+  policy            CompliancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  leadId            String?
+  agentId           String?
+  violationType     String      // "Missing Consent", "Retention Expired", etc.
+  severity          String      // "Critical", "High", "Medium", "Low"
+  status            String      @default("Open") // "Open", "Resolved", "Waived"
+  description       String
+  detectedAt        DateTime    @default(now())
+  resolvedAt        DateTime?
+  resolution        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([policyId])
+  @@index([leadId])
+  @@index([agentId])
+  @@index([severity])
+  @@index([status])
+  @@index([detectedAt])
+}
+
+// Immutable Audit Trail
+model ComplianceAuditLog {
+  id                String      @id @default(cuid())
+  userId            String
+  action            String      // "LeadCreated", "ConsentGiven", "DataDeleted", etc.
+  entityType        String      // "Lead", "Agent", "Document", etc.
+  entityId          String
+  changes           String      // JSON of what changed
+  compliancePolicies String?    // JSON array of policies involved
+  ipAddress         String?
+  userAgent         String?
+  timestamp         DateTime    @default(now()) // Immutable
+  createdAt         DateTime    @default(now())
+  
+  @@index([userId])
+  @@index([entityId])
+  @@index([timestamp])
+  @@index([action])
+}
+
+// Compliance Status Dashboard Data
+model ComplianceStatus {
+  id                String      @id @default(cuid())
+  domain            String      // "GDPR", "HIPAA", etc.
+  jurisdiction      String?
+  totalPolicies     Int
+  activePolicies    Int
+  openViolations    Int
+  resolvedViolations Int
+  complianceScore   Float       // 0-100
+  lastAssessment    DateTime
+  nextAssessment    DateTime
+  updatedAt         DateTime    @updatedAt
+
+  @@index([domain])
+  @@index([jurisdiction])
+}
+
+// Data Subject Requests (GDPR DSAR, CCPA Requests)
+model DataSubjectRequest {
+  id                String      @id @default(cuid())
+  leadId            String
+  requestType       String      // "AccessRequest", "DeletionRequest", "PortabilityRequest"
+  jurisdiction      String      // "GDPR", "CCPA", "Other"
+  status            String      @default("Pending") // "Pending", "InProgress", "Completed", "Denied"
+  requestDate       DateTime
+  dueDate           DateTime    // Legal deadline (30-45 days typically)
+  completionDate    DateTime?
+  documents         String[]    // JSON array of document paths for fulfillment
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([leadId])
+  @@index([status])
+  @@index([requestDate])
+  @@index([jurisdiction])
+}
+
+// Regulatory Requirements Checklist
+model RegulatoryRequirement {
+  id                String      @id @default(cuid())
+  domain            String      // "GDPR", "HIPAA", "Insurance"
+  jurisdiction      String      // "EU", "US", "State", etc.
+  requirement       String      // Specific requirement text
+  description       String?
+  status            String      @default("NotStarted") // "NotStarted", "InProgress", "Completed"
+  implementedDate   DateTime?
+  lastVerified      DateTime?
+  verificationNotes String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([domain])
+  @@index([jurisdiction])
+  @@index([status])
+}
