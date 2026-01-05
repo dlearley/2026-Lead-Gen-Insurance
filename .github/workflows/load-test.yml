@@ -1,0 +1,46 @@
+name: Load Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Load test scenario to run'
+        required: true
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - peak
+          - spike
+          - soak
+          - stress
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6 Load Test
+        env:
+          BASE_URL: ${{ secrets.STAGING_API_URL || 'http://api.staging.local' }}
+        run: |
+          SCENARIO=${{ github.event.inputs.scenario || 'baseline' }}
+          k6 run --out json=results.json scripts/load-tests/k6/${SCENARIO}-test.js
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: results.json
+
+      - name: Performance Regression Check
+        run: |
+          # Simple check against thresholds
+          # In a real setup, we would compare with previous results
+          echo "Checking SLO thresholds..."

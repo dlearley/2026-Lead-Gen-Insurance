@@ -1,0 +1,18 @@
+{
+  "test_name": "baseline",
+  "timestamp": "2024-01-01T00:00:00Z",
+  "metrics": {
+    "http_req_duration": {
+      "avg": 150.5,
+      "p95": 320.0,
+      "p99": 450.0
+    },
+    "http_req_failed": {
+      "rate": 0.0005
+    },
+    "iterations": {
+      "count": 5000,
+      "rate": 8.33
+    }
+  }
+}

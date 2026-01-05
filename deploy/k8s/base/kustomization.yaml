@@ -6,3 +6,6 @@ resources:
   - data-service.yaml
   - orchestrator.yaml
   - backend.yaml
+  - api/hpa-tuned.yaml
+  - data-service/hpa-tuned.yaml
+  - orchestrator/hpa-tuned.yaml
