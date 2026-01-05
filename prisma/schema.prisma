@@ -223,3 +223,280 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// ============================================
+// Phase 25.1E: Enhanced Audit & Logging
+// ============================================
+
+// Core Immutable Audit Log (Enhanced)
+model ImmutableAuditLog {
+  id                String      @id @default(cuid())
+  sequenceNumber    BigInt      @unique @default(autoincrement()) // Detect gaps
+  chainHash         String?     // Hash of previous entry (blockchain-style)
+  
+  // Event Information
+  eventType         String      // e.g., "LeadCreated", "QuoteGenerated", "PolicyBound", "DataAccessed"
+  eventCategory     String      // "LeadManagement", "QuoteGeneration", "PolicyBinding", "DataAccess", "UserManagement", "SystemOperation", "Security", "Compliance"
+  severity          String      // "Critical", "High", "Medium", "Low", "Info"
+  
+  // Actor Information
+  actorId           String      // User/system that performed action
+  actorType         String      // "User", "System", "API", "Scheduler", "Integration"
+  actorRole         String?     // Role at time of action
+  
+  // Target Information
+  resourceType      String      // "Lead", "Quote", "Policy", "Document", "User", "Agent", "Configuration"
+  resourceId        String      // ID of affected resource
+  parentResourceId  String?     // Parent resource (e.g., Lead for Quote)
+  
+  // Change Tracking
+  action            String      // "Create", "Read", "Update", "Delete", "Approve", "Reject", "Export", "Download"
+  oldValues         String?     // JSON of previous state (for updates)
+  newValues         String?     // JSON of new state
+  changes           String?     // JSON diff of changes
+  changeDescription String?     // Human-readable description
+  
+  // Compliance Tracking
+  compliancePolicies String[]   // Policies this action relates to
+  complianceStatus  String      // "Compliant", "Violation", "Warning", "Review"
+  riskLevel         String      // "Low", "Medium", "High", "Critical"
+  
+  // Request Context
+  requestId         String?     // Correlation ID
+  sessionId         String?     // User session ID
+  ipAddress         String?
+  userAgent         String?
+  method            String?     // HTTP method if applicable
+  endpoint          String?     // API endpoint if applicable
+  statusCode        Int?        // Response status if applicable
+  
+  // Outcome
+  success           Boolean     @default(true)
+  errorCode         String?
+  errorMessage      String?
+  duration          Int?        // Milliseconds
+  
+  // Integrity & Immutability
+  timestamp         DateTime    @default(now()) // Server time (immutable)
+  createdAt         DateTime    @default(now()) // Immutable creation time
+  checksum          String      // SHA-256 of complete record
+  signatureHash     String?     // Cryptographic signature if enabled
+  
+  // Append-only: No updates allowed
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([actorId])
+  @@index([resourceId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([severity])
+  @@index([complianceStatus])
+  @@index([riskLevel])
+  @@index([eventCategory])
+  @@index([sequenceNumber])
+}
+
+// Audit Trail Integrity Verification
+model AuditLogIntegrityCheck {
+  id                String      @id @default(cuid())
+  checkType         String      // "SequenceValidation", "ChecksumValidation", "ChainValidation", "TimestampValidation"
+  checkDate         DateTime    @default(now())
+  startSequence     BigInt      // Start of range checked
+  endSequence       BigInt      // End of range checked
+  totalRecordsChecked Int
+  discrepanciesFound Int        @default(0)
+  discrepancies     String?     // JSON array of issues
+  isValid           Boolean
+  verifiedBy        String?     // System that performed check
+  createdAt         DateTime    @default(now())
+  
+  @@index([checkDate])
+  @@index([isValid])
+}
+
+// Compliance Event Registry
+model ComplianceEvent {
+  id                String      @id @default(cuid())
+  eventId           String      @unique // External event ID
+  eventType         String      // "ConsentGiven", "ConsentWithdrawn", "DSARCreated", "DSARCompleted", "DeletionExecuted", "ViolationDetected", "RemediationCompleted", "AuditInitiated", "BreachNotified"
+  jurisdiction      String      // "GDPR", "CCPA", "HIPAA", "GLBA", "Insurance", etc.
+  
+  // Event Details
+  description       String
+  entityType        String      // "Lead", "Agent", "Document", "Policy"
+  entityId          String
+  
+  // Status & Tracking
+  status            String      // "Initiated", "InProgress", "Completed", "Failed", "Remediated"
+  initiatedDate     DateTime
+  completedDate     DateTime?
+  
+  // Related Information
+  relatedAuditLogs  String[]    // Array of audit log IDs
+  evidence          String?     // URL to supporting evidence/documents
+  
+  // Compliance Officer Tracking
+  assignedTo        String?     // Compliance officer
+  notes             String?
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([eventType])
+  @@index([status])
+  @@index([jurisdiction])
+  @@index([entityId])
+  @@index([initiatedDate])
+}
+
+// Compliance Violations & Incidents
+model ComplianceViolationLog {
+  id                String      @id @default(cuid())
+  violationId       String      @unique
+  auditLogId        String?     // Reference to triggering audit log
+  
+  // Violation Details
+  violationType     String      // "UnauthorizedAccess", "DataBreach", "PolicyViolation", "RuleViolation", "DiscriminatoryAction", "DisclosureFailure"
+  severityLevel     String      // "Critical", "High", "Medium", "Low"
+  
+  // What Was Violated
+  policy            String      // Policy/rule that was violated
+  jurisdiction      String      // Applicable jurisdiction
+  regulation        String?     // Specific regulation
+  
+  // When & Who
+  detectionDate     DateTime    @default(now())
+  occurredDate      DateTime    // When violation actually occurred
+  detectedBy        String      // User/system that detected
+  
+  // Impact Assessment
+  affectedEntities  Int         // Number of affected records/leads
+  affectedFields    String[]    // Fields affected
+  riskAssessment    String      // "Critical", "High", "Medium", "Low"
+  
+  // Remediation
+  status            String      // "Detected", "Acknowledged", "InProgress", "Remediated", "Appealed", "Escalated"
+  remediationPlan   String?     // Steps to fix
+  remediationDate   DateTime?
+  remediationDetails String?    // What was done
+  
+  // Reporting
+  reportedToRegulator Boolean   @default(false)
+  regulatoryReport  String?     // Report/ticket number
+  reportDate        DateTime?
+  
+  // Tracking
+  owner             String      // Compliance officer responsible
+  notes             String?
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([violationType])
+  @@index([status])
+  @@index([severityLevel])
+  @@index([detectionDate])
+  @@index([owner])
+}
+
+// Audit Snapshots for Rapid Search
+model AuditSnapshot {
+  id                String      @id @default(cuid())
+  snapshotDate      DateTime    @unique // One per day
+  totalEvents       Int
+  criticalEvents    Int
+  violationCount    Int
+  compliantActions  Int
+  suspiciousActions Int
+  summary           String      // JSON with daily summary
+  
+  createdAt         DateTime    @default(now())
+  
+  @@index([snapshotDate])
+}
+
+// User Action Timeline
+model UserActionTimeline {
+  id                String      @id @default(cuid())
+  userId            String
+  actionDate        DateTime
+  actionType        String      // Type of action
+  actionCount       Int         // Number of actions
+  details           String      // JSON with action details
+  
+  @@unique([userId, actionDate])
+  @@index([userId])
+  @@index([actionDate])
+}
+
+// Sensitive Data Access Tracking
+model SensitiveDataAccessLog {
+  id                String      @id @default(cuid())
+  documentId        String?
+  leadId            String?
+  dataType          String      // "PII", "FinancialData", "HealthData", "CriminalHistory"
+  accessedBy        String      // User who accessed
+  accessDate        DateTime    @default(now())
+  accessReason      String?     // Why accessed
+  accessMethod      String      // "WebUI", "API", "Export", "Download"
+  accessContext     String?     // What they were doing
+  
+  @@index([leadId])
+  @@index([accessDate])
+  @@index([accessedBy])
+  @@index([dataType])
+}
+
+// System State Changes (Configuration Audit)
+model SystemStateAuditLog {
+  id                String      @id @default(cuid())
+  changeId          String      @unique
+  componentName     String      // Service/module that changed
+  configKey         String      // Configuration key
+  oldValue          String?     // Previous value
+  newValue          String?     // New value
+  changedBy         String      // User/system
+  changeDate        DateTime    @default(now())
+  approvedBy        String?     // Who approved if applicable
+  reason            String?     // Why changed
+  
+  @@index([componentName])
+  @@index([changeDate])
+  @@index([changedBy])
+}
+
+// Audit Trail Retention Policy
+model AuditLogRetentionPolicy {
+  id                String      @id @default(cuid())
+  eventCategory     String      @unique
+  retentionDays     Int
+  archiveAfterDays  Int?
+  jurisdiction      String      // Regulatory requirement
+  reason            String
+  status            String      @default("Active")
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([eventCategory])
+  @@index([status])
+}
+
+// Compliance Certifications
+model ComplianceCertification {
+  id                String      @id @default(cuid())
+  certificationName String      // e.g., "SOC 2 Type II", "ISO 27001", "HIPAA Compliance"
+  jurisdiction      String      // "Federal", "State", etc.
+  certifyingBody    String      // Organization that certifies
+  effectiveDate     DateTime
+  expiryDate        DateTime?
+  scope             String      // What's certified
+  status            String      // "Active", "Expired", "Pending", "InProgress"
+  documentUrl       String?     // URL to certification document
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([status])
+  @@index([expiryDate])
+}

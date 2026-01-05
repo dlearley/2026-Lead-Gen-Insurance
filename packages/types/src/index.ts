@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Audit & Compliance (Phase 25.1E)
+export * from './audit.types.js';
