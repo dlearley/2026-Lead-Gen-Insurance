@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Communication Types
+export * from './communication.js';
