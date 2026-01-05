@@ -1,0 +1,328 @@
+# Compliance Alert Rules
+groups:
+  - name: compliance_alerts
+    interval: 30s
+    rules:
+      # Encryption Compliance
+      - alert: UnencryptedDataStorageDetected
+        expr: up{job="postgres",encryption_enabled!="true"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: compliance
+          requirement: encryption_at_rest
+        annotations:
+          summary: "Unencrypted data storage detected"
+          description: "Database instance {{ $labels.instance }} is not encrypted at rest"
+          remediation: "Enable encryption at rest for all data stores"
+
+      - alert: TLSNotConfigured
+        expr: up{job="api",tls_enabled!="true"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: compliance
+          requirement: encryption_in_transit
+        annotations:
+          summary: "TLS not configured for API service"
+          description: "API service {{ $labels.instance }} is not using TLS"
+          remediation: "Configure TLS 1.3 for all services"
+
+      # Audit Logging Compliance
+      - alert: AuditLoggingDisabled
+        expr: rate(audit_log_events_total[5m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          category: compliance
+          requirement: audit_logging
+        annotations:
+          summary: "Audit logging may be disabled"
+          description: "No audit events logged in the last 10 minutes"
+          remediation: "Verify audit logging is enabled and operational"
+
+      - alert: AuditLogRetentionInsufficient
+        expr: audit_log_retention_days < 90
+        for: 1h
+        labels:
+          severity: warning
+          category: compliance
+          requirement: audit_logging
+        annotations:
+          summary: "Audit log retention below compliance requirement"
+          description: "Audit logs are retained for only {{ $value }} days (required: 90 days)"
+          remediation: "Increase audit log retention to at least 90 days"
+
+      # Network Policy Compliance
+      - alert: NetworkPolicyViolationDetected
+        expr: rate(network_policy_denials_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: compliance
+          requirement: network_policies
+        annotations:
+          summary: "Network policy violations detected"
+          description: "{{ $value }} network policy violations detected in last 5 minutes"
+          remediation: "Review and update network policies to allow required traffic"
+
+      - alert: DefaultDenyPolicyMissing
+        expr: network_policy_deny_all_enabled != 1
+        for: 5m
+        labels:
+          severity: high
+          category: compliance
+          requirement: network_policies
+        annotations:
+          summary: "Default deny-all network policy not configured"
+          description: "Default deny-all network policy is not enforced"
+          remediation: "Implement default deny-all network policy and explicitly allow required traffic"
+
+      # Access Control Compliance
+      - alert: MFANotEnforced
+        expr: up{job="api",mfa_enabled!="true"} > 0
+        for: 5m
+        labels:
+          severity: high
+          category: compliance
+          requirement: mfa_enabled
+        annotations:
+          summary: "MFA not enforced for privileged access"
+          description: "API service {{ $labels.instance }} does not enforce MFA for privileged operations"
+          remediation: "Enable MFA for all privileged access"
+
+      - alert: RBACPolicyViolationDetected
+        expr: rate(rbac_denials_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: compliance
+          requirement: rbac_configured
+        annotations:
+          summary: "RBAC policy violations detected"
+          description: "{{ $value }} RBAC denials detected in last 5 minutes"
+          remediation: "Review RBAC policies and ensure least privilege principle"
+
+      # Secret Management Compliance
+      - alert: SecretRotationOverdue
+        expr: (time() - secret_last_rotation_timestamp) / 86400 > secret_rotation_days
+        for: 1h
+        labels:
+          severity: high
+          category: compliance
+          requirement: secret_rotation
+        annotations:
+          summary: "Secret rotation overdue"
+          description: "Secret {{ $labels.secret_name }} was last rotated {{ $value | humanizeDuration }} ago (required: every {{ $labels.secret_rotation_days }} days)"
+          remediation: "Rotate the overdue secret immediately"
+
+      - alert: SecretInRepositoryDetected
+        expr: secrets_scanned_in_repository > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: compliance
+          requirement: secret_management
+        annotations:
+          summary: "Potential secrets detected in repository"
+          description: "{{ $value }} potential secrets found in code repository"
+          remediation: "Remove or rotate exposed secrets and update .gitignore"
+
+      # Vulnerability Management Compliance
+      - alert: CriticalVulnerabilityUnpatched
+        expr: vulnerability_scan_critical_unpatched > 0
+        for: 1h
+        labels:
+          severity: critical
+          category: compliance
+          requirement: vulnerability_scanning
+        annotations:
+          summary: "Critical vulnerabilities remain unpatched"
+          description: "{{ $value }} critical vulnerabilities detected and not patched within 7-day SLA"
+          remediation: "Patch critical vulnerabilities immediately"
+
+      - alert: HighVulnerabilityUnpatched
+        expr: vulnerability_scan_high_unpatched > 0
+        for: 24h
+        labels:
+          severity: high
+          category: compliance
+          requirement: vulnerability_scanning
+        annotations:
+          summary: "High vulnerabilities remain unpatched"
+          description: "{{ $value }} high vulnerabilities detected and not patched within 14-day SLA"
+          remediation: "Patch high vulnerabilities as soon as possible"
+
+      - alert: SecurityScanFailed
+        expr: security_scan_last_status{status="failed"} == 1
+        for: 1h
+        labels:
+          severity: warning
+          category: compliance
+          requirement: security_testing
+        annotations:
+          summary: "Security scan failed"
+          description: "Security scan {{ $labels.scan_type }} failed on {{ $labels.timestamp }}"
+          remediation: "Review and fix security scan failures"
+
+      # Infrastructure Compliance
+      - alert: SecurityHeadersMissing
+        expr: security_headers_score < 1
+        for: 5m
+        labels:
+          severity: high
+          category: compliance
+          requirement: security_headers
+        annotations:
+          summary: "Required security headers not configured"
+          description: "Security headers score is {{ $value }} (expected: 1.0)"
+          remediation: "Configure all required security headers (HSTS, CSP, X-Frame-Options, etc.)"
+
+      - alert: ContainerImageScanFailed
+        expr: container_image_scan_status{status="failed"} == 1
+        for: 1h
+        labels:
+          severity: high
+          category: compliance
+          requirement: container_security
+        annotations:
+          summary: "Container image scan failed"
+          description: "Container image {{ $labels.image }}:{{ $labels.tag }} scan failed"
+          remediation: "Fix vulnerabilities before deploying to production"
+
+      # HIPAA Compliance (if applicable)
+      - alert: HIPAA_AccessNotLogged
+        expr: rate(hipaa_phi_access_events[5m]) == 0 AND rate(hipaa_phi_modification_events[5m]) > 0
+        for: 5m
+        labels:
+          severity: high
+          category: hipaa
+          requirement: audit_controls
+        annotations:
+          summary: "HIPAA PHI access not properly logged"
+          description: "PHI modification detected without corresponding access logs"
+          remediation: "Ensure all PHI access is properly logged per HIPAA requirements"
+
+      - alert: HIPAA_EncryptionNotEnabled
+        expr: up{data_type="phi",encryption_enabled!="true"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: hipaa
+          requirement: transmission_security
+        annotations:
+          summary: "HIPAA PHI not encrypted"
+          description: "PHI data store {{ $labels.instance }} is not encrypted"
+          remediation: "Enable encryption for all PHI stores per HIPAA Security Rule"
+
+      # SOC 2 Compliance
+      - alert: SOC2_AccessReviewOverdue
+        expr: (time() - last_access_review_timestamp) / 86400 > 90
+        for: 1h
+        labels:
+          severity: high
+          category: soc2
+          requirement: access_reviews
+        annotations:
+          summary: "SOC 2 access review overdue"
+          description: "Access review not completed in {{ $value }} days (required: quarterly)"
+          remediation: "Conduct access review immediately"
+
+      - alert: SOC2_IncidentNotLogged
+        expr: rate(incidents_logged_total[5m]) == 0 AND rate(security_events_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          category: soc2
+          requirement: incident_logging
+        annotations:
+          summary: "Security incidents not properly logged"
+          description: "Security events detected without corresponding incident logs"
+          remediation: "Ensure all security incidents are properly logged per SOC 2 CC7.1"
+
+      # GDPR Compliance
+      - alert: GDPR_DataExportRequestOverdue
+        expr: (time() - data_export_request_received) / 3600 > 30
+        for: 1h
+        labels:
+          severity: high
+          category: gdpr
+          requirement: right_of_access
+        annotations:
+          summary: "GDPR data export request overdue"
+          description: "Data export request {{ $labels.request_id }} not completed within 30-day SLA"
+          remediation: "Complete data export request immediately"
+
+      - alert: GDPR_DeletionRequestOverdue
+        expr: (time() - data_deletion_request_received) / 3600 > 30
+        for: 1h
+        labels:
+          severity: critical
+          category: gdpr
+          requirement: right_to_erasure
+        annotations:
+          summary: "GDPR data deletion request overdue"
+          description: "Data deletion request {{ $labels.request_id }} not completed within 30-day SLA"
+          remediation: "Complete data deletion request immediately"
+
+      - alert: GDPR_ConsentNotRecorded
+        expr: rate(gdpr_consent_events[5m]) > 0 AND gdpr_consent_recorded == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: gdpr
+          requirement: consent_management
+        annotations:
+          summary: "GDPR consent not properly recorded"
+          description: "Consent events detected without corresponding consent records"
+          remediation: "Ensure all consent is properly recorded and managed"
+
+      # General Compliance
+      - alert: ComplianceScoreBelowThreshold
+        expr: compliance_score < 90
+        for: 1h
+        labels:
+          severity: warning
+          category: compliance
+        annotations:
+          summary: "Compliance score below target threshold"
+          description: "Overall compliance score is {{ $value }}% (target: >90%)"
+          remediation: "Review compliance gaps and implement required controls"
+
+      - alert: DocumentationNotUpdated
+        expr: (time() - documentation_last_updated_timestamp) / 86400 > 180
+        for: 24h
+        labels:
+          severity: warning
+          category: compliance
+          requirement: documentation
+        annotations:
+          summary: "Security documentation not updated"
+          description: "Security documentation not updated in {{ $value }} days (required: every 6 months)"
+          remediation: "Review and update all security documentation"
+
+  - name: compliance_aggregation
+    interval: 5m
+    rules:
+      # Aggregate compliance metrics
+      - record: compliance:score
+        expr: |
+          (
+            (up{encryption_enabled="true"} / up{job="postgres"}) * 25 +
+            (up{tls_enabled="true"} / up{job="api"}) * 25 +
+            (audit_logging_enabled / 1) * 25 +
+            (network_policy_deny_all_enabled / 1) * 25
+          ) * 100
+
+      - record: compliance:critical_violations_total
+        expr: count(ALERTS{severity="critical",category=~"compliance|hipaa|gdpr|soc2"})
+
+      - record: compliance:high_vulnerabilities_total
+        expr: count(ALERTS{severity="high",category=~"compliance|hipaa|gdpr|soc2"})
+
+      - record: compliance:control_effectiveness
+        expr: |
+          avg by (category) (
+            rate(compliance_control_passed_total[24h]) /
+            (rate(compliance_control_passed_total[24h]) + rate(compliance_control_failed_total[24h]))
+          ) * 100

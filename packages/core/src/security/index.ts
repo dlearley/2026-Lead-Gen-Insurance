@@ -58,3 +58,25 @@ export {
   type SecretsManagerConfig,
   type Secret,
 } from './secrets-manager.js';
+
+// JWT Authentication
+export {
+  JWTService,
+  getJWTService,
+  type JWTConfig,
+  type JWTPayload,
+  type TokenPair,
+} from './jwt.js';
+
+// MFA
+export {
+  MFAService,
+  WebAuthnService,
+  getMFAService,
+  getWebAuthnService,
+  type MFAConfig,
+  type MFASecret,
+  type MFAVerification,
+  type WebAuthnCredential,
+  type WebAuthnChallenge,
+} from './mfa.js';
