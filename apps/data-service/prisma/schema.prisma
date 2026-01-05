@@ -89,6 +89,7 @@ model Lead {
   tasks         Task[]
   assignments   LeadAssignment[]
   events        LeadEvent[]
+  policies      Policy[]
 
   @@index([status])
   @@index([email])
@@ -455,6 +456,7 @@ model Agent {
 
   // Relations
   assignments LeadAssignment[]
+  policies    Policy[]
 
   @@index([email])
   @@index([isActive])
@@ -745,4 +747,242 @@ enum IntegrationAction {
 enum Direction {
   INBOUND
   OUTBOUND
+}
+
+// ========================================
+// POLICY MANAGEMENT (Phase 26.3)
+// ========================================
+
+model Policy {
+  id                    String                   @id @default(uuid())
+  policyNumber          String                   @unique
+  leadId                String
+  agentId               String?
+  carrier               String?
+  productName           String?
+  insuranceType         String
+  status                PolicyStatus             @default(DRAFT)
+  effectiveDate         DateTime
+  expirationDate        DateTime
+  cancelledAt           DateTime?
+  cancellationReason    String?                  @db.Text
+  premiumAmount         Float
+  billingFrequency      PolicyBillingFrequency    @default(MONTHLY)
+  commissionRate        Float                    @default(0.0)
+  totalPremiumCollected Float                    @default(0.0)
+  coverage              Json?
+  deductible            Float?
+  policyholderInfo      Json?
+  renewalOfPolicyId     String?
+  renewedToPolicyId     String?
+  metadata              Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  // Relations
+  lead                  Lead                     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent                 Agent?                   @relation(fields: [agentId], references: [id])
+  endorsements          PolicyEndorsement[]
+  documents             PolicyDocument[]
+  payments              PolicyPayment[]
+  renewals              PolicyRenewal[]
+  activities            PolicyActivity[]
+
+  @@index([policyNumber])
+  @@index([leadId])
+  @@index([agentId])
+  @@index([status])
+  @@index([effectiveDate])
+  @@index([expirationDate])
+  @@map("policies")
+}
+
+enum PolicyStatus {
+  DRAFT
+  PENDING_PAYMENT
+  ACTIVE
+  CANCELLED
+  LAPSED
+  EXPIRED
+  NON_RENEWED
+}
+
+enum PolicyBillingFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+model PolicyEndorsement {
+  id              String                   @id @default(uuid())
+  policyId        String
+  type            PolicyEndorsementType
+  effectiveDate   DateTime
+  description     String?                  @db.Text
+  changes         Json?
+  premiumDelta    Float?
+  newPremium      Float?
+  status          PolicyEndorsementStatus  @default(PENDING)
+  issuedAt        DateTime?
+  createdAt       DateTime                 @default(now())
+  createdBy       String?
+
+  // Relations
+  policy          Policy                   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([type])
+  @@index([status])
+  @@index([effectiveDate])
+  @@map("policy_endorsements")
+}
+
+enum PolicyEndorsementType {
+  COVERAGE_CHANGE
+  DRIVER_ADDITION
+  VEHICLE_CHANGE
+  ADDRESS_CHANGE
+  PREMIUM_ADJUSTMENT
+  OTHER
+}
+
+enum PolicyEndorsementStatus {
+  PENDING
+  APPROVED
+  ISSUED
+  REJECTED
+}
+
+model PolicyDocument {
+  id              String                @id @default(uuid())
+  policyId        String
+  documentType    PolicyDocumentType
+  fileName        String
+  fileUrl         String
+  fileSize        Int
+  mimeType        String
+  uploadedBy      String
+  description     String?               @db.Text
+  isVerified      Boolean               @default(false)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  version         Int                   @default(1)
+  createdAt       DateTime              @default(now())
+
+  // Relations
+  policy          Policy                @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([documentType])
+  @@index([uploadedBy])
+  @@map("policy_documents")
+}
+
+enum PolicyDocumentType {
+  POLICY_DOCUMENT
+  DECLARATIONS_PAGE
+  INSURANCE_CARD
+  ENDORSEMENT
+  INVOICE
+  RECEIPT
+  CANCELLATION_NOTICE
+  RENEWAL_NOTICE
+  CERTIFICATE_OF_INSURANCE
+  OTHER
+}
+
+model PolicyPayment {
+  id              String                @id @default(uuid())
+  policyId        String
+  paymentNumber   String               @unique
+  amount          Float
+  dueDate         DateTime
+  paidAt          DateTime?
+  paymentMethod   PaymentMethod?
+  status          PaymentStatus         @default(PENDING)
+  failureReason   String?
+  refundedAt      DateTime?
+  refundAmount    Float?
+  refundReason    String?
+  notes           String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Relations
+  policy          Policy                @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([paymentNumber])
+  @@map("policy_payments")
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  ACH
+  CHECK
+  CASH
+  WIRE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model PolicyRenewal {
+  id                  String                @id @default(uuid())
+  policyId            String
+  renewalPolicyId     String?
+  renewalQuoteAmount  Float?
+  renewalPremium      Float?
+  offeredDate         DateTime?
+  acceptedDate        DateTime?
+  rejectedDate        DateTime?
+  rejectionReason     String?               @db.Text
+  status              RenewalStatus         @default(PENDING)
+  createdAt           DateTime              @default(now())
+
+  // Relations
+  policy              Policy                @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([renewalPolicyId])
+  @@index([status])
+  @@index([offeredDate])
+  @@map("policy_renewals")
+}
+
+enum RenewalStatus {
+  PENDING
+  OFFERED
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+model PolicyActivity {
+  id              String      @id @default(uuid())
+  policyId        String
+  userId          String?
+  activityType    String
+  action          String
+  description     String      @db.Text
+  oldValue        String?
+  newValue        String?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+
+  // Relations
+  policy          Policy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@map("policy_activities")
 }

@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Policy Management Types (Phase 26.3)
+export * from './policies.js';
