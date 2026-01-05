@@ -746,3 +746,194 @@ enum Direction {
   INBOUND
   OUTBOUND
 }
+
+// ========================================
+// AI-POWERED ROUTING & OPTIMIZATION (Phase 20)
+// ========================================
+
+model BrokerPerformanceMetrics {
+  id                    String   @id @default(uuid())
+  brokerId              String   @unique
+  conversionRate        Float    @default(0)
+  avgLeadValue          Float    @default(0)
+  avgProcessingTime     Int      @default(0) // in minutes
+  slaComplianceRate     Float    @default(0)
+  totalLeadsAssigned    Int      @default(0)
+  totalLeadsConverted   Int      @default(0)
+  revenueGenerated      Float    @default(0)
+  customerSatisfaction  Float    @default(0)
+  responseTimeAvg       Int      @default(0) // in minutes
+  lastPerformanceUpdate DateTime @default(now())
+  metrics               Json?    // Extended metrics
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([brokerId])
+  @@index([conversionRate])
+  @@index([slaComplianceRate])
+  @@map("broker_performance_metrics")
+}
+
+model RoutingProfile {
+  id               String   @id @default(uuid())
+  leadId           String   @unique
+  brokerAssignedId String
+  routingScore     Float
+  reasoning        Json?    // Detailed reasoning for the routing decision
+  routingFactors   Json?    // Factor weights used in decision
+  performanceData  Json?    // Expected performance outcomes
+  createdAt        DateTime @default(now())
+
+  @@index([leadId])
+  @@index([brokerAssignedId])
+  @@index([routingScore])
+  @@map("routing_profiles")
+}
+
+model RoutingDecision {
+  id                   String   @id @default(uuid())
+  leadId               String
+  brokerId             String
+  score                Float
+  reason               String
+  routingMethod        String   // 'ml_prediction', 'specialty_match', 'capacity_based', etc.
+  confidence           Float    @default(0)
+  alternativeBrokers   Json?    // List of alternative brokers considered
+  performanceOutcome   Json?    // Actual performance metrics after assignment
+  optimizationApplied  Boolean  @default(false)
+  experimentId         String?
+  timestamp            DateTime @default(now())
+
+  @@index([leadId])
+  @@index([brokerId])
+  @@index([routingMethod])
+  @@index([timestamp])
+  @@index([experimentId])
+  @@map("routing_decisions")
+}
+
+model RoutingExperiment {
+  id                    String               @id @default(uuid())
+  name                  String
+  description           String?
+  status                ExperimentStatus     @default(ACTIVE)
+  
+  // Experiment configuration
+  controlGroup          Json                 // Control routing strategy
+  treatmentGroup        Json                 // Treatment routing strategy
+  segmentRules          Json?                // Lead segmentation rules
+  trafficAllocation     Float                @default(0.5) // 50% control, 50% treatment
+  
+  // Results and analytics
+  controlMetrics        Json?                // Control group performance
+  treatmentMetrics      Json?                // Treatment group performance
+  statisticalSignificance Float?
+  confidenceLevel       Float                @default(0.95)
+  power                 Float                @default(0.8)
+  
+  // Winner determination
+  winner                String?              // 'control', 'treatment', or 'inconclusive'
+  winnerReason          String?
+  improvement           Float?               // % improvement of winner
+  rolloutStrategy       String?
+  
+  // Metadata
+  startDate             DateTime             @default(now())
+  endDate               DateTime?
+  targetSampleSize      Int?
+  currentSampleSize     Int                  @default(0)
+  metadata              Json?
+  
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("routing_experiments")
+}
+
+model BrokerCapacity {
+  id                    String   @id @default(uuid())
+  brokerId              String   @unique
+  currentLoadPercentage Float    @default(0)
+  activeLeadCount       Int      @default(0)
+  maxCapacity           Int      @default(10)
+  avgProcessingTime     Int      @default(0) // in minutes
+  slaComplianceRate     Float    @default(0)
+  lastUpdated           DateTime @default(now())
+  capacityTrend         Json?    // Historical capacity trends
+  predictedCapacity     Json?    // ML-based capacity predictions
+  overloadThreshold     Float    @default(0.85) // % of max capacity considered overloaded
+  underloadThreshold    Float    @default(0.5)  // % of max capacity considered underutilized
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([brokerId])
+  @@index([currentLoadPercentage])
+  @@map("broker_capacity")
+}
+
+model RoutingOptimization {
+  id            String   @id @default(uuid())
+  brokerId      String
+  specialties   String[] // Broker specialties for vector matching
+  expertise     Json?    // Detailed expertise breakdown
+  weights       Json?    // Performance weights for different factors
+  
+  // Optimization settings
+  roiWeights    Json?    // Weights for ROI optimization
+  fairnessRules Json?    // Broker fairness constraints
+  exclusions    String[] // Lead types to avoid assigning to this broker
+  preferences   Json?    // Broker routing preferences
+  
+  // Machine learning model parameters
+  modelVersion  String?
+  embeddingVector Json? // Vector representation of broker profile
+  performanceModel Json? // Trained model parameters
+  
+  metadata      Json?
+  updatedAt     DateTime @updatedAt
+
+  @@index([brokerId])
+  @@map("routing_optimization")
+}
+
+model LeadEmbedding {
+  id          String   @id @default(uuid())
+  leadId      String   @unique
+  vector      Json     // Lead vector representation
+  embeddingModel String // Model used for embedding
+  features    Json?    // Extracted features
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leadId])
+  @@map("lead_embeddings")
+}
+
+model SpecialtyMatching {
+  id                String   @id @default(uuid())
+  leadId            String
+  brokerId          String
+  specialtyMatch    Float    // Similarity score between lead and broker specialties
+  semanticMatch     Float    // Vector similarity score
+  weightedScore     Float    // Final weighted matching score
+  matchingFactors   Json?    // Breakdown of matching factors
+  createdAt         DateTime @default(now())
+
+  @@index([leadId])
+  @@index([brokerId])
+  @@index([weightedScore])
+  @@map("specialty_matching")
+}
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ROLLED_BACK
+  CANCELLED
+}
