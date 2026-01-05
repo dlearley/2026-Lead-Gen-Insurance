@@ -1,0 +1,115 @@
+// Claims Management Services Index
+// Exports all claims-related services and utilities
+
+export { ClaimService } from './claim.service.js';
+export { AdjusterService } from './adjuster.service.js';
+export { DocumentService } from './document.service.js';
+export { PaymentService } from './payment.service.js';
+
+// Re-export types for convenience
+export type {
+  Claim,
+  CreateClaimDto,
+  UpdateClaimDto,
+  ClaimStatus,
+  ClaimType,
+  ClaimFilterParams,
+  ClaimsSearchResult,
+  ClaimApiResponse,
+  ClaimsListApiResponse,
+  ClaimStatusHistory,
+  ClaimStateTransition,
+  ClaimLifecycleConfig,
+  
+  Adjuster,
+  CreateAdjusterDto,
+  UpdateAdjusterDto,
+  ClaimAssignment,
+  AssignAdjusterDto,
+  AdjusterAvailability,
+  CreateAdjusterAvailabilityDto,
+  AdjusterScore,
+  RecommendAdjusterRequest,
+  AssignmentCriteria,
+  
+  ClaimDocument,
+  UploadDocumentDto,
+  ClaimAttachment,
+  ClaimDocumentAccessLog,
+  DocumentType,
+  UploadedByType,
+  AttachmentCategory,
+  CreatedByType,
+  AccessType,
+  
+  ClaimPayment,
+  CreatePaymentDto,
+  UpdatePaymentDto,
+  ClaimSettlement,
+  CreateSettlementDto,
+  ClaimPaymentSchedule,
+  CreatePaymentScheduleDto,
+  PaymentType,
+  PaymentMethod,
+  PaymentStatus,
+  PayeeType,
+  SettlementType,
+  SettlementStatus,
+  PaymentScheduleType,
+  PaymentFrequency,
+  PaymentScheduleStatus,
+  
+  ClaimCommunication,
+  CreateCommunicationDto,
+  ClaimNote,
+  CreateNoteDto,
+  UpdateNoteDto,
+  ClaimTask,
+  CreateTaskDto,
+  UpdateTaskDto,
+  CommunicationType,
+  CommunicationDirection,
+  CommunicatedWithType,
+  NoteType,
+  NotePriority,
+  TaskType,
+  TaskStatus,
+  TaskPriority,
+  
+  ClaimFraudIndicator,
+  CreateFraudIndicatorDto,
+  ReviewFraudIndicatorDto,
+  FraudIndicatorType,
+  FraudStatus,
+  
+  ClaimSubrogation,
+  CreateSubrogationDto,
+  UpdateSubrogationDto,
+  SubrogationActivity,
+  CreateSubrogationActivityDto,
+  SubrogationStatus,
+  ActivityType,
+  
+  ClaimMetrics,
+  ResolutionStatus,
+  
+  CarrierClaimSync,
+  ClaimWebhook,
+  CreateWebhookDto,
+  SyncDirection,
+  SyncStatus,
+  
+  ClaimsVolumeReport,
+  ClaimsAgingReport,
+  ClaimsCostAnalysis,
+  ClaimsClosureRates,
+  AdjusterPerformanceReport,
+  FraudIndicatorsReport,
+  SettlementAnalysis,
+  ClaimsReportsExport,
+  
+  ReportChannel,
+  RiskLevel,
+  StatusSource,
+  PolicyStatus
+} from '@insurance/types/claims';
