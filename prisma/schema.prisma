@@ -223,3 +223,273 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// ========================================
+// BEHAVIOR TRACKING MODELS
+// ========================================
+
+// BehaviorEvent model - tracks user behavior events
+model BehaviorEvent {
+  id          String            @id @default(uuid())
+  leadId      String?
+  sessionId   String
+  userId      String?
+  eventType   BehaviorEventType
+  category    BehaviorCategory
+  timestamp   DateTime         @default(now())
+  source      String
+  page        Json?
+  properties  Json
+  context     Json?
+  value       Float?
+  metadata    Json?
+
+  // Indexes
+  @@index([leadId])
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([category])
+  @@index([timestamp])
+  @@index([source])
+}
+
+// BehavioralSegment model - stores behavioral segments
+model BehavioralSegment {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  type        SegmentType
+  status      SegmentStatus @default(ACTIVE)
+  criteria    Json
+  leadCount   Int           @default(0)
+  isPublic    Boolean       @default(false)
+  tags        String[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  lastCalculated DateTime?
+
+  // Indexes
+  @@index([type])
+  @@index([status])
+  @@index([isPublic])
+  @@index([createdAt])
+}
+
+// PersonalizationRule model - stores personalization rules
+model PersonalizationRule {
+  id              String                 @id @default(uuid())
+  name            String
+  description     String?
+  type            PersonalizationType
+  status          PersonalizationStatus  @default(ACTIVE)
+  priority        Int                   @default(0)
+  targetSegments  String[]
+  conditions      Json
+  actions         Json
+  startDate       DateTime?
+  endDate         DateTime?
+  isActive        Boolean               @default(true)
+  tags            String[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  // Indexes
+  @@index([type])
+  @@index([status])
+  @@index([isActive])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+// BehaviorExperiment model - stores A/B testing experiments
+model BehaviorExperiment {
+  id              String           @id @default(uuid())
+  name            String
+  description     String?
+  type            ExperimentType
+  status          ExperimentStatus @default(DRAFT)
+  hypothesis      String
+  successMetrics  String[]
+  targetSegments  String[]
+  trafficAllocation Json
+  variants        Json
+  startDate       DateTime?
+  endDate         DateTime?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Indexes
+  @@index([type])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([createdAt])
+}
+
+// BehavioralTrigger model - stores behavior-based triggers
+model BehavioralTrigger {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  event       TriggerEvent
+  status      TriggerStatus @default(ACTIVE)
+  conditions  Json
+  actions     Json
+  targetSegments String[]
+  cooldown    Int         @default(0) // in minutes
+  priority    Int         @default(0)
+  triggerCount Int        @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  lastTriggered DateTime?
+
+  // Indexes
+  @@index([event])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([lastTriggered])
+}
+
+// TriggerExecution model - tracks trigger executions
+model TriggerExecution {
+  id          String   @id @default(uuid())
+  triggerId   String
+  leadId      String
+  executedAt  DateTime @default(now())
+  actions     Json
+  context     Json
+
+  // Relationships
+  trigger     BehavioralTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([triggerId])
+  @@index([leadId])
+  @@index([executedAt])
+}
+
+// BehaviorAnalytics model - stores computed analytics
+model BehaviorAnalytics {
+  id                      String   @id @default(uuid())
+  leadId                  String?
+  sessionId               String
+  totalEvents             Int      @default(0)
+  uniqueEventTypes        Int      @default(0)
+  totalTimeSpent          Int      @default(0) // in seconds
+  averageSessionDuration   Int      @default(0) // in seconds
+  engagementScore          Float    @default(0.0)
+  interestScore            Float    @default(0.0)
+  intentScore             Float    @default(0.0)
+  conversionProbability    Float    @default(0.0)
+  segments                String[]
+  behaviorPattern          String
+  lastActivity            DateTime
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Indexes
+  @@index([leadId])
+  @@index([sessionId])
+  @@index([behaviorPattern])
+  @@index([lastActivity])
+  @@index([engagementScore])
+  @@index([conversionProbability])
+}
+
+// Enums for behavior tracking
+enum BehaviorEventType {
+  PAGE_VIEW
+  FORM_START
+  FORM_SUBMIT
+  FORM_ABANDON
+  EMAIL_OPEN
+  EMAIL_CLICK
+  EMAIL_REPLY
+  PHONE_CALL
+  TEXT_INTERACTION
+  SOCIAL_SHARE
+  DOWNLOAD
+  VIDEO_PLAY
+  SCROLL_DEPTH
+  TIME_ON_PAGE
+  CLICK_OUTBOUND
+  SEARCH_QUERY
+  FILTER_USAGE
+  QUOTE_REQUEST
+  APPLICATION_START
+  APPLICATION_COMPLETE
+}
+
+enum BehaviorCategory {
+  ENGAGEMENT
+  INTEREST
+  INTENT
+  CONVERSION
+  RETENTION
+  ADVOCACY
+}
+
+enum SegmentType {
+  STATIC
+  DYNAMIC
+  BEHAVIORAL
+}
+
+enum SegmentStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+enum PersonalizationType {
+  CONTENT
+  OFFER
+  MESSAGE
+  CTA
+  TIMING
+  CHANNEL
+}
+
+enum PersonalizationStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum ExperimentType {
+  CONTENT
+  OFFER
+  LAYOUT
+  TIMING
+  CHANNEL
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum TriggerEvent {
+  HIGH_ENGAGEMENT
+  LOW_ENGAGEMENT
+  FORM_ABANDON
+  EMAIL_ENGAGEMENT
+  PRICE_VIEW
+  APPLICATION_START
+  TIME_BASED
+  SEQUENCE_COMPLETE
+  SEGMENT_ENTER
+  SEGMENT_EXIT
+}
+
+enum TriggerStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+}

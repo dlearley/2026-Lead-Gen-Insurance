@@ -34,6 +34,8 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { BehaviorAnalyticsService } from './services/behavior-analytics.js';
+import { createBehaviorAnalyticsRoutes } from './routes/behavior.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -63,9 +65,13 @@ const start = async (): Promise<void> => {
   const referralService = new ReferralService();
   const rewardService = new RewardService();
   const advancedAnalyticsService = new AdvancedAnalyticsService();
+  const behaviorAnalyticsService = new BehaviorAnalyticsService(prisma);
 
   // Setup analytics routes
   app.use('/api/v1/analytics', createAnalyticsRoutes(analyticsService));
+
+  // Setup behavior analytics routes
+  app.use('/api/behavior', createBehaviorAnalyticsRoutes(behaviorAnalyticsService));
 
   // Setup referral program routes
   app.use('/api/v1/partners', partnerRoutes);
