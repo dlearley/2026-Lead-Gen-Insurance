@@ -10,3 +10,6 @@ export * from './database/index.js';
 
 // Security exports
 export * from './security/index.js';
+
+// NLP and Document Processing Services
+export * from './services/index.js';

@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// NLP & Document Processing Types
+export * from './nlp.js';

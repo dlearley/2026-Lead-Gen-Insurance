@@ -223,3 +223,389 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// NLP and Document Processing Enums
+enum DocumentType {
+  POLICY_AUTO
+  POLICY_HOME
+  POLICY_LIFE
+  POLICY_HEALTH
+  POLICY_COMMERCIAL
+  CLAIM_FORM
+  MEDICAL_RECORD
+  REPAIR_ESTIMATE
+  PROOF_OF_LOSS
+  INSPECTION_REPORT
+  POLICE_REPORT
+  FINANCIAL_STATEMENT
+  IDENTITY_DOCUMENT
+  OTHER
+}
+
+enum DocumentClass {
+  INSURANCE_POLICY
+  CLAIM_DOCUMENTATION
+  MEDICAL_RECORDS
+  ESTIMATE
+  LEGAL_DOCUMENT
+  FINANCIAL_DOCUMENT
+  IDENTITY_VERIFICATION
+  SUPPORTING_DOCUMENT
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  MANUAL_REVIEW
+}
+
+enum EntityType {
+  PARTY_INSURED
+  PARTY_CLAIMANT
+  PARTY_BENEFICIARY
+  PARTY_PROVIDER
+  PARTY_WITNESS
+  COVERAGE_LIABILITY
+  COVERAGE_COLLISION
+  COVERAGE_COMPREHENSIVE
+  COVERAGE_UNINSURED_MOTORIST
+  COVERAGE_DEDUCTIBLE
+  FINANCIAL_PREMIUM
+  FINANCIAL_LIMIT
+  FINANCIAL_COVERAGE_AMOUNT
+  FINANCIAL_COPAY
+  TEMPORAL_EFFECTIVE_DATE
+  TEMPORAL_EXPIRATION
+  TEMPORAL_CLAIM_DATE
+  TEMPORAL_INCIDENT_DATE
+  VEHICLE_VIN
+  VEHICLE_MAKE
+  VEHICLE_MODEL
+  VEHICLE_YEAR
+  VEHICLE_USAGE
+  VEHICLE_MILEAGE
+  PROPERTY_ADDRESS
+  PROPERTY_SQUARE_FOOTAGE
+  PROPERTY_TYPE
+  PROPERTY_YEAR_BUILT
+  PROPERTY_CONDITION
+  MEDICAL_ICD_CODE
+  MEDICAL_CPT_CODE
+  MEDICAL_DIAGNOSIS
+  MEDICAL_TREATMENT
+  MEDICAL_PROVIDER
+  RISK_AGE
+  RISK_OCCUPATION
+  RISK_LIFESTYLE
+  RISK_SMOKING_STATUS
+  RISK_HEALTH_CONDITION
+}
+
+enum ValidationType {
+  PAGE_COUNT
+  READABILITY
+  COMPLETENESS
+  SIGNATURE
+  DATE_VALIDITY
+  CONSISTENCY
+}
+
+enum ValidationSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ConversationType {
+  PHONE
+  CHAT
+  EMAIL
+  MEETING
+}
+
+enum ConversationChannel {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum IntentType {
+  QUOTE_REQUEST
+  POLICY_INQUIRY
+  CLAIMS_SUBMISSION
+  CLAIMS_STATUS
+  BILLING_PAYMENT_QUESTION
+  COVERAGE_VERIFICATION
+  COMPLAINT_ESCALATION
+  DOCUMENT_REQUEST
+  CANCELLATION_NON_RENEWAL
+  PRODUCT_UPGRADE
+  OTHER
+}
+
+enum SentimentType {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  VERY_NEGATIVE
+}
+
+enum NoteCreatedBy {
+  AI_SYSTEM
+  AGENT
+  CUSTOMER
+  SYSTEM
+}
+
+// ========================================
+// NLP AND DOCUMENT PROCESSING MODELS
+// ========================================
+
+// Processed Documents - tracks all documents processed through NLP pipeline
+model ProcessedDocument {
+  id                          String            @id @default(uuid())
+  originalDocumentId          String?
+  leadId                      String?
+  claimId                     String?
+  customerId                  String?
+  documentType                DocumentType?
+  documentClass               DocumentClass?
+  classificationConfidence    Float?
+  documentLanguage            String?           @default("en")
+  originalLanguage            String?
+  filePath                    String?
+  extractedText               String?           @db.Text
+  pageCount                   Int?
+  ocrConfidence               Float?
+  isReadable                  Boolean?
+  processingStatus            ProcessingStatus  @default(PENDING)
+  processedAt                 DateTime?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+
+  // Relationships
+  entities                    DocumentEntity[]
+  validations                 DocumentValidation[]
+  embeddings                  DocumentEmbedding[]
+  policySummaries             PolicySummary[]
+
+  @@index([leadId])
+  @@index([claimId])
+  @@index([customerId])
+  @@index([documentType, classificationConfidence(sort: Desc)])
+  @@index([processingStatus])
+}
+
+// Document Entities - extracted entities from documents
+model DocumentEntity {
+  id                String          @id @default(uuid())
+  documentId        String
+  entityType        EntityType
+  entityValue       String
+  entityConfidence  Float?
+  pageNumber        Int?
+  startPosition     Int?
+  endPosition       Int?
+  context           String?         @db.Text
+  normalizedValue   String?
+  linkedEntityId    String?
+  createdAt         DateTime        @default(now())
+
+  // Relationships
+  document          ProcessedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([entityType, entityConfidence(sort: Desc)])
+}
+
+// Document Validation Results
+model DocumentValidation {
+  id                  String              @id @default(uuid())
+  documentId          String
+  validationType      ValidationType
+  isValid             Boolean
+  issueDescription    String?             @db.Text
+  severity            ValidationSeverity?
+  actionRequired      String?
+  reviewerNotes       String?             @db.Text
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  createdAt           DateTime            @default(now())
+
+  // Relationships
+  document            ProcessedDocument   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([validationType, isValid])
+}
+
+// Conversations - phone calls, chats, emails, meetings
+model Conversation {
+  id                      String              @id @default(uuid())
+  customerId              String?
+  agentId                 String?
+  conversationType        ConversationType
+  conversationChannel      ConversationChannel
+  startedAt               DateTime?
+  endedAt                 DateTime?
+  durationSeconds         Int?
+  transcription           String?             @db.Text
+  transcriptionConfidence Float?
+  originalLanguage        String?             @default("en")
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  // Relationships
+  analysis                ConversationAnalysis?
+  automatedNotes          AutomatedNote[]
+
+  @@index([customerId, createdAt(sort: Desc)])
+  @@index([agentId])
+  @@index([conversationType])
+}
+
+// Conversation Analysis - NLP analysis of conversations
+model ConversationAnalysis {
+  id                        String              @id @default(uuid())
+  conversationId            String              @unique
+  primaryIntent             IntentType?
+  secondaryIntents          Json?
+  overallSentiment          SentimentType?
+  sentimentScore            Float?
+  emotionDetected           Json?
+  customerSatisfactionScore Float?
+  topicsDiscussed           Json?
+  keyPhrases                Json?
+  issuesRaised              Json?
+  escalationFlag            Boolean             @default(false)
+  escalationReason          String?             @db.Text
+  createdAt                 DateTime            @default(now())
+
+  // Relationships
+  conversation              Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([overallSentiment])
+  @@index([escalationFlag])
+}
+
+// Automated Notes - AI-generated notes from conversations/documents
+model AutomatedNote {
+  id                    String      @id @default(uuid())
+  conversationId        String?
+  customerId            String
+  leadId                String?
+  claimId               String?
+  noteSummary           String      @db.Text
+  customerSentiment     SentimentType?
+  issuesIdentified      Json?
+  productsDiscussed     Json?
+  actionItems           Json?
+  followUpRequired      Boolean     @default(false)
+  followUpType          String?
+  followUpDueDate       DateTime?
+  noteQualityScore      Float?
+  createdBy             NoteCreatedBy @default(AI_SYSTEM)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relationships
+  conversation          Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([customerId, createdAt(sort: Desc)])
+  @@index([leadId])
+  @@index([claimId])
+}
+
+// Policy Summaries - AI-generated policy summaries
+model PolicySummary {
+  id                      String            @id @default(uuid())
+  policyId                String?
+  policyDocumentId       String?
+  executiveSummary        String?           @db.Text
+  coverageSummary         Json?
+  keyHighlights           Json?
+  plainEnglishSummary     String?           @db.Text
+  importantExclusions     Json?
+  customerActionItems     Json?
+  summaryQualityScore     Float?
+  generatedAt             DateTime?
+  updatedAt               DateTime           @default(now())
+
+  // Relationships
+  document                ProcessedDocument @relation(fields: [policyDocumentId], references: [id])
+
+  @@index([policyId])
+}
+
+// Document Embeddings - for semantic search
+model DocumentEmbedding {
+  id                String   @id @default(uuid())
+  documentId        String
+  embeddingModel    String
+  embeddingVector   Unsupported("vector(1536)")?
+  chunkIndex        Int?
+  chunkText         String?  @db.Text
+  createdAt         DateTime @default(now())
+
+  // Relationships
+  document          ProcessedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+// NLP Models - model registry
+model NLPModel {
+  id                  String   @id @default(uuid())
+  modelName           String
+  modelType           String
+  modelCategory       String
+  baseModel           String?
+  modelVersion        Int
+  language            String?
+  trainingDate        DateTime?
+  performanceMetrics  Json?
+  isActive            Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@index([modelType, isActive])
+}
+
+// Document Processing Analytics
+model DocumentAnalytics {
+  id                           String   @id @default(uuid())
+  periodDate                   DateTime @db.Date
+  documentType                 String?
+  totalDocumentsProcessed      Int      @default(0)
+  successfulExtractions        Int      @default(0)
+  extractionRate               Float?
+  averageOcrConfidence         Float?
+  averageClassificationConfidence Float?
+  manualReviewsRequired        Int      @default(0)
+  averageProcessingTimeSeconds Float?
+  updatedAt                    DateTime @default(now())
+
+  @@unique([periodDate, documentType])
+  @@index([periodDate])
+}
+
+// Conversation Processing Analytics
+model ConversationAnalytics {
+  id                           String   @id @default(uuid())
+  periodDate                   DateTime @db.Date
+  conversationChannel          String?
+  totalConversations           Int      @default(0)
+  averageDurationSeconds       Float?
+  transcriptionSuccessRate     Float?
+  intentDetectionAccuracy      Float?
+  sentimentAccuracy            Float?
+  escalationRate               Float?
+  averageSentimentScore        Float?
+  automatedNotesGenerated      Int      @default(0)
+  updatedAt                    DateTime @default(now())
+
+  @@unique([periodDate, conversationChannel])
+  @@index([periodDate])
+}
