@@ -341,6 +341,30 @@ export interface EmailFilterParams {
 }
 
 // ========================================
+// KNOWLEDGE BASE TYPES
+// ========================================
+
+export interface KnowledgeBaseEntry {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags?: string[];
+  metadata?: Record<string, any>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface KnowledgeBaseSearchResult {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  similarity: number;
+  metadata?: Record<string, any>;
+}
+
+// ========================================
 // TASK TYPES
 // ========================================
 

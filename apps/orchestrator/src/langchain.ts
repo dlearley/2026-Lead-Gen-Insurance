@@ -3,16 +3,23 @@ import { Lead } from '@insurance-lead-gen/types';
 import { OpenAIClient } from './openai.js';
 import { EnrichmentService } from './enrichment.js';
 import { getQdrantClient } from './qdrant.js';
+import { KnowledgeBaseService } from './services/knowledge-base.service.js';
 
 export class LangChainEngine {
   private openaiClient: OpenAIClient;
   private enrichmentService: EnrichmentService;
   private qdrantClient = getQdrantClient();
+  private knowledgeBaseService: KnowledgeBaseService;
   private readonly LEADS_COLLECTION = 'leads';
 
   constructor(openaiClient: OpenAIClient, enrichmentService?: EnrichmentService) {
     this.openaiClient = openaiClient;
     this.enrichmentService = enrichmentService || new EnrichmentService();
+    this.knowledgeBaseService = new KnowledgeBaseService(openaiClient);
+    // Initialize knowledge base service
+    this.knowledgeBaseService.initialize().catch(error => {
+      logger.error('Failed to initialize knowledge base service in LangChain', { error: error.message });
+    });
   }
 
   async processLead(leadData: Lead): Promise<any> {
@@ -34,7 +41,18 @@ export class LangChainEngine {
         hasPersonData: !!enrichment.person
       });
 
-      // Step 3: Generate embedding for semantic search
+      // Step 3: Get knowledge base insights (new feature)
+      const knowledgeInsights = await this.getKnowledgeBaseInsights(
+        leadData,
+        classification.insuranceType
+      );
+      logger.debug('Knowledge base insights generated', { 
+        leadId: leadData.id,
+        knowledgeCount: knowledgeInsights.relevantKnowledge.length,
+        hasInsights: !!knowledgeInsights.insights
+      });
+
+      // Step 4: Generate embedding for semantic search
       const embeddingText = this.createEmbeddingText({ ...leadData, enrichment });
       const embedding = await this.openaiClient.generateEmbedding(embeddingText);
       logger.debug('Lead embedding generated', { 
@@ -42,12 +60,17 @@ export class LangChainEngine {
         embeddingSize: embedding.length
       });
 
-      // Step 4: Create enriched lead data
+      // Step 5: Create enriched lead data with knowledge insights
       const enrichedLead = {
         ...leadData,
         ...classification,
         enrichment,
         embedding,
+        knowledgeInsights: {
+          relevantKnowledge: knowledgeInsights.relevantKnowledge,
+          insights: knowledgeInsights.insights,
+          knowledgeBaseUsed: knowledgeInsights.relevantKnowledge.length > 0,
+        },
         processingStatus: 'qualified',
         processedAt: new Date().toISOString(),
       };
@@ -72,7 +95,10 @@ export class LangChainEngine {
         // Continue processing even if embedding storage fails
       }
 
-      logger.info('Lead processing completed with enrichment', { leadId: leadData.id });
+      logger.info('Lead processing completed with enrichment and knowledge insights', { 
+        leadId: leadData.id,
+        knowledgeCount: knowledgeInsights.relevantKnowledge.length
+      });
       return enrichedLead;
 
     } catch (error) {
@@ -158,6 +184,170 @@ export class LangChainEngine {
       });
       // Return empty array on error to prevent breaking the workflow
       return [];
+    }
+  }
+
+  async getKnowledgeBaseInsights(leadData: Lead, insuranceType: string): Promise<{
+    relevantKnowledge: any[];
+    insights: string;
+  }> {
+    try {
+      // Create a query based on lead data and insurance type
+      const query = this.createKnowledgeBaseQuery(leadData, insuranceType);
+
+      logger.info('Searching knowledge base for insights', {
+        leadId: leadData.id,
+        insuranceType,
+        queryLength: query.length,
+      });
+
+      // Search knowledge base for relevant information
+      const knowledgeResults = await this.knowledgeBaseService.search(
+        query,
+        3, // Get top 3 relevant knowledge entries
+        0.6 // Minimum similarity threshold
+      );
+
+      // Generate insights from the knowledge base results
+      const insights = this.generateInsightsFromKnowledge(knowledgeResults, leadData);
+
+      logger.info('Generated knowledge base insights', {
+        leadId: leadData.id,
+        knowledgeCount: knowledgeResults.length,
+        hasInsights: !!insights,
+      });
+
+      return {
+        relevantKnowledge: knowledgeResults,
+        insights,
+      };
+
+    } catch (error) {
+      logger.error('Failed to get knowledge base insights', {
+        leadId: leadData.id,
+        error: error.message,
+      });
+      // Return empty results on error to prevent breaking the workflow
+      return {
+        relevantKnowledge: [],
+        insights: '',
+      };
+    }
+  }
+
+  private createKnowledgeBaseQuery(leadData: Lead, insuranceType: string): string {
+    // Create a comprehensive query for knowledge base search
+    const parts = [
+      `Insurance type: ${insuranceType}`,
+      `Lead source: ${leadData.source || 'unknown'}`,
+    ];
+
+    if (leadData.firstName || leadData.lastName) {
+      parts.push(`Customer name: ${leadData.firstName || ''} ${leadData.lastName || ''}`);
+    }
+
+    if (leadData.email) {
+      parts.push(`Email: ${leadData.email}`);
+    }
+
+    if (leadData.phone) {
+      parts.push(`Phone: ${leadData.phone}`);
+    }
+
+    if (leadData.address) {
+      const addressParts = [];
+      if (leadData.address.city) addressParts.push(leadData.address.city);
+      if (leadData.address.state) addressParts.push(leadData.address.state);
+      if (addressParts.length > 0) {
+        parts.push(`Location: ${addressParts.join(', ')}`);
+      }
+    }
+
+    if (leadData.notes) {
+      parts.push(`Notes: ${leadData.notes}`);
+    }
+
+    // Add specific insurance type context
+    parts.push(`Context: ${this.getInsuranceTypeContext(insuranceType)}`);
+
+    return parts.join(' | ');
+  }
+
+  private getInsuranceTypeContext(insuranceType: string): string {
+    // Return context based on insurance type for better knowledge base search
+    const contexts: Record<string, string> = {
+      auto: 'auto insurance, vehicle coverage, car insurance policies, automobile protection',
+      home: 'home insurance, property coverage, homeowners insurance, dwelling protection',
+      life: 'life insurance, term life, whole life, life coverage, beneficiary protection',
+      health: 'health insurance, medical coverage, healthcare plans, health protection',
+      commercial: 'commercial insurance, business coverage, liability protection, commercial policies',
+    };
+
+    return contexts[insuranceType] || 'general insurance information';
+  }
+
+  private generateInsightsFromKnowledge(
+    knowledgeResults: any[],
+    leadData: Lead
+  ): string {
+    if (knowledgeResults.length === 0) {
+      return '';
+    }
+
+    try {
+      // Create a summary of relevant knowledge
+      const knowledgeSummary = knowledgeResults
+        .map((result, index) => {
+          return `Knowledge ${index + 1} (${result.similarity.toFixed(2)} similarity):
+` +
+                 `- Title: ${result.title}
+` +
+                 `- Category: ${result.category}
+` +
+                 `- Content: ${result.content.substring(0, 200)}...`;
+        })
+        .join('\n\n');
+
+      // Generate insights based on the knowledge and lead data
+      const prompt = `
+        Based on the following knowledge base information and lead data,
+        provide concise insights that could help qualify and route this lead:
+
+        Knowledge Base Information:
+        ${knowledgeSummary}
+
+        Lead Data:
+        - Insurance Type: ${leadData.insuranceType}
+        - Source: ${leadData.source}
+        - Name: ${leadData.firstName || ''} ${leadData.lastName || ''}
+        - Email: ${leadData.email || 'N/A'}
+        - Phone: ${leadData.phone || 'N/A'}
+        - Location: ${leadData.address?.city || ''}, ${leadData.address?.state || ''}
+        - Notes: ${leadData.notes || 'None'}
+
+        Provide insights in the following format:
+        1. Relevance assessment (high/medium/low)
+        2. Key considerations for this lead
+        3. Potential questions to ask the customer
+        4. Recommended next steps
+
+        Keep the response concise and actionable.
+      `;
+
+      // Use OpenAI to generate insights
+      if (this.openaiClient && typeof (this.openaiClient as any).completePrompt === 'function') {
+        return (this.openaiClient as any).completePrompt(prompt);
+      }
+
+      // Fallback: Simple summary if OpenAI is not available
+      return `Knowledge base insights: Found ${knowledgeResults.length} relevant knowledge entries about ${leadData.insuranceType} insurance.`;
+
+    } catch (error) {
+      logger.error('Failed to generate insights from knowledge', {
+        error: error.message,
+        leadId: leadData.id,
+      });
+      return '';
     }
   }
 }

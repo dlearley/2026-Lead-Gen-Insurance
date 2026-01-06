@@ -10,6 +10,7 @@ import { NatsEventBus } from './nats/nats-event-bus.js';
 import { RankingService } from './services/ranking.service.js';
 import { RoutingService } from './services/routing.service.js';
 import { LeadRoutingWorkflow } from './services/lead-routing-workflow.js';
+import knowledgeBaseRoutes from './routes/knowledge-base.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.orchestrator;
@@ -43,6 +44,9 @@ const start = async (): Promise<void> => {
       service: 'orchestrator',
     });
   });
+
+  // Knowledge base routes
+  app.use('/api/v1/knowledge-base', knowledgeBaseRoutes);
 
   // Start Express server
   const server = app.listen(PORT, () => {
