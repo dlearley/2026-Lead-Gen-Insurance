@@ -1,0 +1,238 @@
+{
+  "dashboard": {
+    "title": "Phase 26 - Production Monitoring",
+    "tags": ["phase-26", "production", "insurance"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{service=~\"api|data-service|orchestrator\"}[5m])",
+            "legendFormat": "{{service}} - {{method}} {{path}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "req/s",
+            "format": "reqps"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "API Response Time (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=~\"api|data-service\"}[5m]))",
+            "legendFormat": "{{service}} - p95"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "seconds",
+            "format": "s"
+          }
+        ],
+        "alert": {
+          "name": "High API Latency",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.2],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "API p95 latency is above 200ms threshold"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\",service=~\"api|data-service\"}[5m]) / rate(http_requests_total{service=~\"api|data-service\"}[5m])",
+            "legendFormat": "{{service}} error rate"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "%",
+            "format": "percentunit"
+          }
+        ],
+        "alert": {
+          "name": "High Error Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.05],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "Error rate is above 5% threshold - possible production issue"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Claims Processing Volume",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(claims_created_total[1h]))",
+            "legendFormat": "Claims Created (Last Hour)"
+          },
+          {
+            "expr": "sum(increase(claims_approved_total[1h]))",
+            "legendFormat": "Claims Approved (Last Hour)"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Policy Operations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(policies_created_total[1h]))",
+            "legendFormat": "Policies Created (Last Hour)"
+          },
+          {
+            "expr": "sum(increase(policies_activated_total[1h]))",
+            "legendFormat": "Policies Activated (Last Hour)"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Carrier API Health",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "carrier_api_requests_total",
+            "legendFormat": "{{carrier}}"
+          },
+          {
+            "expr": "rate(carrier_api_errors_total[5m])",
+            "legendFormat": "{{carrier}} errors"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Database Query Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{operation}} - p95"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "seconds",
+            "format": "s"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Active WebSocket Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "websocket_connections_active",
+            "legendFormat": "Active Connections"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Queue Depth",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "queue_depth{queue=~\"lead-processing|notification|ai-enrichment\"}",
+            "legendFormat": "{{queue}}"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Compliance & Audit",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(audit_events_total[1h]))",
+            "legendFormat": "Audit Events (Last Hour)"
+          },
+          {
+            "expr": "sum(increase(privacy_requests_total[24h]))",
+            "legendFormat": "Privacy Requests (Last 24h)"
+          },
+          {
+            "expr": "sum(increase(consent_recorded_total[24h]))",
+            "legendFormat": "Consent Records (Last 24h)"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{service=~\"api|data-service|orchestrator\"} / 1024 / 1024",
+            "legendFormat": "{{service}} - Memory (MB)"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{service=~\"api|data-service|orchestrator\"}[5m])",
+            "legendFormat": "{{service}} - CPU"
+          }
+        ]
+      }
+    ]
+  }
+}
