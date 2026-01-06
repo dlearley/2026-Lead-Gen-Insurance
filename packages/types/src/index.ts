@@ -803,6 +803,10 @@ export interface ProcessingResult {
 // Claims Management (Phase 10.1)
 export * from './claims.js';
 
+// Fraud Detection & Claims Intelligence (Phase 27.4)
+export * from './fraud-detection.js';
+export * from './claims-outcome.js';
+
 export * from './events.js';
 export * from './analytics.js';
 

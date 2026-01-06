@@ -223,3 +223,184 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+
+// ========================================
+// FRAUD DETECTION & CLAIMS INTELLIGENCE - Phase 27.4
+// ========================================
+
+// Fraud detection models configuration
+model FraudDetectionModel {
+  id                String   @id @default(uuid())
+  name              String   @db.VarChar(255)
+  modelType         String   @db.VarChar(100) // behavioral, ml_classifier, rule_based, network
+  insuranceLine     String?  @db.VarChar(50)
+  modelVersion      Int?
+  trainingDate      DateTime?
+  performanceMetrics Json?
+  featureImportance Json?
+  isActive          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+}
+
+// Claims fraud assessments
+model ClaimFraudAssessment {
+  id                  String   @id @default(uuid())
+  claimId             String
+  assessmentDate      DateTime?
+  fraudProbability    Float?
+  fraudRiskLevel      String?  @db.VarChar(20) // High, Medium, Low
+  riskFactors         Json?
+  ruleTriggers        Json?
+  behavioralAnomalies Json?
+  networkRisk         Boolean  @default(false)
+  fraudNetworkId      String?
+  investigatorNotes   String?
+  flagForInvestigation Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@index([claimId])
+  @@index([fraudProbability(sort: Desc)])
+  @@index([fraudRiskLevel])
+}
+
+// Claims outcome predictions
+model ClaimOutcomePrediction {
+  id                       String    @id @default(uuid())
+  claimId                  String
+  predictedSettlementAmount Decimal?  @db.Decimal(10, 2)
+  settlementConfidence     Float?
+  predictedResolutionDays  Int?
+  likelihoodDispute        Float?
+  litigationRiskProbability Float?
+  reserveRecommendation    Decimal?  @db.Decimal(10, 2)
+  predictionTimestamp      DateTime?
+  actualSettlementAmount   Decimal?  @db.Decimal(10, 2)
+  actualResolutionDays     Int?
+  predictionAccuracy       Float?
+  createdAt                DateTime  @default(now())
+
+  @@index([claimId])
+}
+
+// Fraud networks
+model FraudNetwork {
+  id                    String   @id @default(uuid())
+  networkType           String?  @db.VarChar(50) // organized_ring, family_network, provider_conspiracy
+  memberCount           Int?
+  totalFraudLoss        Decimal? @db.Decimal(12, 2)
+  confidenceScore       Float?
+  status                String   @db.VarChar(50) // active, under_investigation, closed
+  lawEnforcementReported Boolean  @default(false)
+  reportDate            DateTime?
+  notes                 String?
+  createdAt             DateTime @default(now())
+
+  @@index([status, memberCount(sort: Desc)])
+}
+
+// Fraud network members
+model FraudNetworkMember {
+  id                  String   @id @default(uuid())
+  networkId           String
+  memberType          String?  @db.VarChar(50) // claimant, provider, witness, beneficiary
+  memberId            String?
+  memberInfo          Json?
+  connectionStrength  Float?
+  addedDate           DateTime?
+  createdAt           DateTime @default(now())
+}
+
+// Claims automation rules
+model ClaimsAutomationRule {
+  id              String   @id @default(uuid())
+  ruleName        String   @db.VarChar(255)
+  ruleType        String   @db.VarChar(100) // auto_approve, auto_request_docs, auto_route, auto_pay
+  conditionLogic  Json?
+  action          String   @db.VarChar(255)
+  priority        Int?
+  isActive        Boolean  @default(true)
+  successRate     Float?
+  createdAt       DateTime @default(now())
+}
+
+// Claims processing history
+model ClaimsProcessingHistory {
+  id                  String   @id @default(uuid())
+  claimId             String
+  eventType           String   @db.VarChar(100) // submitted, reviewed, fraud_flagged, approved, rejected, paid
+  eventData           Json?
+  processedByAgent    String?
+  processedBySystem   String?  @db.VarChar(100) // AI engine, automation rule, manual
+  timestamp           DateTime?
+  notes               String?
+  createdAt           DateTime @default(now())
+}
+
+// Settlement recommendations
+model SettlementRecommendation {
+  id                    String   @id @default(uuid())
+  claimId               String
+  recommendedAmount     Decimal? @db.Decimal(10, 2)
+  confidenceLevel       Float?
+  negotiationStrategy   String?  @db.VarChar(50) // aggressive, balanced, conservative
+  litigationCostEstimate Decimal? @db.Decimal(10, 2)
+  subrogationPotential  Decimal? @db.Decimal(10, 2)
+  justification         String?
+  createdAt             DateTime @default(now())
+  recommendedTimestamp   DateTime?
+
+  @@index([claimId])
+}
+
+// Claims analytics
+model ClaimsAnalytics {
+  id                       String   @id @default(uuid())
+  periodDate               DateTime @db.Date
+  insuranceLine            String?  @db.VarChar(50)
+  totalClaims              Int?
+  fraudDetected            Int?
+  fraudDetectionRate       Float?
+  averageProcessingDays    Float?
+  averageSettlementRatio   Float? // settled_amount / claimed_amount
+  subrogationRecovery      Decimal? @db.Decimal(12, 2)
+  litigationCases          Int?
+  litigationSuccessRate    Float?
+  updatedAt                DateTime @default(now())
+
+  @@unique([periodDate, insuranceLine])
+  @@index([insuranceLine, periodDate(sort: Desc)])
+}
+
+// Anomaly detection events
+model AnomalyEvent {
+  id              String   @id @default(uuid())
+  claimId         String
+  anomalyType     String?  @db.VarChar(100) // size, timing, frequency, network, document, behavioral
+  anomalyScore    Float? // 0-100
+  severity        String?  @db.VarChar(20) // Critical, High, Medium, Low
+  description     String?
+  triggeredByModel String?  @db.VarChar(100)
+  requiresReview  Boolean  @default(true)
+  reviewedBy      String?
+  reviewTimestamp DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([claimId, severity(sort: Desc)])
+}
+
+// Claims investigation tracking
+model ClaimsInvestigation {
+  id                  String   @id @default(uuid())
+  claimId             String
+  investigationType   String?  @db.VarChar(50) // fraud, coverage, liability, provider
+  investigationReason String?
+  assignedInvestigator String?
+  status              String   @db.VarChar(50) // open, in_progress, completed, closed
+  findings            String?
+  fraudConfirmed      Boolean?
+  investigationCost   Decimal? @db.Decimal(10, 2)
+  resolutionDate      DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([claimId])
+}
