@@ -165,11 +165,30 @@ export class LeadScoringService {
         scoringFactors
       );
 
+      // Phase 27.1: Calculate Predictive Score
+      // Lead Score = (0.35 * conversion_prob + 0.40 * (ltv_norm) + 0.15 * (1-churn) + 0.10 * roi)
+      // Mock values for now since we're in the integration phase
+      const conversionProbability = 0.75;
+      const predictedLTV = 7500;
+      const churnProbability = 0.15;
+      const roiScore = 0.85;
+      
+      const maxLtv = 25000;
+      const ltvNormalized = Math.min(1, predictedLTV / maxLtv);
+      
+      const predictiveScore = (
+        0.35 * conversionProbability +
+        0.40 * ltvNormalized +
+        0.15 * (1 - churnProbability) +
+        0.10 * roiScore
+      ) * 100;
+
       const processingTime = Date.now() - startTime;
 
       logger.info('Lead scored successfully', {
         leadId: leadData.id,
         overallScore: normalizedScore,
+        predictiveScore,
         qualificationLevel,
         processingTime,
       });
@@ -187,6 +206,12 @@ export class LeadScoringService {
         primaryInsuranceType,
         scoringFactors,
         recommendations,
+        // Phase 27.1 additions
+        conversionProbability,
+        predictedLTV,
+        churnProbability,
+        roiScore,
+        predictiveScore,
         createdAt: new Date(),
       };
     } catch (error) {

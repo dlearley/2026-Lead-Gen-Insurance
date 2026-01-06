@@ -201,6 +201,14 @@ export interface LeadScoringResult {
   primaryInsuranceType: InsuranceType;
   scoringFactors: ScoringFactor[];
   recommendations: string[];
+  
+  // Phase 27.1 Predictive Analytics
+  conversionProbability?: number;
+  predictedLTV?: number;
+  churnProbability?: number;
+  roiScore?: number;
+  predictiveScore?: number;
+
   createdAt: Date;
 }
 

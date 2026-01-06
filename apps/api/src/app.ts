@@ -24,6 +24,11 @@ import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
+import predictionsRouter from './routes/predictions.js';
+import ltvRouter from './routes/ltv.js';
+import churnRouter from './routes/churn.js';
+import roiRouter from './routes/roi.js';
+import modelsRouter from './routes/models.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -66,6 +71,11 @@ export function createApp(): express.Express {
   app.use('/api/v1/vip', vipRouter);
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/claims', claimsRouter);
+  app.use('/api/v1/predictions', predictionsRouter);
+  app.use('/api/v1/ltv', ltvRouter);
+  app.use('/api/v1/churn', churnRouter);
+  app.use('/api/v1/roi', roiRouter);
+  app.use('/api/v1/models', modelsRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -87,6 +97,11 @@ export function createApp(): express.Express {
   app.use('/api/vip', vipRouter);
   app.use('/api/community', communityRouter);
   app.use('/api/claims', claimsRouter);
+  app.use('/api/predictions', predictionsRouter);
+  app.use('/api/ltv', ltvRouter);
+  app.use('/api/churn', churnRouter);
+  app.use('/api/roi', roiRouter);
+  app.use('/api/models', modelsRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
