@@ -244,3 +244,4 @@ setInterval(() => {
 
 // Re-export for package consumers
 export { prisma, disconnectPrisma } from './database/prisma.client.js';
+export { ComplianceService } from './services/compliance-service.js';

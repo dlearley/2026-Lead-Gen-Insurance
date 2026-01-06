@@ -183,6 +183,218 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
+// DataConsent model - tracks user consent for data processing (GDPR/CCPA)
+model DataConsent {
+  id              String           @id @default(uuid())
+  leadId          String?
+  email           String?
+  consentType     ConsentType
+  consentGiven     Boolean          @default(false)
+  consentText      String
+  ipAddress       String?
+  userAgent       String?
+  version         Int              @default(1)
+  withdrawnAt     DateTime?
+  expiresAt       DateTime?
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Indexes
+  @@index([leadId])
+  @@index([email])
+  @@index([consentType])
+  @@index([consentGiven])
+  @@index([createdAt])
+  @@index([withdrawnAt])
+}
+
+// DataDeletionRequest model - handles right to be forgotten requests (GDPR Article 17)
+model DataDeletionRequest {
+  id                String               @id @default(uuid())
+  leadId            String?
+  email             String?
+  requestType       DeletionRequestType
+  status            DeletionRequestStatus @default(PENDING)
+  requestedBy       String
+  requestedByEmail  String?
+  ipAddress         String?
+  reason            String?
+  verifiedAt        DateTime?
+  processedAt       DateTime?
+  completedAt       DateTime?
+  rejectedReason    String?
+  retentionExpiry   DateTime?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relationships
+  auditLogs         ComplianceAuditLog[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@index([requestedBy])
+}
+
+// ComplianceAuditLog model - comprehensive audit trail for compliance
+model ComplianceAuditLog {
+  id                String               @id @default(uuid())
+  entityType        EntityType
+  entityId          String
+  actionType        ActionType
+  performedBy       String?
+  performedByRole   String?
+  ipAddress         String?
+  userAgent         String?
+  oldValue          Json?
+  newValue          Json?
+  sensitiveFields   String[]
+  requestId         String?
+  sessionId         String?
+  deletionRequestId String?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+
+  // Relationships
+  deletionRequest    DataDeletionRequest? @relation(fields: [deletionRequestId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([entityType])
+  @@index([entityId])
+  @@index([actionType])
+  @@index([performedBy])
+  @@index([createdAt])
+  @@index([deletionRequestId])
+  @@index([requestId])
+}
+
+// ComplianceReport model - generated regulatory reports
+model ComplianceReport {
+  id                  String              @id @default(uuid())
+  reportType          ReportType
+  reportFormat        ReportFormat
+  status              ReportStatus        @default(PENDING)
+  title               String
+  description         String?
+  generatedBy         String
+  periodStart         DateTime?
+  periodEnd           DateTime?
+  filters             Json?
+  metrics             Json?
+  fileUrl             String?
+  fileSize            Int?
+  recordCount         Int?
+  encryptionKey       String?
+  checksum            String?
+  retentionExpiresAt  DateTime?
+  publishedAt         DateTime?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Indexes
+  @@index([reportType])
+  @@index([status])
+  @@index([generatedBy])
+  @@index([periodStart])
+  @@index([periodEnd])
+  @@index([createdAt])
+  @@index([publishedAt])
+}
+
+// DataRetentionPolicy model - define and enforce retention policies
+model DataRetentionPolicy {
+  id              String                @id @default(uuid())
+  entityType      EntityType
+  retentionPeriod Int                   // retention period in days
+  action          RetentionAction       @default(DELETE)
+  condition       String?
+  isActive        Boolean               @default(true)
+  priority        Int                   @default(0)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  recordsProcessed Int                  @default(0)
+  recordsDeleted Int                   @default(0)
+  createdBy       String?
+  metadata        Json?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Indexes
+  @@index([entityType])
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@index([priority])
+}
+
+// ComplianceViolation model - track violations and remediation
+model ComplianceViolation {
+  id                  String              @id @default(uuid())
+  violationType       ViolationType
+  severity            ViolationSeverity
+  status              ViolationStatus     @default(OPEN)
+  description         String
+  entityId            String?
+  entityType          EntityType?
+  detectedBy          String?
+  detectionMethod     String?
+  affectedRecords     Int?
+  riskScore           Float?
+  remediationAction   String?
+  remediationStatus   RemediationStatus  @default(NOT_STARTED)
+  remediatedAt        DateTime?
+  remediatedBy        String?
+  notes               String?
+  reportedTo          String?
+  reportDate          DateTime?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Indexes
+  @@index([violationType])
+  @@index([severity])
+  @@index([status])
+  @@index([entityType])
+  @@index([detectedBy])
+  @@index([createdAt])
+  @@index([riskScore])
+}
+
+// DataSubjectRequest model - general data subject rights requests
+model DataSubjectRequest {
+  id                String                @id @default(uuid())
+  leadId            String?
+  email             String
+  requestType       DataSubjectRequestType
+  status            DataSubjectRequestStatus @default(PENDING)
+  verificationData  Json?
+  identityVerified  Boolean               @default(false)
+  verifiedAt        DateTime?
+  processedAt       DateTime?
+  completedAt       DateTime?
+  requestData       Json?
+  responseData      Json?
+  rejectionReason   String?
+  ipAddress         String?
+  requestedBy       String
+  metadata          Json?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  // Indexes
+  @@index([leadId])
+  @@index([email])
+  @@index([requestType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([identityVerified])
+}
+
 // Enums for type safety
 enum LeadStatus {
   RECEIVED
@@ -222,4 +434,143 @@ enum PartnershipStatus {
   SUSPENDED
   TERMINATED
   RENEWAL_NEEDED
+}
+
+// Compliance Enums
+enum ConsentType {
+  MARKETING_COMMUNICATIONS
+  DATA_PROCESSING
+  DATA_SHARING
+  ANALYTICS
+  PERSONALIZED_ADS
+  LOCATION_TRACKING
+  THIRD_PARTY_SHARING
+}
+
+enum DeletionRequestType {
+  RIGHT_TO_BE_FORGOTTEN
+  DATA_PORTABILITY
+  ACCOUNT_DELETION
+  CONSENT_WITHDRAWAL
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  VERIFIED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+enum EntityType {
+  LEAD
+  AGENT
+  CARRIER
+  ASSIGNMENT
+  CONSENT
+  AUDIT_LOG
+  REPORT
+  POLICY
+  VIOLATION
+  DATA_SUBJECT_REQUEST
+}
+
+enum ActionType {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  EXPORT
+  ACCESS
+  SHARE
+  ANONYMIZE
+  ARCHIVE
+  RESTORE
+}
+
+enum ReportType {
+  DATA_PROCESSING_REGISTRY
+  DATA_SUBJECT_REQUESTS
+  DATA_BREACH_REPORT
+  CONSENT_REGISTRY
+  RETENTION_REPORT
+  AUDIT_LOG_REPORT
+  PRIVACY_IMPACT_ASSESSMENT
+  SECURITY_INCIDENT_REPORT
+}
+
+enum ReportFormat {
+  PDF
+  CSV
+  JSON
+  XML
+  HTML
+}
+
+enum ReportStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum RetentionAction {
+  DELETE
+  ANONYMIZE
+  ARCHIVE
+  TRANSFER
+}
+
+enum ViolationType {
+  UNAUTHORIZED_ACCESS
+  DATA_BREACH
+  CONSENT_VIOLATION
+  RETENTION_VIOLATION
+  DATA_LEAK
+  SECURITY_INCIDENT
+  POLICY_VIOLATION
+  COMPLIANCE_BREACH
+}
+
+enum ViolationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ViolationStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum RemediationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+enum DataSubjectRequestType {
+  ACCESS_REQUEST
+  DELETION_REQUEST
+  PORTABILITY_REQUEST
+  RECTIFICATION_REQUEST
+  OBJECTION_REQUEST
+  RESTRICTION_REQUEST
+}
+
+enum DataSubjectRequestStatus {
+  PENDING
+  VERIFIED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  EXPIRED
 }
