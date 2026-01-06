@@ -10,3 +10,6 @@ export * from './database/index.js';
 
 // Security exports
 export * from './security/index.js';
+
+// Phase 27.2: Lead Prioritization & Routing Services
+export * from './services/index.js';

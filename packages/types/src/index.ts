@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Lead Prioritization & Routing Types (Phase 27.2)
+export * from './routing.js';
