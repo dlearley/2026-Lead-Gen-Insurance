@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Broker Benchmarking (Phase 12.2)
-export * from './benchmark.js';
+// Compliance Types (Phase 19.9)
+export * from './compliance.js';

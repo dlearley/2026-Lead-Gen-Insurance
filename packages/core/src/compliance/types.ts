@@ -1,4 +1,4 @@
-// Compliance and audit types for Phase 19.9
+// Type definitions for compliance audit and validation
 
 export enum ComplianceDomain {
   REGULATORY = 'regulatory',
@@ -189,38 +189,4 @@ export interface RegulatoryMapping {
   controls: string[];
   gaps: string[];
   actionItems: RemediationAction[];
-}
-
-export interface ComplianceDashboard {
-  overallScore: number;
-  riskLevel: string;
-  totalIssues: number;
-  criticalIssues: number;
-  highIssues: number;
-  mediumIssues: number;
-  lowIssues: number;
-  lastUpdated: Date;
-  trends: {
-    complianceScore: number[];
-    issuesByMonth: number[];
-    criticalIssuesByMonth: number[];
-  };
-  domains: {
-    domain: string;
-    score: number;
-    status: string;
-    issues: number;
-  }[];
-  recentActivities: {
-    activity: string;
-    timestamp: Date;
-    status: string;
-    owner: string;
-  }[];
-  upcomingDeadlines: {
-    deadline: string;
-    dueDate: Date;
-    priority: string;
-    owner: string;
-  }[];
 }

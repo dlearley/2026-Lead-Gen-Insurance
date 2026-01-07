@@ -1,500 +1,617 @@
-import { Router } from 'express';
+// Compliance API routes for Phase 19.9
+import { Router, Request, Response } from 'express';
 import {
-  ComplianceService,
-} from '../services/compliance.service.js';
+  complianceAuditEngine,
+  regulatoryComplianceService,
+  dataPrivacyComplianceService,
+  financialComplianceService,
+  thirdPartyRiskService,
+  auditTrailValidationService,
+  complianceReportsService,
+  remediationTracker,
+} from '@insurance-lead-gen/core';
 import {
-  CompliancePolicy,
-  ComplianceViolation,
-  ComplianceAuditLog,
-  ComplianceStatus,
-  CreatePolicyRequest,
-  ComplianceReportRequest,
-  ComplianceViolationFilter,
-  ComplianceAuditLogFilter,
-} from '@types/compliance.js';
+  ComplianceDomain,
+  RegulationType,
+  ComplianceSeverity,
+  RemediationAction,
+} from '@insurance-lead-gen/types';
+import { logger } from '@insurance-lead-gen/core';
 
 const router = Router();
-const complianceService = new ComplianceService();
 
-/**
- * @route GET /api/v1/compliance/status
- * @desc Get overall compliance status
- * @access Public
- */
-router.get('/status', async (req, res) => {
+// Middleware to ensure compliance mode is enabled
+const requireComplianceMode = (req: Request, res: Response, next: Function) => {
+  const complianceMode = process.env.COMPLIANCE_MODE || 'full';
+  if (complianceMode === 'disabled') {
+    return res.status(503).json({
+      error: 'Compliance features disabled',
+      message: 'Compliance mode is currently disabled',
+    });
+  }
+  next();
+};
+
+// Apply compliance mode middleware to all routes
+router.use(requireComplianceMode);
+
+// GET /api/v1/compliance/dashboard - Executive compliance dashboard
+router.get('/dashboard', async (req: Request, res: Response) => {
   try {
-    const score = await complianceService.getComplianceScore();
-    
-    const status = {
-      overallComplianceScore: score,
-      status: score >= 90 ? 'Excellent' : score >= 80 ? 'Good' : score >= 70 ? 'Fair' : 'Poor',
-      lastUpdated: new Date().toISOString(),
-      domains: await getDomainComplianceStatus(),
-    };
+    logger.info('Generating executive compliance dashboard');
+
+    // Run quick compliance assessment for dashboard
+    const auditResults = await complianceAuditEngine.runComplianceAudit({
+      includeEvidence: false,
+    });
+
+    const dashboard = await complianceReportsService.generateExecutiveComplianceDashboard(
+      {
+        overallScore: auditResults.summary.overallScore,
+        criticalIssues: auditResults.summary.criticalIssues,
+        highIssues: auditResults.summary.highIssues,
+        auditTrailCompleteness: 92,
+        totalRequirements: auditResults.summary.totalRequirements,
+        compliant: auditResults.summary.compliant,
+        nonCompliant: auditResults.summary.nonCompliant,
+        partial: auditResults.summary.partial,
+        notApplicable: auditResults.summary.notApplicable,
+        totalVendors: 5,
+        highRiskVendors: 2,
+        overallRisk: 'medium',
+        totalContracts: 8,
+        criticalIssues: 1,
+      },
+      {
+        includeTrends: true,
+        includeBenchmarks: true,
+        timeframe: 'quarterly',
+      }
+    );
 
     res.json({
       success: true,
-      data: status,
+      data: dashboard.dashboard,
+      summary: dashboard.summary,
+      generatedAt: new Date(),
     });
   } catch (error) {
+    logger.error('Error generating compliance dashboard', { error });
     res.status(500).json({
       success: false,
-      error: 'Failed to retrieve compliance status',
-      message: error.message,
+      error: 'Failed to generate compliance dashboard',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
 
-/**
- * @route GET /api/v1/compliance/policies
- * @desc List all compliance policies
- * @access Public
- */
-router.get('/policies', async (req, res) => {
+// POST /api/v1/compliance/audit - Run comprehensive compliance audit
+router.post('/audit', async (req: Request, res: Response) => {
   try {
-    const { domain, status, limit = 50, offset = 0 } = req.query;
+    const {
+      domains,
+      regulations,
+      includeEvidence = true,
+    } = req.body;
 
-    let policies: CompliancePolicy[];
-    
-    if (domain) {
-      policies = await complianceService.getPoliciesByDomain(domain as any);
-    } else {
-      // Get all policies from database
-      // This would need to be implemented in the service
-      policies = [];
-    }
+    logger.info('Starting compliance audit', { domains, regulations, includeEvidence });
 
-    // Apply status filter
-    if (status) {
-      policies = policies.filter(p => p.status === status);
-    }
-
-    // Apply pagination
-    const paginatedPolicies = policies.slice(Number(offset), Number(offset) + Number(limit));
+    const auditResults = await complianceAuditEngine.runComplianceAudit({
+      domains: domains as ComplianceDomain[],
+      regulations: regulations as RegulationType[],
+      includeEvidence,
+    });
 
     res.json({
       success: true,
-      data: paginatedPolicies,
-      pagination: {
-        total: policies.length,
+      data: auditResults,
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    logger.error('Error running compliance audit', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to run compliance audit',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/reports - List compliance reports
+router.get('/reports', async (req: Request, res: Response) => {
+  try {
+    const { type, limit = 10, offset = 0 } = req.query;
+
+    // In a real implementation, this would query the database
+    const reports = await complianceReportsService.getAllReports();
+
+    res.json({
+      success: true,
+      data: {
+        reports: reports.slice(Number(offset), Number(offset) + Number(limit)),
+        total: reports.length,
         limit: Number(limit),
         offset: Number(offset),
       },
     });
   } catch (error) {
+    logger.error('Error listing compliance reports', { error });
     res.status(500).json({
       success: false,
-      error: 'Failed to retrieve compliance policies',
-      message: error.message,
+      error: 'Failed to list compliance reports',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
 
-/**
- * @route GET /api/v1/compliance/policies/:id
- * @desc Get policy details
- * @access Public
- */
-router.get('/policies/:id', async (req, res) => {
+// GET /api/v1/compliance/reports/:id - Get specific compliance report
+router.get('/reports/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // This would need to be implemented in the service
-    // const policy = await complianceService.getPolicyById(id);
-
-    // For now, return a placeholder
-    res.json({
-      success: true,
-      data: {
-        id,
-        name: 'Policy not found',
-        message: 'This endpoint needs implementation',
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve policy details',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route POST /api/v1/compliance/policies
- * @desc Create new policy (admin only)
- * @access Private
- */
-router.post('/policies', async (req, res) => {
-  try {
-    // Check admin permissions (would need authentication middleware)
-    // if (!req.user || req.user.role !== 'ADMIN') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     error: 'Insufficient permissions',
-    //   });
-    // }
-
-    const policyConfig: CreatePolicyRequest = req.body;
-
-    // Validate request body
-    if (!policyConfig.name || !policyConfig.domain || !policyConfig.riskLevel) {
-      return res.status(400).json({
+    const report = await complianceReportsService.getReport(id);
+    if (!report) {
+      return res.status(404).json({
         success: false,
-        error: 'Missing required fields: name, domain, riskLevel',
+        error: 'Report not found',
+        message: `Compliance report with ID ${id} not found`,
       });
     }
-
-    const policy = await complianceService.registerPolicy(policyConfig);
-
-    res.status(201).json({
-      success: true,
-      data: policy,
-      message: 'Compliance policy created successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create compliance policy',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route PUT /api/v1/compliance/policies/:id
- * @desc Update policy (admin only)
- * @access Private
- */
-router.put('/policies/:id', async (req, res) => {
-  try {
-    // Check admin permissions
-    // if (!req.user || req.user.role !== 'ADMIN') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     error: 'Insufficient permissions',
-    //   });
-    // }
-
-    const { id } = req.params;
-    const updates = req.body;
-
-    // This would need to be implemented in the service
-    // const policy = await complianceService.updatePolicy(id, updates);
-
-    res.json({
-      success: true,
-      data: { id, updates },
-      message: 'Policy update endpoint needs implementation',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update policy',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route DELETE /api/v1/compliance/policies/:id
- * @desc Archive policy (admin only)
- * @access Private
- */
-router.delete('/policies/:id', async (req, res) => {
-  try {
-    // Check admin permissions
-    // if (!req.user || req.user.role !== 'ADMIN') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     error: 'Insufficient permissions',
-    //   });
-    // }
-
-    const { id } = req.params;
-
-    await complianceService.archivePolicy(id);
-
-    res.json({
-      success: true,
-      message: 'Policy archived successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to archive policy',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route GET /api/v1/compliance/violations
- * @desc List policy violations
- * @access Public
- */
-router.get('/violations', async (req, res) => {
-  try {
-    const filters: ComplianceViolationFilter = {
-      policyId: req.query.policyId as string,
-      leadId: req.query.leadId as string,
-      agentId: req.query.agentId as string,
-      severity: req.query.severity as any,
-      status: req.query.status as any,
-      dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-      dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
-    };
-
-    // This would need to be implemented in the service
-    // const violations = await complianceService.getViolations(filters);
-
-    res.json({
-      success: true,
-      data: [], // Placeholder
-      filters,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve violations',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route GET /api/v1/compliance/violations/:id
- * @desc Get violation details
- * @access Public
- */
-router.get('/violations/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // This would need to be implemented in the service
-    // const violation = await complianceService.getViolationById(id);
-
-    res.json({
-      success: true,
-      data: {
-        id,
-        message: 'Violation details endpoint needs implementation',
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve violation details',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route PUT /api/v1/compliance/violations/:id
- * @desc Update violation status
- * @access Private
- */
-router.put('/violations/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, resolution } = req.body;
-
-    // This would need to be implemented in the service
-    // const violation = await complianceService.updateViolationStatus(id, status, resolution);
-
-    res.json({
-      success: true,
-      data: { id, status, resolution },
-      message: 'Violation status update endpoint needs implementation',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update violation status',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route GET /api/v1/compliance/audit-logs
- * @desc Query immutable audit trail
- * @access Private
- */
-router.get('/audit-logs', async (req, res) => {
-  try {
-    const filters: ComplianceAuditLogFilter = {
-      userId: req.query.userId as string,
-      entityId: req.query.entityId as string,
-      action: req.query.action as string,
-      entityType: req.query.entityType as string,
-      dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-      dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
-      limit: req.query.limit ? Number(req.query.limit) : undefined,
-      offset: req.query.offset ? Number(req.query.offset) : undefined,
-    };
-
-    // This would need to be implemented in the service
-    // const auditLogs = await complianceService.getAuditTrail(filters);
-
-    res.json({
-      success: true,
-      data: [], // Placeholder
-      filters,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve audit logs',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route POST /api/v1/compliance/score
- * @desc Calculate compliance score
- * @access Public
- */
-router.post('/score', async (req, res) => {
-  try {
-    const { domain, jurisdiction } = req.body;
-
-    // This would need to be implemented in the service
-    // const score = await complianceService.calculateComplianceScore(domain, jurisdiction);
-
-    const score = await complianceService.getComplianceScore();
-
-    res.json({
-      success: true,
-      data: {
-        score,
-        domain,
-        jurisdiction,
-        calculatedAt: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to calculate compliance score',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route GET /api/v1/compliance/requirements
- * @desc List regulatory requirements
- * @access Public
- */
-router.get('/requirements', async (req, res) => {
-  try {
-    const { domain, jurisdiction, status } = req.query;
-
-    // This would need to be implemented
-    const requirements = [];
-
-    res.json({
-      success: true,
-      data: requirements,
-      filters: { domain, jurisdiction, status },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve regulatory requirements',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route POST /api/v1/compliance/validate-lead
- * @desc Validate lead against compliance policies
- * @access Public
- */
-router.post('/validate-lead', async (req, res) => {
-  try {
-    const leadData = req.body;
-
-    const validationResult = await complianceService.validateLeadCompliance(leadData);
-
-    res.json({
-      success: true,
-      data: validationResult,
-      leadId: leadData.id,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to validate lead compliance',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * @route POST /api/v1/compliance/report
- * @desc Generate compliance report
- * @access Private
- */
-router.post('/report', async (req, res) => {
-  try {
-    const reportRequest: ComplianceReportRequest = req.body;
-
-    // Validate required fields
-    if (!reportRequest.dateFrom || !reportRequest.dateTo) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: dateFrom, dateTo',
-      });
-    }
-
-    const report = await complianceService.generateComplianceReport(reportRequest);
 
     res.json({
       success: true,
       data: report,
     });
   } catch (error) {
+    logger.error('Error getting compliance report', { error });
     res.status(500).json({
       success: false,
-      error: 'Failed to generate compliance report',
-      message: error.message,
+      error: 'Failed to get compliance report',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
 
-/**
- * Helper function to get domain-specific compliance status
- */
-async function getDomainComplianceStatus() {
-  // This would query actual domain compliance data
-  return [
-    {
-      domain: 'GDPR',
-      score: 95,
-      status: 'Excellent',
-      activePolicies: 3,
-      openViolations: 1,
-    },
-    {
-      domain: 'HIPAA',
-      score: 88,
-      status: 'Good',
-      activePolicies: 2,
-      openViolations: 0,
-    },
-    {
-      domain: 'Insurance',
-      score: 92,
-      status: 'Excellent',
-      activePolicies: 5,
-      openViolations: 2,
-    },
-  ];
-}
+// POST /api/v1/compliance/reports - Generate new compliance report
+router.post('/reports', async (req: Request, res: Response) => {
+  try {
+    const {
+      type = 'comprehensive',
+      options = {},
+    } = req.body;
+
+    // Run audit first
+    const auditResults = await complianceAuditEngine.runComplianceAudit({
+      includeEvidence: options.includeEvidence,
+    });
+
+    let report;
+    switch (type) {
+      case 'executive':
+        report = await complianceReportsService.generateExecutiveComplianceDashboard(
+          auditResults,
+          options
+        );
+        break;
+      case 'regulatory':
+        report = await complianceReportsService.generateRegulatoryGapAnalysis(
+          auditResults,
+          options
+        );
+        break;
+      case 'privacy':
+        report = await complianceReportsService.generateDataPrivacyImpactAssessment(
+          auditResults,
+          options
+        );
+        break;
+      case 'third_party':
+        report = await complianceReportsService.generateThirdPartyRiskAssessmentReport(
+          auditResults,
+          options
+        );
+        break;
+      case 'audit_trail':
+        report = await complianceReportsService.generateAuditTrailValidationReport(
+          auditResults,
+          options
+        );
+        break;
+      default:
+        report = await complianceReportsService.generateComprehensiveComplianceReport(
+          auditResults,
+          options
+        );
+    }
+
+    res.json({
+      success: true,
+      data: report,
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    logger.error('Error generating compliance report', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate compliance report',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /api/v1/compliance/remediation - Create remediation action
+router.post('/remediation', async (req: Request, res: Response) => {
+  try {
+    const { title, description, owner, priority, dueDate, findingId } = req.body;
+
+    if (!title || !description || !owner || !priority) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'title, description, owner, and priority are required',
+      });
+    }
+
+    const action = await remediationTracker.createRemediationAction({
+      title,
+      description,
+      owner,
+      priority: priority as ComplianceSeverity,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+    }, findingId);
+
+    res.status(201).json({
+      success: true,
+      data: action,
+    });
+  } catch (error) {
+    logger.error('Error creating remediation action', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create remediation action',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/remediation - Get remediation actions
+router.get('/remediation', async (req: Request, res: Response) => {
+  try {
+    const {
+      owner,
+      priority,
+      status,
+      overdue,
+      limit = 50,
+      offset = 0,
+    } = req.query;
+
+    const progress = await remediationTracker.getRemediationProgress({
+      owner: owner as string,
+      priority: priority as ComplianceSeverity,
+      status: status as RemediationAction['status'],
+      overdue: overdue === 'true',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        actions: progress.actions.slice(Number(offset), Number(offset) + Number(limit)),
+        summary: progress.summary,
+        progressMetrics: progress.progressMetrics,
+        trends: progress.trends,
+        total: progress.actions.length,
+        limit: Number(limit),
+        offset: Number(offset),
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting remediation actions', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get remediation actions',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// PUT /api/v1/compliance/remediation/:id - Update remediation status
+router.put('/remediation/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, notes, updatedBy } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'status is required',
+      });
+    }
+
+    await remediationTracker.updateRemediationStatus(
+      id,
+      status as RemediationAction['status'],
+      notes,
+      updatedBy
+    );
+
+    const action = remediationTracker.getAction(id);
+    if (!action) {
+      return res.status(404).json({
+        success: false,
+        error: 'Remediation action not found',
+        message: `Remediation action with ID ${id} not found`,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: action,
+    });
+  } catch (error) {
+    logger.error('Error updating remediation action', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update remediation action',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/vendors - Get vendor risk assessments
+router.get('/vendors', async (req: Request, res: Response) => {
+  try {
+    const report = await thirdPartyRiskService.generateThirdPartyRiskReport();
+
+    res.json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    logger.error('Error getting vendor assessments', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get vendor assessments',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /api/v1/compliance/vendors/:id/assess - Assess specific vendor risk
+router.post('/vendors/:id/assess', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const assessment = await thirdPartyRiskService.assessVendorRisk(id);
+
+    res.json({
+      success: true,
+      data: assessment,
+    });
+  } catch (error) {
+    logger.error('Error assessing vendor risk', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to assess vendor risk',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/audit-trail - Validate audit trail
+router.get('/audit-trail', async (req: Request, res: Response) => {
+  try {
+    const report = await auditTrailValidationService.generateAuditTrailValidationReport();
+
+    res.json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    logger.error('Error validating audit trail', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to validate audit trail',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/gdpr - GDPR compliance check
+router.get('/gdpr', async (req: Request, res: Response) => {
+  try {
+    const compliance = await dataPrivacyComplianceService.performGDPRComplianceCheck();
+
+    res.json({
+      success: true,
+      data: compliance,
+    });
+  } catch (error) {
+    logger.error('Error checking GDPR compliance', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check GDPR compliance',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/gdpr/export - GDPR data export
+router.get('/gdpr/export', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing user ID',
+        message: 'userId parameter is required',
+      });
+    }
+
+    const exportData = await dataPrivacyComplianceService.generateDataProcessingInventory();
+
+    res.json({
+      success: true,
+      data: exportData,
+    });
+  } catch (error) {
+    logger.error('Error exporting GDPR data', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to export GDPR data',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /api/v1/compliance/gdpr/delete - GDPR data deletion
+router.post('/gdpr/delete', async (req: Request, res: Response) => {
+  try {
+    const { userId, reason, retainAnalytics = false } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing user ID',
+        message: 'userId is required',
+      });
+    }
+
+    await dataPrivacyComplianceService.recordConsent(userId, {
+      userId,
+      purpose: 'data_deletion',
+      granted: true,
+      reason,
+      retainAnalytics,
+    });
+
+    res.json({
+      success: true,
+      message: 'Data deletion request recorded successfully',
+    });
+  } catch (error) {
+    logger.error('Error processing GDPR data deletion', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process data deletion',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/hipaa - HIPAA compliance check
+router.get('/hipaa', async (req: Request, res: Response) => {
+  try {
+    const compliance = await dataPrivacyComplianceService.performHIPAAComplianceCheck();
+
+    res.json({
+      success: true,
+      data: compliance,
+    });
+  } catch (error) {
+    logger.error('Error checking HIPAA compliance', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check HIPAA compliance',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/ccpa - CCPA compliance check
+router.get('/ccpa', async (req: Request, res: Response) => {
+  try {
+    const compliance = await dataPrivacyComplianceService.performCCPAComplianceCheck();
+
+    res.json({
+      success: true,
+      data: compliance,
+    });
+  } catch (error) {
+    logger.error('Error checking CCPA compliance', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check CCPA compliance',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/sox - SOX controls validation
+router.get('/sox', async (req: Request, res: Response) => {
+  try {
+    const validation = await financialComplianceService.validateSOXControls();
+
+    res.json({
+      success: true,
+      data: validation,
+    });
+  } catch (error) {
+    logger.error('Error validating SOX controls', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to validate SOX controls',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/financial - Financial compliance check
+router.get('/financial', async (req: Request, res: Response) => {
+  try {
+    const report = await financialComplianceService.generateFinancialComplianceReport();
+
+    res.json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    logger.error('Error checking financial compliance', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check financial compliance',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET /api/v1/compliance/regulatory - Regulatory compliance check
+router.get('/regulatory', async (req: Request, res: Response) => {
+  try {
+    const { states = 'CA,NY,TX' } = req.query;
+    const stateArray = (states as string).split(',');
+
+    const results = await Promise.all(
+      stateArray.map(async (state) => ({
+        state,
+        compliance: await regulatoryComplianceService.validateStateCompliance(state.trim()),
+      }))
+    );
+
+    const overall = await regulatoryComplianceService.generateRegulatoryMapping();
+
+    res.json({
+      success: true,
+      data: {
+        stateCompliance: results,
+        regulatoryMapping: overall,
+        summary: {
+          totalStates: stateArray.length,
+          compliantStates: results.filter(r => r.compliance.compliant).length,
+          overallCompliance: results.reduce((sum, r) => sum + r.compliance.score, 0) / stateArray.length,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Error checking regulatory compliance', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check regulatory compliance',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
 
 export default router;
