@@ -1,228 +1,231 @@
-import { Router, Request, Response } from 'express';
-import { getConfig } from '@insurance-lead-gen/config';
+/**
+ * Phase 30: Partner Ecosystem & Integrations
+ * Partner management API routes
+ */
+
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { PartnerService } from '@insurance-platform/core';
+import type { CreatePartnerRequest, UpdatePartnerRequest } from '@insurance-platform/types';
 
 const router = Router();
-const config = getConfig();
+const prisma = new PrismaClient();
+const partnerService = new PartnerService(prisma);
 
 /**
- * Proxy requests to data service for partners
+ * GET /api/partners
+ * List all partners with filters
  */
-const DATA_SERVICE_URL = `http://localhost:${config.ports.dataService || 3001}`;
-
-/**
- * GET /api/v1/partners
- * Get all partners
- */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners?${new URLSearchParams(req.query as Record<string, string>)}`);
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partners' });
-  }
-});
+    const { status, type, tier, search, limit, offset } = req.query;
 
-/**
- * GET /api/v1/partners/:id
- * Get a specific partner
- */
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}`);
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner' });
-  }
-});
-
-/**
- * POST /api/v1/partners
- * Create a new partner
- */
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+    const result = await partnerService.listPartners({
+      status: status as any,
+      type: type as any,
+      tier: tier as any,
+      search: search as string,
+      limit: limit ? parseInt(limit as string) : undefined,
+      offset: offset ? parseInt(offset as string) : undefined,
     });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create partner' });
-  }
-});
 
-/**
- * PUT /api/v1/partners/:id
- * Update a partner
- */
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+    res.json({
+      success: true,
+      data: result.partners,
+      pagination: {
+        total: result.total,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      },
     });
-    const data = await response.json();
-    res.status(response.status).json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update partner' });
+    next(error);
   }
 });
 
 /**
- * DELETE /api/v1/partners/:id
- * Delete a partner
+ * GET /api/partners/:id
+ * Get partner by ID
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}`, {
-      method: 'DELETE',
-    });
-    res.status(response.status).send();
+    const partner = await partnerService.getPartnerById(req.params.id);
+
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Partner not found' },
+      });
+    }
+
+    res.json({ success: true, data: partner });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete partner' });
+    next(error);
   }
 });
 
 /**
- * GET /api/v1/partners/:id/users
- * Get all users for a partner
+ * POST /api/partners
+ * Create new partner (admin only)
  */
-router.get('/:id/users', async (req: Request, res: Response) => {
+router.post('/', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/users`);
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const partnerData: CreatePartnerRequest = req.body;
+
+    const partner = await partnerService.createPartner(partnerData);
+
+    res.status(201).json({ success: true, data: partner });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner users' });
+    next(error);
   }
 });
 
 /**
- * POST /api/v1/partners/:id/users
- * Add a user to a partner
+ * PUT /api/partners/:id
+ * Update partner
  */
-router.post('/:id/users', async (req: Request, res: Response) => {
+router.put('/:id', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const updates: UpdatePartnerRequest = req.body;
+
+    const partner = await partnerService.updatePartner(req.params.id, updates);
+
+    res.json({ success: true, data: partner });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to add partner user' });
+    next(error);
   }
 });
 
 /**
- * GET /api/v1/partners/:id/training
- * Get training progress for a partner
+ * DELETE /api/partners/:id
+ * Delete partner (admin only)
  */
-router.get('/:id/training', async (req: Request, res: Response) => {
+router.delete('/:id', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/training`);
-    const data = await response.json();
-    res.status(response.status).json(data);
+    await partnerService.deletePartner(req.params.id);
+
+    res.json({ success: true, message: 'Partner deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner training progress' });
+    next(error);
   }
 });
 
 /**
- * GET /api/v1/partners/:id/certifications
- * Get certifications for a partner
+ * POST /api/partners/:id/activate
+ * Activate partner
  */
-router.get('/:id/certifications', async (req: Request, res: Response) => {
+router.post('/:id/activate', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/certifications`);
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const partner = await partnerService.activatePartner(req.params.id);
+
+    res.json({ success: true, data: partner });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner certifications' });
+    next(error);
   }
 });
 
 /**
- * GET /api/v1/partners/:id/performance
- * Get performance metrics for a partner
+ * POST /api/partners/:id/suspend
+ * Suspend partner
  */
-router.get('/:id/performance', async (req: Request, res: Response) => {
+router.post('/:id/suspend', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/performance`);
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const { reason } = req.body;
+
+    const partner = await partnerService.suspendPartner(req.params.id, reason);
+
+    res.json({ success: true, data: partner });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner performance' });
+    next(error);
   }
 });
 
 /**
- * POST /api/v1/partners/:id/support
- * Create a support ticket for a partner
+ * GET /api/partners/:id/contacts
+ * Get partner contacts
  */
-router.post('/:id/support', async (req: Request, res: Response) => {
+router.get('/:id/contacts', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/support`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const contacts = await partnerService.getContacts(req.params.id);
+
+    res.json({ success: true, data: contacts });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create support ticket' });
+    next(error);
   }
 });
 
 /**
- * GET /api/v1/partners/:id/support
- * Get support tickets for a partner
+ * POST /api/partners/:id/contacts
+ * Add partner contact
  */
-router.get('/:id/support', async (req: Request, res: Response) => {
+router.post('/:id/contacts', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/partners/${req.params.id}/support`);
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const contact = await partnerService.addContact(req.params.id, req.body);
+
+    res.status(201).json({ success: true, data: contact });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch support tickets' });
+    next(error);
   }
 });
 
 /**
- * GET /api/v1/training/modules
- * Get all training modules
+ * GET /api/partners/:id/agreements
+ * Get partner agreements
  */
-router.get('/training/modules', async (req: Request, res: Response) => {
+router.get('/:id/agreements', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/training/modules`);
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const agreements = await partnerService.getAgreements(req.params.id);
+
+    res.json({ success: true, data: agreements });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch training modules' });
+    next(error);
   }
 });
 
 /**
- * POST /api/v1/training/modules
- * Create a new training module
+ * POST /api/partners/:id/agreements
+ * Create partner agreement
  */
-router.post('/training/modules', async (req: Request, res: Response) => {
+router.post('/:id/agreements', async (req, res, next) => {
   try {
-    const response = await fetch(`${DATA_SERVICE_URL}/api/v1/training/modules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const agreement = await partnerService.createAgreement(req.params.id, req.body);
+
+    res.status(201).json({ success: true, data: agreement });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create training module' });
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/partners/:id/agreements/:agreementId/sign
+ * Sign agreement
+ */
+router.put('/:id/agreements/:agreementId/sign', async (req, res, next) => {
+  try {
+    const { signedDate } = req.body;
+
+    const agreement = await partnerService.signAgreement(
+      req.params.agreementId,
+      signedDate ? new Date(signedDate) : new Date()
+    );
+
+    res.json({ success: true, data: agreement });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/partners/:id/statistics
+ * Get partner statistics
+ */
+router.get('/:id/statistics', async (req, res, next) => {
+  try {
+    const statistics = await partnerService.getPartnerStatistics(req.params.id);
+
+    res.json({ success: true, data: statistics });
+  } catch (error) {
+    next(error);
   }
 });
 

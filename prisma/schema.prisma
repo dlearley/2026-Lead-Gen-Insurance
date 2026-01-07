@@ -458,141 +458,653 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// Compliance Enums
-enum ConsentType {
-  MARKETING_COMMUNICATIONS
-  DATA_PROCESSING
-  DATA_SHARING
-  ANALYTICS
-  PERSONALIZED_ADS
-  LOCATION_TRACKING
-  THIRD_PARTY_SHARING
+// ============================================================================
+// PHASE 30: PARTNER ECOSYSTEM & INTEGRATIONS
+// ============================================================================
+
+// Partner model - stores information about third-party partners
+model Partner {
+  id              String          @id @default(uuid())
+  organizationId  String?
+  partnerName     String
+  description     String?
+  partnerType     PartnerType
+  website         String?
+  logoUrl         String?
+  status          PartnerStatus   @default(PENDING)
+  tier            PartnerTier     @default(BASIC)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relationships
+  contacts        PartnerContact[]
+  agreements      PartnerAgreement[]
+  applications    PartnerApplication[]
+  apiKeys         ApiKey[]
+  oauthClients    OAuthClient[]
+  integrations    Integration[]
+  usage           PartnerUsage[]
+  pricing         PartnerPricing[]
+  invoices        PartnerInvoice[]
+  payouts         PartnerPayout[]
+  tickets         SupportTicket[]
+
+  @@index([partnerName])
+  @@index([partnerType])
+  @@index([status])
+  @@index([tier])
+  @@index([createdAt])
 }
 
-enum DeletionRequestType {
-  RIGHT_TO_BE_FORGOTTEN
-  DATA_PORTABILITY
-  ACCOUNT_DELETION
-  CONSENT_WITHDRAWAL
+// PartnerContact model - stores contact information for partners
+model PartnerContact {
+  id          String   @id @default(uuid())
+  partnerId   String
+  contactName String
+  email       String
+  phone       String?
+  role        String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  partner     Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([email])
 }
 
-enum DeletionRequestStatus {
+// PartnerAgreement model - stores legal agreements with partners
+model PartnerAgreement {
+  id              String            @id @default(uuid())
+  partnerId       String
+  agreementType   String
+  signedDate      DateTime?
+  effectiveDate   DateTime
+  expirationDate  DateTime?
+  terms           Json?
+  documentUrl     String?
+  status          AgreementStatus   @default(DRAFT)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  partner         Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([effectiveDate])
+}
+
+// PartnerApplication model - stores partner applications/integrations
+model PartnerApplication {
+  id              String              @id @default(uuid())
+  partnerId       String
+  appName         String
+  description     String?
+  appVersion      String              @default("1.0.0")
+  status          ApplicationStatus   @default(DRAFT)
+  permissions     Json?               // Array of permission scopes
+  dataAccess      Json?               // Data access requirements
+  securityInfo    Json?               // Security practices and certifications
+  approvalStatus  String?
+  submittedDate   DateTime?
+  approvedDate    DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relationships
+  partner         Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  apiKeys         ApiKey[]
+  oauthClients    OAuthClient[]
+  integrations    Integration[]
+  tickets         SupportTicket[]
+  listings        MarketplaceListing[]
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([appName])
+}
+
+// ApiKey model - stores API keys for partner authentication
+model ApiKey {
+  id            String      @id @default(uuid())
+  partnerId     String
+  appId         String?
+  keyValue      String      @unique // Hashed API key
+  keyPrefix     String      // First 8 chars for identification
+  scopes        Json?       // Array of permission scopes
+  rateLimit     Int         @default(1000) // Requests per hour
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  status        ApiKeyStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relationships
+  partner       Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  application   PartnerApplication? @relation(fields: [appId], references: [id], onDelete: Cascade)
+  integrations  Integration[]
+
+  @@index([partnerId])
+  @@index([appId])
+  @@index([keyPrefix])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// OAuthClient model - stores OAuth 2.0 clients
+model OAuthClient {
+  id                    String   @id @default(uuid())
+  partnerId             String
+  appId                 String
+  clientId              String   @unique
+  clientSecret          String   // Hashed client secret
+  redirectUris          String[] // Allowed redirect URIs
+  allowedFlows          String[] // authorization_code, client_credentials, refresh_token
+  tokenLifetime         Int      @default(3600) // Seconds
+  refreshTokenLifetime  Int      @default(2592000) // 30 days
+  status                OAuthClientStatus @default(ACTIVE)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relationships
+  partner               Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  application           PartnerApplication @relation(fields: [appId], references: [id], onDelete: Cascade)
+  tokens                OAuthToken[]
+
+  @@index([partnerId])
+  @@index([appId])
+  @@index([clientId])
+}
+
+// OAuthToken model - stores issued OAuth tokens
+model OAuthToken {
+  id              String    @id @default(uuid())
+  clientId        String
+  userId          String?
+  tokenType       String    @default("Bearer")
+  accessToken     String    @unique
+  refreshToken    String?   @unique
+  scopes          Json?     // Array of granted scopes
+  expiresAt       DateTime
+  refreshExpiresAt DateTime?
+  revoked         Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  // Relationships
+  client          OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([accessToken])
+  @@index([refreshToken])
+  @@index([expiresAt])
+  @@index([revoked])
+}
+
+// Integration model - stores active partner integrations
+model Integration {
+  id              String            @id @default(uuid())
+  partnerId       String
+  appId           String
+  organizationId  String?
+  integrationName String
+  integrationType String
+  status          IntegrationStatus @default(INACTIVE)
+  lastHealthCheck DateTime?
+  healthStatus    String?
+  config          Json?
+  apiKeyId        String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  partner         Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  application     PartnerApplication @relation(fields: [appId], references: [id], onDelete: Cascade)
+  apiKey          ApiKey?           @relation(fields: [apiKeyId], references: [id])
+  mappings        IntegrationMapping[]
+  webhooks        WebhookEndpoint[]
+  metrics         IntegrationMetric[]
+  errors          IntegrationError[]
+
+  @@index([partnerId])
+  @@index([appId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([integrationType])
+}
+
+// IntegrationMapping model - stores field mappings for integrations
+model IntegrationMapping {
+  id              String   @id @default(uuid())
+  integrationId   String
+  sourceField     String
+  targetField     String
+  transformation  Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+}
+
+// EventType model - catalog of available event types
+model EventType {
+  id              String   @id @default(uuid())
+  eventName       String   @unique
+  description     String?
+  eventCategory   String
+  payloadSchema   Json?
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  events          PlatformEvent[]
+
+  @@index([eventName])
+  @@index([eventCategory])
+}
+
+// PlatformEvent model - stores platform events for event sourcing
+model PlatformEvent {
+  id            String    @id @default(uuid())
+  eventTypeId   String
+  organizationId String?
+  entityType    String
+  entityId      String
+  payload       Json
+  createdAt     DateTime  @default(now())
+
+  // Relationships
+  eventType     EventType @relation(fields: [eventTypeId], references: [id])
+  deliveries    WebhookDelivery[]
+
+  @@index([eventTypeId])
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+// WebhookEndpoint model - stores webhook endpoints
+model WebhookEndpoint {
+  id                String    @id @default(uuid())
+  integrationId     String
+  endpointUrl       String
+  webhookSecret     String    // HMAC secret for signature verification
+  subscribedEvents  Json      // Array of event names
+  active            Boolean   @default(true)
+  testMode          Boolean   @default(false)
+  lastTestedAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationships
+  integration       Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  deliveries        WebhookDelivery[]
+
+  @@index([integrationId])
+  @@index([active])
+}
+
+// WebhookDelivery model - tracks webhook delivery attempts
+model WebhookDelivery {
+  id              String    @id @default(uuid())
+  webhookId       String
+  eventId         String
+  payload         Json
+  attemptNumber   Int       @default(1)
+  status          WebhookDeliveryStatus @default(PENDING)
+  responseStatus  Int?
+  responseBody    String?
+  nextRetryAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationships
+  webhook         WebhookEndpoint @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event           PlatformEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([eventId])
+  @@index([status])
+  @@index([nextRetryAt])
+}
+
+// PartnerUsage model - tracks partner usage metrics
+model PartnerUsage {
+  id          String   @id @default(uuid())
+  partnerId   String
+  appId       String?
+  usageDate   DateTime
+  metricName  String
+  metricValue BigInt
+  unit        String
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  partner     Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([appId])
+  @@index([usageDate])
+  @@index([metricName])
+}
+
+// PartnerPricing model - stores partner pricing models
+model PartnerPricing {
+  id                      String   @id @default(uuid())
+  partnerId               String
+  pricingModel            PricingModel
+  revenueSharePercentage  Float?
+  flatFeeMonthly          Float?
+  flatFeeAnnual           Float?
+  usageTiers              Json?    // Array of usage tier objects
+  currency                String   @default("USD")
+  effectiveDate           DateTime
+  expirationDate          DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Relationships
+  partner                 Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([effectiveDate])
+}
+
+// PartnerInvoice model - stores partner invoices
+model PartnerInvoice {
+  id                  String        @id @default(uuid())
+  partnerId           String
+  billingPeriodStart  DateTime
+  billingPeriodEnd    DateTime
+  usage               Json?
+  subtotal            Float
+  taxes               Float         @default(0)
+  totalAmount         Float
+  status              InvoiceStatus @default(DRAFT)
+  dueDate             DateTime
+  paymentDate         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relationships
+  partner             Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([billingPeriodStart])
+}
+
+// PartnerPayout model - stores partner payouts
+model PartnerPayout {
+  id                  String       @id @default(uuid())
+  partnerId           String
+  payoutPeriodStart   DateTime
+  payoutPeriodEnd     DateTime
+  totalRevenue        Float
+  revenueShareAmount  Float
+  deductions          Float        @default(0)
+  netPayout           Float
+  status              PayoutStatus @default(PENDING)
+  paymentMethodId     String?
+  paidDate            DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relationships
+  partner             Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([payoutPeriodStart])
+}
+
+// IntegrationMetric model - stores integration performance metrics
+model IntegrationMetric {
+  id                  String   @id @default(uuid())
+  integrationId       String
+  timestamp           DateTime
+  apiCalls            Int      @default(0)
+  errorCount          Int      @default(0)
+  avgResponseTime     Int      @default(0) // Milliseconds
+  uptimePercentage    Float    @default(100)
+  dataProcessedBytes  BigInt   @default(0)
+  createdAt           DateTime @default(now())
+
+  // Relationships
+  integration         Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([timestamp])
+}
+
+// IntegrationError model - tracks integration errors
+model IntegrationError {
+  id              String   @id @default(uuid())
+  integrationId   String
+  errorCode       String
+  errorMessage    String
+  stackTrace      String?
+  requestDetails  Json?
+  responseDetails Json?
+  occurrenceCount Int      @default(1)
+  firstOccurrence DateTime @default(now())
+  lastOccurrence  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([errorCode])
+  @@index([lastOccurrence])
+}
+
+// SupportTicket model - stores partner support tickets
+model SupportTicket {
+  id          String         @id @default(uuid())
+  partnerId   String
+  appId       String?
+  title       String
+  description String
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  category    String?
+  assignedToId String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relationships
+  partner     Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  application PartnerApplication? @relation(fields: [appId], references: [id])
+  comments    TicketComment[]
+
+  @@index([partnerId])
+  @@index([appId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+// TicketComment model - stores support ticket comments
+model TicketComment {
+  id          String   @id @default(uuid())
+  ticketId    String
+  commenterId String
+  comment     String
+  attachments Json?
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([createdAt])
+}
+
+// MarketplaceListing model - stores marketplace integration listings
+model MarketplaceListing {
+  id                  String        @id @default(uuid())
+  appId               String
+  listingTitle        String
+  listingDescription  String
+  shortDescription    String?
+  categories          Json          // Array of category strings
+  features            Json?         // Array of feature strings
+  documentationUrl    String?
+  supportUrl          String?
+  pricingInfo         String?
+  averageRating       Float         @default(0)
+  reviewCount         Int           @default(0)
+  downloads           Int           @default(0)
+  status              ListingStatus @default(DRAFT)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relationships
+  application         PartnerApplication @relation(fields: [appId], references: [id], onDelete: Cascade)
+  reviews             MarketplaceReview[]
+
+  @@index([appId])
+  @@index([status])
+  @@index([averageRating])
+  @@index([downloads])
+}
+
+// MarketplaceReview model - stores marketplace reviews
+model MarketplaceReview {
+  id            String   @id @default(uuid())
+  listingId     String
+  reviewerId    String
+  rating        Int
+  reviewText    String?
+  helpfulCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  listing       MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PHASE 30 ENUMS
+// ============================================================================
+
+enum PartnerType {
+  TECHNOLOGY      // SaaS platforms, software providers
+  SERVICE         // Integration services, consulting
+  DATA            // Data providers, enrichment services
+  CHANNEL         // Resellers, referral partners
+  STRATEGIC       // Co-marketing, OEM partners
+  VERIFICATION    // Compliance, security, industry partners
+}
+
+enum PartnerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
   PENDING
-  VERIFIED
+}
+
+enum PartnerTier {
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum AgreementStatus {
+  DRAFT
+  SIGNED
+  EXPIRED
+  TERMINATED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PUBLISHED
+  SUSPENDED
+  DEPRECATED
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  ROTATED
+  REVOKED
+  EXPIRED
+}
+
+enum OAuthClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  MAINTENANCE
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+enum PricingModel {
+  REVENUE_SHARE
+  FLAT_FEE
+  USAGE_BASED
+  HYBRID
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+}
+
+enum PayoutStatus {
+  PENDING
   PROCESSING
   COMPLETED
-  REJECTED
-  EXPIRED
-}
-
-enum EntityType {
-  LEAD
-  AGENT
-  CARRIER
-  ASSIGNMENT
-  CONSENT
-  AUDIT_LOG
-  REPORT
-  POLICY
-  VIOLATION
-  DATA_SUBJECT_REQUEST
-}
-
-enum ActionType {
-  CREATE
-  READ
-  UPDATE
-  DELETE
-  EXPORT
-  ACCESS
-  SHARE
-  ANONYMIZE
-  ARCHIVE
-  RESTORE
-}
-
-enum ReportType {
-  DATA_PROCESSING_REGISTRY
-  DATA_SUBJECT_REQUESTS
-  DATA_BREACH_REPORT
-  CONSENT_REGISTRY
-  RETENTION_REPORT
-  AUDIT_LOG_REPORT
-  PRIVACY_IMPACT_ASSESSMENT
-  SECURITY_INCIDENT_REPORT
-}
-
-enum ReportFormat {
-  PDF
-  CSV
-  JSON
-  XML
-  HTML
-}
-
-enum ReportStatus {
-  PENDING
-  GENERATING
-  COMPLETED
   FAILED
-  EXPIRED
 }
 
-enum RetentionAction {
-  DELETE
-  ANONYMIZE
-  ARCHIVE
-  TRANSFER
-}
-
-enum ViolationType {
-  UNAUTHORIZED_ACCESS
-  DATA_BREACH
-  CONSENT_VIOLATION
-  RETENTION_VIOLATION
-  DATA_LEAK
-  SECURITY_INCIDENT
-  POLICY_VIOLATION
-  COMPLIANCE_BREACH
-}
-
-enum ViolationSeverity {
+enum TicketPriority {
   LOW
   MEDIUM
   HIGH
   CRITICAL
 }
 
-enum ViolationStatus {
+enum TicketStatus {
   OPEN
   IN_PROGRESS
+  PENDING
   RESOLVED
   CLOSED
-  ESCALATED
 }
 
-enum RemediationStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  PARTIAL
-}
-
-enum DataSubjectRequestType {
-  ACCESS_REQUEST
-  DELETION_REQUEST
-  PORTABILITY_REQUEST
-  RECTIFICATION_REQUEST
-  OBJECTION_REQUEST
-  RESTRICTION_REQUEST
-}
-
-enum DataSubjectRequestStatus {
-  PENDING
-  VERIFIED
-  PROCESSING
-  COMPLETED
-  REJECTED
-  EXPIRED
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  REMOVED
+  ARCHIVED
 }

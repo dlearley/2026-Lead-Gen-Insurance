@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Compliance & Regulatory
-export * from './compliance.js';
+// Partner Ecosystem (Phase 30)
+export * from './partner.js';
