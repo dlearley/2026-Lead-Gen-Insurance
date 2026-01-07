@@ -828,3 +828,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Partner Ecosystem (Phase 30)
+export * from './partner.js';

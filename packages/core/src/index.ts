@@ -10,3 +10,6 @@ export * from './database/index.js';
 
 // Security exports
 export * from './security/index.js';
+
+// Partner ecosystem exports (Phase 30)
+export * from './partner/index.js';
