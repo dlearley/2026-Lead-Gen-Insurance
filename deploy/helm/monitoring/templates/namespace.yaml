@@ -1,0 +1,11 @@
+{{- if .Values.prometheus.enabled -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    name: {{ .Values.namespace }}
+    app.kubernetes.io/part-of: insurance-lead-gen
+    app.kubernetes.io/component: monitoring
+    {{- include "monitoring.labels" . | nindent 4 }}
+{{- end }}

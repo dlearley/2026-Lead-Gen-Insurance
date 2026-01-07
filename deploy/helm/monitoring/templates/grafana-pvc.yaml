@@ -1,0 +1,17 @@
+{{- if .Values.grafana.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/name: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.grafana.storage.className }}
+  resources:
+    requests:
+      storage: {{ .Values.grafana.storage.size }}
+{{- end }}
