@@ -516,202 +516,588 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
-// MarketingSource model - tracks different marketing sources and channels
-model MarketingSource {
-  id          String     @id @default(uuid())
-  name        String
-  type        MarketingSourceType
+// Messaging Models
+model Conversation {
+  id String @id @default(cuid())
+  organizationId String
+  
+  name String? // null for direct messages
+  type ConversationType
+  
+  isArchived Boolean @default(false)
+  lastMessageAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  participants ConversationParticipant[]
+  messages Message[]
+}
+
+model ConversationParticipant {
+  id String @id @default(cuid())
+  conversationId String
+  userId String
+  
+  role String // member, moderator, admin
+  joinedAt DateTime @default(now())
+  leftAt DateTime?
+  
+  lastReadAt DateTime?
+  isMuted Boolean @default(false)
+  
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
+
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  authorId String
+  
+  content String
+  contentType MessageContentType
+  
+  editedAt DateTime?
+  deletedAt DateTime?
+  
+  isPinned Boolean @default(false)
+  
+  threadId String? // for threaded messages
+  
+  createdAt DateTime @default(now())
+  
+  reactions MessageReaction[]
+  attachments MessageAttachment[]
+  mentions String[] // mentioned user ids
+  
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  
+  @@index([conversationId, createdAt])
+}
+
+model MessageReaction {
+  id String @id @default(cuid())
+  messageId String
+  userId String
+  emoji String
+  
+  createdAt DateTime @default(now())
+  
+  message Message @relation(fields: [messageId], references: [id])
+  
+  @@unique([messageId, userId, emoji])
+}
+
+model MessageAttachment {
+  id String @id @default(cuid())
+  messageId String
+  
+  fileName String
+  fileUrl String
+  fileSize Int
+  mimeType String
+  
+  createdAt DateTime @default(now())
+  
+  message Message @relation(fields: [messageId], references: [id])
+}
+
+model UserPresence {
+  id String @id @default(cuid())
+  userId String @unique
+  organizationId String
+  
+  status UserPresenceStatus
+  lastSeen DateTime @default(now())
+  
+  updatedAt DateTime @updatedAt
+}
+
+// Video & Voice
+model Call {
+  id String @id @default(cuid())
+  organizationId String
+  
+  initiatorId String
+  status CallStatus
+  
+  callType CallType
+  mediaType MediaType
+  
+  roomId String? // for meeting rooms
+  
+  startedAt DateTime?
+  endedAt DateTime?
+  duration Int? // seconds
+  
+  recordingId String?
+  transcription String?
+  
+  createdAt DateTime @default(now())
+  
+  participants CallParticipant[]
+  recording CallRecording?
+}
+
+model CallParticipant {
+  id String @id @default(cuid())
+  callId String
+  userId String
+  
+  joinedAt DateTime
+  leftAt DateTime?
+  
+  mediaEnabled Json // { audio: bool, video: bool }
+  
+  call Call @relation(fields: [callId], references: [id])
+}
+
+model CallRecording {
+  id String @id @default(cuid())
+  callId String @unique
+  
+  fileUrl String
+  fileSize Int
+  duration Int
+  
+  storageProvider String // s3, gcs, etc
+  
+  createdAt DateTime @default(now())
+  
+  call Call @relation(fields: [callId], references: [id])
+}
+
+model MeetingRoom {
+  id String @id @default(cuid())
+  organizationId String
+  
+  name String
   description String?
-  costPerLead Float?     @default(0.0)
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  // Relationships
-  campaigns   Campaign[]
-  attributions Attribution[]
-  metrics      MarketingSourceMetric[]
-
-  // Indexes
-  @@index([name])
-  @@index([type])
-  @@index([isActive])
+  
+  roomUrl String @unique
+  password String?
+  
+  capacity Int?
+  
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  schedules MeetingSchedule[]
 }
 
-// Campaign model - tracks marketing campaigns
-model Campaign {
-  id              String     @id @default(uuid())
-  name            String
-  description     String?
-  sourceId        String
-  startDate       DateTime
-  endDate         DateTime?
-  budget          Float      @default(0.0)
-  status          CampaignStatus @default(DRAFT)
-  objective       String?
-  targetAudience  String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  // Relationships
-  source          MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  attributions    Attribution[]
-  metrics         CampaignMetric[]
-
-  // Indexes
-  @@index([name])
-  @@index([status])
-  @@index([startDate])
-  @@index([endDate])
+model MeetingSchedule {
+  id String @id @default(cuid())
+  roomId String
+  
+  title String
+  description String?
+  
+  startTime DateTime
+  endTime DateTime
+  
+  organizers String[]
+  participants String[]
+  
+  createdAt DateTime @default(now())
+  
+  room MeetingRoom @relation(fields: [roomId], references: [id])
 }
 
-// Attribution model - tracks attribution data for leads
-model Attribution {
-  id              String     @id @default(uuid())
-  leadId          String
-  sourceId        String
-  campaignId      String?
-  attributionType AttributionType @default(FIRST_TOUCH)
-  utmSource       String?
-  utmMedium       String?
-  utmCampaign     String?
-  utmTerm         String?
-  utmContent      String?
-  referralSource  String?
-  referringDomain String?
-  landingPage     String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  // Relationships
-  lead             Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  source           MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  campaign         Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-
-  // Indexes
-  @@index([leadId])
-  @@index([sourceId])
-  @@index([campaignId])
-  @@index([attributionType])
-  @@index([createdAt])
+// Case Management
+model Case {
+  id String @id @default(cuid())
+  organizationId String
+  
+  caseNumber String @unique
+  title String
+  description String?
+  
+  status CaseStatus
+  priority CasePriority
+  
+  assignedToId String?
+  createdById String
+  
+  leadId String? // related lead
+  
+  tags String[]
+  customFields Json
+  
+  dueDate DateTime?
+  closedAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  activities CaseActivity[]
+  notes CaseNote[]
+  documents CaseDocument[]
+  relationships CaseRelationship[]
 }
 
-// CampaignMetric model - tracks campaign performance metrics
-model CampaignMetric {
-  id                    String     @id @default(uuid())
-  campaignId            String
-  date                  DateTime   @default(now())
-  leadsGenerated        Int        @default(0)
-  leadsQualified        Int        @default(0)
-  leadsConverted        Int        @default(0)
-  conversionRate        Float      @default(0.0)
-  costPerLead           Float      @default(0.0)
-  costPerConversion     Float      @default(0.0)
-  revenueGenerated      Float      @default(0.0)
-  roi                   Float      @default(0.0)
-  clickThroughRate      Float      @default(0.0)
-  engagementScore       Float      @default(0.0)
-
-  // Relationships
-  campaign              Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([campaignId])
-  @@index([date])
-  @@unique([campaignId, date])
+model CaseActivity {
+  id String @id @default(cuid())
+  caseId String
+  
+  activityType String // message, call, document, status_change, assignment
+  activityId String? // reference to related record
+  
+  description String
+  userId String
+  
+  createdAt DateTime @default(now())
+  
+  case Case @relation(fields: [caseId], references: [id])
+  
+  @@index([caseId, createdAt])
 }
 
-// MarketingSourceMetric model - tracks source-level performance
-model MarketingSourceMetric {
-  id                    String     @id @default(uuid())
-  sourceId              String
-  date                  DateTime   @default(now())
-  leadsGenerated        Int        @default(0)
-  leadsQualified        Int        @default(0)
-  leadsConverted        Int        @default(0)
-  conversionRate        Float      @default(0.0)
-  costPerLead           Float      @default(0.0)
-  costPerConversion     Float      @default(0.0)
-  revenueGenerated      Float      @default(0.0)
-  roi                   Float      @default(0.0)
-
-  // Relationships
-  source                MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([sourceId])
-  @@index([date])
-  @@unique([sourceId, date])
+model CaseNote {
+  id String @id @default(cuid())
+  caseId String
+  authorId String
+  
+  content String
+  editedAt DateTime?
+  
+  isInternal Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  
+  case Case @relation(fields: [caseId], references: [id])
 }
 
-// Enums for type safety
-enum LeadStatus {
-  RECEIVED
-  PROCESSING
-  QUALIFIED
-  ROUTED
-  CONVERTED
-  REJECTED
+model CaseDocument {
+  id String @id @default(cuid())
+  caseId String
+  documentId String
+  
+  documentType String // application, supporting, contract, etc
+  
+  addedAt DateTime @default(now())
+  
+  case Case @relation(fields: [caseId], references: [id])
 }
 
-enum AssignmentStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  TIMEOUT
+model CaseRelationship {
+  id String @id @default(cuid())
+  caseId String
+  relatedCaseId String
+  
+  relationshipType CaseRelationshipType
+  
+  createdAt DateTime @default(now())
 }
 
-enum InsuranceType {
-  AUTO
-  HOME
-  LIFE
-  HEALTH
-  COMMERCIAL
+model CaseTemplate {
+  id String @id @default(cuid())
+  organizationId String
+  
+  name String
+  description String?
+  category String
+  
+  defaultStatus CaseStatus
+  defaultPriority CasePriority
+  
+  tags String[]
+  customFields Json
+  
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-enum PartnershipTier {
-  BASIC
-  STANDARD
-  PREMIUM
-  ELITE
-  STRATEGIC
+// Document Collaboration
+model Document {
+  id String @id @default(cuid())
+  organizationId String
+  
+  title String
+  mimeType String
+  
+  ownerId String
+  
+  isPublished Boolean @default(false)
+  isArchived Boolean @default(false)
+  
+  fileSize Int
+  pageCount Int? // for PDFs
+  
+  storageUrl String
+  
+  tags String[]
+  customMetadata Json
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  versions DocumentVersion[]
+  permissions DocumentPermission[]
+  comments DocumentComment[]
 }
 
-enum PartnershipStatus {
-  ACTIVE
-  PENDING
-  SUSPENDED
-  TERMINATED
-  RENEWAL_NEEDED
+model DocumentVersion {
+  id String @id @default(cuid())
+  documentId String
+  
+  versionNumber Int
+  fileUrl String
+  fileSize Int
+  
+  createdBy String
+  createdAt DateTime @default(now())
+  
+  changeSummary String?
+  
+  document Document @relation(fields: [documentId], references: [id])
 }
 
-enum MarketingSourceType {
-  ORGANIC_SEARCH
-  PAID_SEARCH
-  SOCIAL_MEDIA
-  EMAIL
-  REFERRAL
+model DocumentPermission {
+  id String @id @default(cuid())
+  documentId String
+  userId String
+  
+  permission DocumentPermission
+  grantedAt DateTime @default(now())
+  grantedBy String
+  
+  expiresAt DateTime?
+  
+  document Document @relation(fields: [documentId], references: [id])
+  
+  @@unique([documentId, userId])
+}
+
+model DocumentComment {
+  id String @id @default(cuid())
+  documentId String
+  authorId String
+  
+  content String
+  pageNumber Int? // for PDFs
+  highlights Json? // text selection coordinates
+  
+  resolvedAt DateTime?
+  resolvedBy String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  document Document @relation(fields: [documentId], references: [id])
+}
+
+// Integrations
+model Integration {
+  id String @id @default(cuid())
+  organizationId String
+  
+  integrationType IntegrationType
+  
+  isActive Boolean @default(true)
+  isAuthenticated Boolean @default(false)
+  
+  credentials Json // encrypted
+  webhookUrl String?
+  webhookSecret String?
+  
+  syncEnabled Boolean @default(false)
+  lastSyncAt DateTime?
+  
+  config Json // integration-specific config
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model IntegrationSync {
+  id String @id @default(cuid())
+  integrationId String
+  
+  syncType String // leads, deals, contacts, activities
+  direction String // one_way, two_way
+  
+  syncedRecords Int @default(0)
+  failedRecords Int @default(0)
+  
+  lastRun DateTime
+  nextRun DateTime?
+  
+  status String // pending, running, success, failed
+  errorMessage String?
+  
+  createdAt DateTime @default(now())
+}
+
+model IntegrationMapping {
+  id String @id @default(cuid())
+  integrationId String
+  
+  sourceField String // field in external system
+  targetField String // field in our system
+  transformationRules Json?
+  
+  isActive Boolean @default(true)
+  
+  Integration Int @id @default(cuid())
+}
+
+model IntegrationWebhook {
+  id String @id @default(cuid())
+  integrationId String
+  
+  event String // lead.created, deal.updated, etc
+  
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+}
+
+// Notifications
+model Notification {
+  id String @id @default(cuid())
+  organizationId String
+  userId String
+  
+  type NotificationType
+  title String
+  message String
+  actionUrl String?
+  
+  readAt DateTime?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id String @id @default(cuid())
+  userId String @unique
+  organizationId String
+  
+  pushEnabled Boolean @default(true)
+  emailEnabled Boolean @default(true)
+  
+  messageNotifications MessageNotificationPreference
+  callNotifications Boolean @default(true)
+  caseNotifications Boolean @default(true)
+  documentNotifications Boolean @default(true)
+  
+  quietHoursStart String? // HH:mm
+  quietHoursEnd String?
+  quietHoursEnabled Boolean @default(false)
+  
+  updatedAt DateTime @updatedAt
+}
+
+model PushToken {
+  id String @id @default(cuid())
+  userId String
+  organizationId String
+  
+  token String
+  platform String // ios, android, web
+  deviceName String?
+  
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, token, platform])
+}
+
+enum ConversationType {
   DIRECT
-  AFFILIATE
-  CONTENT_MARKETING
-  EVENT
-  OTHER
+  GROUP
+  CASE
 }
 
-enum CampaignStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
+enum MessageContentType {
+  TEXT
+  SYSTEM
+  FILE
+}
+
+enum UserPresenceStatus {
+  ONLINE
+  AWAY
+  OFFLINE
+  DND
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  CONNECTED
+  ENDED
+  FAILED
+}
+
+enum CallType {
+  ONE_ON_ONE
+  GROUP
+}
+
+enum MediaType {
+  AUDIO
+  VIDEO
+}
+
+enum CaseStatus {
+  NEW
+  IN_PROGRESS
+  ON_HOLD
   COMPLETED
-  CANCELLED
-  ARCHIVED
+  CLOSED
 }
 
-enum AttributionType {
-  FIRST_TOUCH
-  LAST_TOUCH
-  MULTI_TOUCH
-  LINEAR
-  TIME_DECAY
-  POSITION_BASED
+enum CasePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CaseRelationshipType {
+  PARENT
+  CHILD
+  RELATED
+  DUPLICATE
+}
+
+enum DocumentPermission {
+  VIEW
+  COMMENT
+  EDIT
+  OWNER
+}
+
+enum IntegrationType {
+  SALESFORCE
+  HUBSPOT
+  PIPEDRIVE
+  SLACK
+  TEAMS
+  OUTLOOK
+  GOOGLE_CALENDAR
+  QUICKBOOKS
+  XERO
+}
+
+enum NotificationType {
+  MESSAGE
+  CALL
+  CASE
+  DOCUMENT
+}
+
+enum MessageNotificationPreference {
+  ALL
+  MENTIONS
+  NONE
 }

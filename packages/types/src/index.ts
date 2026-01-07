@@ -1713,5 +1713,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Attribution & Marketing ROI
-export * from './attribution.js';
+// Communication Types
+export * from './communication.js';
