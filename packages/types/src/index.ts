@@ -834,4 +834,6 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
-export * from './community-phase-12-5.js';
+
+// Marketplace (Phase 12.6)
+export * from './marketplace.js';

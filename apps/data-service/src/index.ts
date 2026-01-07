@@ -34,12 +34,7 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { createCommunityGroupsRoutes } from './routes/community-groups.routes.js';
-import { createCommunityEventsRoutes } from './routes/community-events.routes.js';
-import { createBadgesRoutes } from './routes/badges.routes.js';
-import { createMentorshipRoutes } from './routes/mentorship.routes.js';
-import { createAgentProfileRoutes } from './routes/agent-profile.routes.js';
-import { createAgentConnectionsRoutes } from './routes/agent-connections.routes.js';
+import marketplaceRoutes from './routes/marketplace.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -104,8 +99,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup education routes
-  app.use('/api/v1/education', createEducationRoutes());
+  // Setup marketplace routes
+  app.use('/api/v1/marketplace', marketplaceRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
