@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Financial Services
-export * from './financial-services.js';
+// Features & Data
+export * from './features.js';

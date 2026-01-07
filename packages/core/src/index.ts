@@ -13,5 +13,5 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// Partner ecosystem exports (Phase 30)
-export * from './partner/index.js';
+// Features exports
+export * from './features/index.js';
