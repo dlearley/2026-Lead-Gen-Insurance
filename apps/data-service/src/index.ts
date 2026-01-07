@@ -36,7 +36,8 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { createAttributionRoutes } from './routes/attribution.routes.js';
+import { PolicyRepository } from './services/policy-repository.js';
+import { createPoliciesRoutes } from './routes/policies.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -61,7 +62,7 @@ const start = async (): Promise<void> => {
   const assignmentRepository = new AssignmentRepository(prisma);
   const analyticsService = new AnalyticsService(prisma);
   const claimRepository = new ClaimRepository(prisma);
-  const benchmarkService = new BrokerBenchmarkService(prisma);
+  const policyRepository = new PolicyRepository(prisma);
 
   // Initialize referral services
   const partnerService = new PartnerService();
@@ -113,8 +114,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup attribution routes
-  app.use('/api/v1/attribution', createAttributionRoutes(prisma));
+  // Setup policy routes
+  app.use('/api/v1/policies', createPoliciesRoutes(policyRepository));
 
   // Health check endpoint
   app.get('/health', (req, res) => {

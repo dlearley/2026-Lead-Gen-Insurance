@@ -1527,5 +1527,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Advanced AI & Verticals
-export * from './ai-verticals.js';
+// Policy Management Types (Phase 26.3)
+export * from './policies.js';

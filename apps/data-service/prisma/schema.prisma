@@ -90,15 +90,7 @@ model Lead {
   tasks         Task[]
   assignments   LeadAssignment[]
   events        LeadEvent[]
-  
-  // New relations for Phase 16.3.8
-  experimentAssignments ExperimentAssignment[]
-  campaignLeads        CampaignLead[]
-  state                LeadState?
-  attributionLogs      AttributionLog[]
-  orchestrationEvents  OrchestrationEvent[]
-  customerTouchpoints  CustomerTouchpoint[]
-  engagement           CustomerEngagement?
+  policies      Policy[]
 
   @@index([status])
   @@index([email])
@@ -464,29 +456,8 @@ model Agent {
   updatedAt           DateTime    @updatedAt
 
   // Relations
-  assignments         LeadAssignment[]
-
-  // Phase 9.6c: VIP & Community
-  vipStatus           AgentVIPStatus?
-  communityPosts      CommunityPost[]
-  communityComments   CommunityComment[]
-  communityLikes      CommunityLike[]
-
-  // Phase 12.5: Groups, Events, Badges, Profiles, Connections, Mentorship
-  createdGroups       CommunityGroup[]        @relation("GroupCreator")
-  groupMemberships    CommunityGroupMember[]
-
-  hostedEvents        CommunityEvent[]        @relation("EventHost")
-  eventAttendances    CommunityEventAttendee[]
-
-  badges              AgentBadge[]
-  profile             AgentProfile?
-
-  followingConnections AgentConnection[]      @relation("Follower")
-  followerConnections  AgentConnection[]      @relation("Following")
-
-  mentorshipAsMentor  MentorshipRelationship[] @relation("Mentor")
-  mentorshipAsMentee  MentorshipRelationship[] @relation("Mentee")
+  assignments LeadAssignment[]
+  policies    Policy[]
 
   @@index([email])
   @@index([isActive])
@@ -1365,310 +1336,239 @@ enum Direction {
 }
 
 // ========================================
-// BROKER EDUCATION & COMPETENCY (Phase 12.3)
+// POLICY MANAGEMENT (Phase 26.3)
 // ========================================
 
-model Course {
-  id              String       @id @default(uuid())
-  title           String
-  description     String       @db.Text
-  category        String
-  level           CompetencyLevel
-  status          CourseStatus @default(DRAFT)
-  thumbnailUrl    String?
-  estimatedHours  Int
-  prerequisites   String[]
-  tags            String[]
-  objectives      String[]
-  instructorName  String?
-  version         Int          @default(1)
-  publishedAt     DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+model Policy {
+  id                    String                   @id @default(uuid())
+  policyNumber          String                   @unique
+  leadId                String
+  agentId               String?
+  carrier               String?
+  productName           String?
+  insuranceType         String
+  status                PolicyStatus             @default(DRAFT)
+  effectiveDate         DateTime
+  expirationDate        DateTime
+  cancelledAt           DateTime?
+  cancellationReason    String?                  @db.Text
+  premiumAmount         Float
+  billingFrequency      PolicyBillingFrequency    @default(MONTHLY)
+  commissionRate        Float                    @default(0.0)
+  totalPremiumCollected Float                    @default(0.0)
+  coverage              Json?
+  deductible            Float?
+  policyholderInfo      Json?
+  renewalOfPolicyId     String?
+  renewedToPolicyId     String?
+  metadata              Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
-  relations       Module[]
-  enrollments     Enrollment[]
-  assessments     Assessment[]
-  certificates    Certificate[]
+  // Relations
+  lead                  Lead                     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent                 Agent?                   @relation(fields: [agentId], references: [id])
+  endorsements          PolicyEndorsement[]
+  documents             PolicyDocument[]
+  payments              PolicyPayment[]
+  renewals              PolicyRenewal[]
+  activities            PolicyActivity[]
 
-  @@index([status])
-  @@index([category])
-  @@index([level])
-  @@map("courses")
-}
-
-model Module {
-  id          String   @id @default(uuid())
-  courseId    String
-  title       String
-  description String   @db.Text
-  order       Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons     Lesson[]
-
-  @@index([courseId])
-  @@index([order])
-  @@map("modules")
-}
-
-model Lesson {
-  id              String   @id @default(uuid())
-  moduleId        String
-  title           String
-  content         String   @db.Text
-  videoUrl        String?
-  resourcesUrl    String?
-  order           Int
-  durationMinutes Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  module          Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  progress        LessonProgress[]
-
-  @@index([moduleId])
-  @@index([order])
-  @@map("lessons")
-}
-
-model Assessment {
-  id               String         @id @default(uuid())
-  courseId         String
-  title            String
-  description      String?        @db.Text
-  type             AssessmentType
-  timeLimitMinutes Int?
-  passingScore     Int
-  maxAttempts      Int
-  isActive         Boolean        @default(true)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-
-  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  questions        Question[]
-  attempts         AssessmentAttempt[]
-  certificates     Certificate[]
-
-  @@index([courseId])
-  @@index([type])
-  @@map("assessments")
-}
-
-model Question {
-  id            String       @id @default(uuid())
-  assessmentId  String
-  type          QuestionType
-  text          String       @db.Text
-  options       String[]
-  correctAnswer String
-  explanation   String?      @db.Text
-  points        Int
-  order         Int
-
-  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-
-  @@index([assessmentId])
-  @@index([order])
-  @@map("questions")
-}
-
-model AssessmentAttempt {
-  id            String   @id @default(uuid())
-  assessmentId  String
-  agentId       String
-  attemptNumber Int
-  score         Int
-  passed        Boolean
-  startedAt     DateTime @default(now())
-  completedAt   DateTime?
-  answers       Json
-
-  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-
-  @@index([assessmentId])
-  @@index([agentId])
-  @@index([passed])
-  @@map("assessment_attempts")
-}
-
-model Enrollment {
-  id               String         @id @default(uuid())
-  courseId         String
-  agentId          String
-  status           EnrollmentStatus @default(NOT_STARTED)
-  progress         Int            @default(0)
-  currentLessonId  String?
-  enrolledAt       DateTime       @default(now())
-  completedAt      DateTime?
-  lastAccessedAt   DateTime?
-
-  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessonProgress   LessonProgress[]
-
-  @@unique([courseId, agentId])
+  @@index([policyNumber])
+  @@index([leadId])
   @@index([agentId])
   @@index([status])
-  @@map("enrollments")
+  @@index([effectiveDate])
+  @@index([expirationDate])
+  @@map("policies")
 }
 
-model LessonProgress {
-  id               String   @id @default(uuid())
-  enrollmentId     String
-  lessonId         String
-  completed        Boolean  @default(false)
-  timeSpentMinutes Int      @default(0)
-  completedAt      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  lesson           Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-
-  @@unique([enrollmentId, lessonId])
-  @@index([enrollmentId])
-  @@index([lessonId])
-  @@map("lesson_progress")
-}
-
-model Competency {
-  id          String           @id @default(uuid())
-  name        String
-  description String           @db.Text
-  category    String
-  level       CompetencyLevel
-  skills      String[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  agentCompetencies AgentCompetency[]
-
-  @@index([category])
-  @@index([level])
-  @@map("competencies")
-}
-
-model AgentCompetency {
-  id               String           @id @default(uuid())
-  agentId          String
-  competencyId     String
-  level            CompetencyLevel
-  assessedAt       DateTime         @default(now())
-  evidence         String[]
-  assessmentMethod String?
-
-  competency       Competency       @relation(fields: [competencyId], references: [id], onDelete: Cascade)
-
-  @@unique([agentId, competencyId])
-  @@index([agentId])
-  @@index([competencyId])
-  @@map("agent_competencies")
-}
-
-model LearningPath {
-  id                String         @id @default(uuid())
-  title             String
-  description       String         @db.Text
-  category          String
-  targetRole        String?
-  targetLevel       CompetencyLevel
-  estimatedWeeks    Int
-  requiredCourses   String[]
-  electiveCourses   String[]
-  isActive          Boolean        @default(true)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-
-  pathEnrollments   PathEnrollment[]
-
-  @@index([category])
-  @@index([targetRole])
-  @@index([isActive])
-  @@map("learning_paths")
-}
-
-model PathEnrollment {
-  id               String         @id @default(uuid())
-  learningPathId   String
-  agentId          String
-  status           EnrollmentStatus @default(NOT_STARTED)
-  progress         Int            @default(0)
-  enrolledAt       DateTime       @default(now())
-  completedAt      DateTime?
-  completedCourses String[]
-
-  learningPath     LearningPath   @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-
-  @@unique([learningPathId, agentId])
-  @@index([agentId])
-  @@index([status])
-  @@map("path_enrollments")
-}
-
-model Certificate {
-  id               String           @id @default(uuid())
-  agentId          String
-  courseId         String?
-  assessmentId     String?
-  certificateNumber String          @unique
-  title            String
-  description      String          @db.Text
-  issueDate        DateTime         @default(now())
-  expiryDate       DateTime?
-  status           CertificateStatus @default(ACTIVE)
-  verificationUrl  String?
-  credentialId     String?
-
-  course           Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  assessment       Assessment?      @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
-
-  @@index([agentId])
-  @@index([certificateNumber])
-  @@index([status])
-  @@map("certificates")
-}
-
-// Enums for Education
-
-enum CourseStatus {
+enum PolicyStatus {
   DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-enum EnrollmentStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  DROPPED
-}
-
-enum QuestionType {
-  MULTIPLE_CHOICE
-  TRUE_FALSE
-  SHORT_ANSWER
-  ESSAY
-}
-
-enum AssessmentType {
-  QUIZ
-  EXAM
-  CERTIFICATION
-}
-
-enum CompetencyLevel {
-  NOVICE
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-  EXPERT
-}
-
-enum CertificateStatus {
+  PENDING_PAYMENT
   ACTIVE
+  CANCELLED
+  LAPSED
   EXPIRED
-  REVOKED
+  NON_RENEWED
+}
+
+enum PolicyBillingFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+model PolicyEndorsement {
+  id              String                   @id @default(uuid())
+  policyId        String
+  type            PolicyEndorsementType
+  effectiveDate   DateTime
+  description     String?                  @db.Text
+  changes         Json?
+  premiumDelta    Float?
+  newPremium      Float?
+  status          PolicyEndorsementStatus  @default(PENDING)
+  issuedAt        DateTime?
+  createdAt       DateTime                 @default(now())
+  createdBy       String?
+
+  // Relations
+  policy          Policy                   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([type])
+  @@index([status])
+  @@index([effectiveDate])
+  @@map("policy_endorsements")
+}
+
+enum PolicyEndorsementType {
+  COVERAGE_CHANGE
+  DRIVER_ADDITION
+  VEHICLE_CHANGE
+  ADDRESS_CHANGE
+  PREMIUM_ADJUSTMENT
+  OTHER
+}
+
+enum PolicyEndorsementStatus {
+  PENDING
+  APPROVED
+  ISSUED
+  REJECTED
+}
+
+model PolicyDocument {
+  id              String                @id @default(uuid())
+  policyId        String
+  documentType    PolicyDocumentType
+  fileName        String
+  fileUrl         String
+  fileSize        Int
+  mimeType        String
+  uploadedBy      String
+  description     String?               @db.Text
+  isVerified      Boolean               @default(false)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  version         Int                   @default(1)
+  createdAt       DateTime              @default(now())
+
+  // Relations
+  policy          Policy                @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([documentType])
+  @@index([uploadedBy])
+  @@map("policy_documents")
+}
+
+enum PolicyDocumentType {
+  POLICY_DOCUMENT
+  DECLARATIONS_PAGE
+  INSURANCE_CARD
+  ENDORSEMENT
+  INVOICE
+  RECEIPT
+  CANCELLATION_NOTICE
+  RENEWAL_NOTICE
+  CERTIFICATE_OF_INSURANCE
+  OTHER
+}
+
+model PolicyPayment {
+  id              String                @id @default(uuid())
+  policyId        String
+  paymentNumber   String               @unique
+  amount          Float
+  dueDate         DateTime
+  paidAt          DateTime?
+  paymentMethod   PaymentMethod?
+  status          PaymentStatus         @default(PENDING)
+  failureReason   String?
+  refundedAt      DateTime?
+  refundAmount    Float?
+  refundReason    String?
+  notes           String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Relations
+  policy          Policy                @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([paymentNumber])
+  @@map("policy_payments")
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  ACH
+  CHECK
+  CASH
+  WIRE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model PolicyRenewal {
+  id                  String                @id @default(uuid())
+  policyId            String
+  renewalPolicyId     String?
+  renewalQuoteAmount  Float?
+  renewalPremium      Float?
+  offeredDate         DateTime?
+  acceptedDate        DateTime?
+  rejectedDate        DateTime?
+  rejectionReason     String?               @db.Text
+  status              RenewalStatus         @default(PENDING)
+  createdAt           DateTime              @default(now())
+
+  // Relations
+  policy              Policy                @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([renewalPolicyId])
+  @@index([status])
+  @@index([offeredDate])
+  @@map("policy_renewals")
+}
+
+enum RenewalStatus {
+  PENDING
+  OFFERED
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+model PolicyActivity {
+  id              String      @id @default(uuid())
+  policyId        String
+  userId          String?
+  activityType    String
+  action          String
+  description     String      @db.Text
+  oldValue        String?
+  newValue        String?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+
+  // Relations
+  policy          Policy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@map("policy_activities")
 }
