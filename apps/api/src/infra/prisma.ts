@@ -1,16 +1,10 @@
+/**
+ * Prisma Client for API Service
+ */
+
 import { PrismaClient } from '@prisma/client';
-import { logger } from '@insurance-lead-gen/core';
+import { applyAuditImmutability } from '../middleware/audit-immutability.middleware.js';
 
-class PrismaClientSingleton {
-  private static instance: PrismaClient | null = null;
+export const prisma = new PrismaClient();
 
-  public static getInstance(): PrismaClient {
-    if (!PrismaClientSingleton.instance) {
-      PrismaClientSingleton.instance = new PrismaClient();
-      logger.info('Prisma client initialized in API service');
-    }
-    return PrismaClientSingleton.instance;
-  }
-}
-
-export const prisma = PrismaClientSingleton.getInstance();
+applyAuditImmutability(prisma);

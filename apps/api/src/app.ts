@@ -31,10 +31,7 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import privacyRouter from './routes/privacy.js';
-import auditLogsRouter from './routes/audit-logs.js';
-import { createAuditMiddleware } from './middleware/audit.middleware.js';
-import { requestIdMiddleware } from './middleware/request-id.js';
+import complianceAuditRouter from './routes/compliance-audit.routes.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -100,7 +97,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/attribution', attributionRouter);
+  app.use('/api/v1', complianceAuditRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);

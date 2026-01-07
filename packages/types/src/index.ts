@@ -1712,5 +1712,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Lead Prioritization & Routing Types (Phase 27.2)
-export * from './routing.js';
+// Audit & Compliance (Phase 25.1E)
+export * from './audit.types.js';
