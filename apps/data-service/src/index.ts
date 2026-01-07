@@ -34,7 +34,11 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import marketplaceRoutes from './routes/marketplace.routes.js';
+import { LeadEnrichmentService } from './services/lead-enrichment-service.js';
+import { OfferRecommendationEngine } from './services/offer-recommendation-engine.js';
+import { CoachingSuggestionService } from './services/coaching-suggestion-service.js';
+import { RiskValidationService } from './services/risk-validation-service.js';
+import { PersonalizationAnalyticsService } from './services/personalization-analytics-service.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -257,3 +261,10 @@ setInterval(() => {
 
 // Re-export for package consumers
 export { prisma, disconnectPrisma } from './database/prisma.client.js';
+
+// Export personalization services
+export { LeadEnrichmentService } from './services/lead-enrichment-service.js';
+export { OfferRecommendationEngine } from './services/offer-recommendation-engine.js';
+export { CoachingSuggestionService } from './services/coaching-suggestion-service.js';
+export { RiskValidationService } from './services/risk-validation-service.js';
+export { PersonalizationAnalyticsService } from './services/personalization-analytics-service.js';

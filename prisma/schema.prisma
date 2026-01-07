@@ -33,6 +33,10 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
+  enrichmentProfile LeadEnrichmentProfile?
+  personalizedOffers PersonalizedOffer[]
+  coachingSuggestions CoachingSuggestion[]
+  riskValidations RiskValidationResult[]
 
   // Indexes for performance
   @@index([email])
@@ -240,310 +244,243 @@ enum PartnershipStatus {
 }
 
 // ========================================
-// Phase 12.6: Marketplace Models
+// LEAD ENRICHMENT & PERSONALIZATION MODELS (Phase 16.3.7)
 // ========================================
 
-// MarketplaceVendor model - stores marketplace vendor information
-model MarketplaceVendor {
-  id              String         @id @default(uuid())
-  userId          String
-  businessName    String
-  description     String
-  logo            String?
-  website         String?
-  email           String
-  phone           String
-  address         String
-  city            String
-  state           String
-  zipCode         String
-  country         String
-  status          VendorStatus   @default(PENDING_APPROVAL)
-  tier            VendorTier     @default(BASIC)
-  rating          Float          @default(0.0)
-  reviewCount     Int            @default(0)
-  totalSales      Int            @default(0)
-  totalRevenue    Float          @default(0.0)
-  commissionRate  Float          @default(0.15)
-  verifiedAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+// DataProvider - Third-party data enrichment providers
+model DataProvider {
+  id                  String   @id @default(uuid())
+  name                String
+  type                String   // zoominfo, apollo, clearbit, etc.
+  description         String?
+  apiEndpoint         String?
+  apiKey              String?
+  apiSecret           String?
+  rateLimitPerMinute  Int?
+  rateLimitPerDay     Int?
+  status              String   @default("active")
+  priority            Int      @default(0)
+  cacheTtlMinutes     Int      @default(1440) // 24 hours default
+  isEnabled           Boolean  @default(true)
+  lastSuccessfulAt    DateTime?
+  lastErrorAt         DateTime?
+  lastErrorMessage    String?
+  totalCalls          Int      @default(0)
+  failedCalls         Int      @default(0)
+  successRate         Float    @default(1.0)
+  config              Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Relationships
-  items           MarketplaceItem[]
-  transactions    MarketplaceTransaction[]
-  reviews         MarketplaceReview[]
-  payouts         VendorPayout[]
+  enrichmentProfiles  LeadEnrichmentProfile[]
 
   // Indexes
-  @@index([userId])
-  @@index([status])
-  @@index([tier])
-  @@index([createdAt])
-}
-
-// MarketplaceItem model - stores marketplace items/products
-model MarketplaceItem {
-  id              String                @id @default(uuid())
-  vendorId        String
-  title           String
-  description     String
-  type            MarketplaceItemType
-  status          MarketplaceItemStatus @default(DRAFT)
-  price           Float
-  currency        String                @default("USD")
-  images          String[]
-  tags            String[]
-  category        String
-  subcategory     String?
-  specifications  Json?
-  inventory       Int?
-  featured        Boolean               @default(false)
-  views           Int                   @default(0)
-  purchases       Int                   @default(0)
-  rating          Float                 @default(0.0)
-  reviewCount     Int                   @default(0)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-
-  // Relationships
-  vendor          MarketplaceVendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  transactions    MarketplaceTransaction[]
-  reviews         MarketplaceReview[]
-  wishlistItems   Wishlist[]
-  cartItems       CartItem[]
-
-  // Indexes
-  @@index([vendorId])
   @@index([type])
   @@index([status])
-  @@index([category])
-  @@index([featured])
-  @@index([createdAt])
+  @@index([isEnabled])
+  @@index([priority])
 }
 
-// MarketplaceTransaction model - stores marketplace transactions
-model MarketplaceTransaction {
-  id                String             @id @default(uuid())
-  itemId            String
-  vendorId          String
-  buyerId           String
-  type              TransactionType
-  status            TransactionStatus  @default(PENDING)
-  quantity          Int
-  unitPrice         Float
-  totalAmount       Float
-  currency          String             @default("USD")
-  commissionAmount  Float
-  vendorPayout      Float
-  paymentMethod     String?
-  paymentReference  String?
-  metadata          Json?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  completedAt       DateTime?
+// LeadEnrichmentProfile - Cached enriched lead data
+model LeadEnrichmentProfile {
+  id                  String   @id @default(uuid())
+  leadId              String   @unique
+  enrichmentVersion   Int      @default(1)
+  demographics        Json?    // EnrichmentDemographics
+  firmographics       Json?    // EnrichmentFirmographics
+  behavioral          Json?    // EnrichmentBehavioral
+  risk                Json?    // EnrichmentRisk
+  propertyData        Json?    // EnrichmentProperty
+  vehicleData         Json?    // EnrichmentVehicle[]
+  confidenceScore     Float    @default(0.0)
+  dataSources         String[] // Provider IDs
+  dataFreshness       Json?    // Map of field -> {enrichedAt, providerId, expiresAt}
+  dataConflicts       Json?    // DataConflict[]
+  enrichmentMetadata  Json     // Total data points, duration, etc.
+  lastEnrichedAt      DateTime @default(now())
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Relationships
-  item              MarketplaceItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  vendor            MarketplaceVendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  reviews           MarketplaceReview[]
+  lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  dataProviders       DataProvider[] @relation("EnrichmentProviders")
+  personalizedOffers  PersonalizedOffer[]
+  coachingSuggestions CoachingSuggestion[]
+  riskValidations     RiskValidationResult[]
 
   // Indexes
-  @@index([itemId])
-  @@index([vendorId])
-  @@index([buyerId])
+  @@index([leadId])
+  @@index([confidenceScore])
+  @@index([lastEnrichedAt])
+  @@index([expiresAt])
+}
+
+// PersonalizedOffer - Recommended offers for leads
+model PersonalizedOffer {
+  id                    String   @id @default(uuid())
+  leadId                String
+  callId                String?
+  tier                  String   // primary, secondary, tertiary
+  offerType             String   // auto, home, life, health, commercial, bundle
+  title                 String
+  description           String
+  coverageDetails       Json
+  premium               Json     // {amount, currency, frequency}
+  coverageLimits        Json
+  deductibles           Json
+  reasoning             Json[]   // OfferReasoning[]
+  fitScore              Float    @default(0.0)
+  confidence            Float    @default(0.0)
+  estimatedConversionProbability Float @default(0.0)
+  competitiveAdvantages String[]
+  abTestVariant         String?
+  validUntil            DateTime
+  status                String   @default("suggested")
+  metadata              Json?
+  presentedAt           DateTime?
+  acceptedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relationships
+  lead                  Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  enrichmentProfile     LeadEnrichmentProfile @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  acceptanceHistory     OfferAcceptanceHistory[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([callId])
+  @@index([offerType])
+  @@index([tier])
   @@index([status])
+  @@index([validUntil])
   @@index([createdAt])
 }
 
-// MarketplaceReview model - stores marketplace reviews
-model MarketplaceReview {
-  id              String                  @id @default(uuid())
-  itemId          String?
-  vendorId        String?
-  userId          String
-  transactionId   String?
-  rating          Int
-  title           String
-  comment         String
-  pros            String[]
-  cons            String[]
-  verified        Boolean                 @default(false)
-  helpful         Int                     @default(0)
-  reported        Int                     @default(0)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+// OfferAcceptanceHistory - Track offer conversion outcomes
+model OfferAcceptanceHistory {
+  id                  String   @id @default(uuid())
+  offerId             String
+  leadId              String
+  agentId             String?
+  callId              String?
+  status              String
+  presentedAt         DateTime
+  acceptedAt          DateTime?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+  agentFeedback       String?
+  outcomeMetadata     Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Relationships
-  item            MarketplaceItem?        @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  vendor          MarketplaceVendor?      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  transaction     MarketplaceTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  offer               PersonalizedOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
   // Indexes
-  @@index([itemId])
-  @@index([vendorId])
-  @@index([userId])
-  @@index([rating])
-  @@index([createdAt])
-}
-
-// MarketplaceCategory model - stores marketplace categories
-model MarketplaceCategory {
-  id              String         @id @default(uuid())
-  name            String
-  slug            String         @unique
-  description     String
-  icon            String?
-  parentId        String?
-  itemCount       Int            @default(0)
-  displayOrder    Int            @default(0)
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  // Self-referential relationship for subcategories
-  parent          MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children        MarketplaceCategory[] @relation("CategoryHierarchy")
-
-  // Indexes
-  @@index([slug])
-  @@index([parentId])
-  @@index([isActive])
-}
-
-// Wishlist model - stores user wishlist items
-model Wishlist {
-  id              String         @id @default(uuid())
-  userId          String
-  itemId          String
-  addedAt         DateTime       @default(now())
-
-  // Relationships
-  item            MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  // Unique constraint
-  @@unique([userId, itemId])
-  @@index([userId])
-  @@index([itemId])
-}
-
-// CartItem model - stores user cart items
-model CartItem {
-  id              String         @id @default(uuid())
-  userId          String
-  itemId          String
-  quantity        Int
-  addedAt         DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  // Relationships
-  item            MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  // Unique constraint
-  @@unique([userId, itemId])
-  @@index([userId])
-  @@index([itemId])
-}
-
-// CommissionRule model - stores commission rules for marketplace
-model CommissionRule {
-  id              String                @id @default(uuid())
-  vendorTier      VendorTier
-  itemType        MarketplaceItemType
-  commissionRate  Float
-  minimumAmount   Float?
-  maximumAmount   Float?
-  effectiveFrom   DateTime
-  effectiveTo     DateTime?
-  isActive        Boolean               @default(true)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-
-  // Indexes
-  @@index([vendorTier])
-  @@index([itemType])
-  @@index([effectiveFrom])
-  @@index([isActive])
-}
-
-// VendorPayout model - stores vendor payouts
-model VendorPayout {
-  id                String         @id @default(uuid())
-  vendorId          String
-  periodStart       DateTime
-  periodEnd         DateTime
-  totalRevenue      Float
-  commissionAmount  Float
-  payoutAmount      Float
-  transactionCount  Int
-  status            PayoutStatus   @default(PENDING)
-  paymentMethod     String?
-  paymentReference  String?
-  processedAt       DateTime?
-  createdAt         DateTime       @default(now())
-
-  // Relationships
-  vendor            MarketplaceVendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([vendorId])
+  @@index([offerId])
+  @@index([leadId])
+  @@index([agentId])
+  @@index([callId])
   @@index([status])
+  @@index([presentedAt])
+}
+
+// CoachingSuggestion - Real-time coaching for agents
+model CoachingSuggestion {
+  id                    String   @id @default(uuid())
+  leadId                String
+  callId                String?
+  agentId               String?
+  type                  String   // sentiment_adjustment, objection_handling, etc.
+  title                 String
+  content               String
+  suggestedScript       String?
+  talkingPoints         String[]
+  confidence            String   // high, medium, low
+  priority              String   @default("medium")
+  triggeredBy           Json[]   // SuggestionTrigger[]
+  context               Json     // SuggestionContext
+  estimatedImpact       String
+  expiresAt             DateTime
+  status                String   @default("pending")
+  acknowledgedAt        DateTime?
+  usedAt                DateTime?
+  dismissedAt           DateTime?
+  feedback              Json?    // SuggestionFeedback
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relationships
+  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  enrichmentProfile     LeadEnrichmentProfile @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([leadId])
+  @@index([callId])
+  @@index([agentId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+// RiskValidationResult - Fraud and compliance validation
+model RiskValidationResult {
+  id                    String   @id @default(uuid())
+  leadId                String
+  validationType        String   // fraud, compliance, quality
+  overallRiskScore      Float    @default(0.0)
+  severity              String   // low, medium, high, critical
+  isApproved            Boolean  @default(true)
+  requiresReview        Boolean  @default(false)
+  autoEscalate          Boolean  @default(false)
+  validationChecks      Json[]   // ValidationCheck[]
+  validationMetadata    Json     // checksPerformed, passed, failed, duration
+  validatedAt           DateTime @default(now())
+  expiresAt             DateTime
+  createdAt             DateTime @default(now())
+
+  // Relationships
+  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  enrichmentProfile     LeadEnrichmentProfile @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([leadId])
+  @@index([validationType])
+  @@index([severity])
+  @@index([isApproved])
+  @@index([validatedAt])
+}
+
+// PersonalizationEffectivenessMetrics - Analytics tracking
+model PersonalizationEffectivenessMetrics {
+  id                    String   @id @default(uuid())
+  periodStart           DateTime
+  periodEnd             DateTime
+  leadsWithPersonalization      Int      @default(0)
+  leadsWithoutPersonalization   Int      @default(0)
+  conversionWithPersonalization Int      @default(0)
+  conversionWithoutPersonalization Int  @default(0)
+  conversionUplift      Float    @default(0.0)
+  conversionUpliftAbsolute Float  @default(0.0)
+
+  offerMetrics          Json
+  suggestionMetrics     Json
+  sentimentMetrics      Json
+  costMetrics           Json
+  topPerformingCombinations Json[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Indexes
   @@index([periodStart])
   @@index([periodEnd])
-  @@index([createdAt])
-}
-
-// Marketplace Enums
-enum VendorStatus {
-  PENDING_APPROVAL
-  ACTIVE
-  SUSPENDED
-  INACTIVE
-  BLACKLISTED
-}
-
-enum VendorTier {
-  BASIC
-  SILVER
-  GOLD
-  PLATINUM
-}
-
-enum MarketplaceItemType {
-  INSURANCE_PRODUCT
-  LEAD_PACKAGE
-  SERVICE
-  TRAINING
-  TOOL
-}
-
-enum MarketplaceItemStatus {
-  DRAFT
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-  ARCHIVED
-}
-
-enum TransactionStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  REFUNDED
-  CANCELLED
-}
-
-enum TransactionType {
-  PURCHASE
-  BID
-  SUBSCRIPTION
-  RENTAL
-}
-
-enum PayoutStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+  @@unique([periodStart, periodEnd])
 }

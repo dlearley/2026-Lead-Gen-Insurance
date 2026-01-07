@@ -835,5 +835,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Marketplace (Phase 12.6)
-export * from './marketplace.js';
+// Personalization (Phase 16.3.7)
+export * from './personalization.js';
