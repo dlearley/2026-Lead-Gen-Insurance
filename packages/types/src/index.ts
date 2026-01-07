@@ -1,24 +1,208 @@
 // ========================================
-// COPILOT TYPES
+// ORGANIZATION TYPES
 // ========================================
 
-export * from './copilot.js';
+export type OrganizationStatus = 'pending' | 'active' | 'suspended' | 'cancelled';
+export type SubscriptionStatus = 'pending' | 'active' | 'past_due' | 'cancelled' | 'expired';
+export type SubscriptionPlan = 'free' | 'starter' | 'professional' | 'enterprise' | 'trial';
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  domain?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  
+  // Company Info
+  companySize?: string; // '1-10', '11-50', '51-200', '201-500', '500+'
+  industry?: string; // 'health', 'life', 'property', 'casualty', 'commercial', 'auto'
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  phone?: string;
+  
+  // Status & Configuration
+  status: OrganizationStatus;
+  isActive: boolean;
+  setupComplete: boolean;
+  verifiedAt?: Date;
+  
+  // Subscription
+  subscriptionId?: string;
+  subscriptionStatus: SubscriptionStatus;
+  subscriptionPlan?: SubscriptionPlan;
+  
+  // API & Security
+  apiKeyHash?: string;
+  webhookUrl?: string;
+  
+  // Metadata
+  preferences?: Record<string, unknown>; // Custom notification settings, etc.
+  customFields?: Record<string, unknown>; // Dynamic schema fields
+  
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Relationships (optional for nests)
+  users?: User[];
+  auditLogs?: AuditLog[];
+}
+
+export interface CreateOrganizationDto {
+  name: string;
+  slug: string;
+  domain?: string;
+  companySize?: string;
+  industry?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  phone?: string;
+  subscriptionPlan?: SubscriptionPlan;
+}
+
+export interface UpdateOrganizationDto {
+  name?: string;
+  slug?: string;
+  domain?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  companySize?: string;
+  industry?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  phone?: string;
+  webhookUrl?: string;
+  preferences?: Record<string, unknown>;
+  customFields?: Record<string, unknown>;
+  isActive?: boolean;
+  setupComplete?: boolean;
+  subscriptionPlan?: SubscriptionPlan;
+  apiKeyHash?: string;
+}
+
+export interface OrganizationFilterParams {
+  status?: OrganizationStatus | OrganizationStatus[];
+  isActive?: boolean;
+  subscriptionPlan?: SubscriptionPlan | SubscriptionPlan[];
+  industry?: string | string[];
+  search?: string;
+  page?: number;
+  limit?: number;
+}
 
 // ========================================
 // USER TYPES
 // ========================================
 
-export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+export type UserRole = 'user' | 'agent' | 'manager' | 'admin' | 'super_admin' | 'viewer';
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'revoked';
 
 export interface User {
   id: string;
   email: string;
   firstName?: string;
   lastName?: string;
+  passwordHash?: string;
+  
+  // Organization membership
+  organizationId?: string;
   role: UserRole;
+  permissions?: Record<string, unknown>; // Custom permissions for fine-grained access control
+  
+  // Authentication
   isActive: boolean;
+  emailVerified: boolean;
+  lastLoginAt?: Date;
+  failedLoginCount: number;
+  lockoutUntil?: Date;
+  
+  // Profile
+  avatarUrl?: string;
+  phone?: string;
+  jobTitle?: string;
+  department?: string;
+  
+  // Social Auth
+  googleId?: string;
+  microsoftId?: string;
+  
+  // Onboarding & Preferences
+  onboardingStep?: number; // Current step in onboarding wizard (0-6)
+  preferences?: Record<string, unknown>; // User preferences (notifications, theme, etc.)
+  
+  // Security & Tokens
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
+  
   createdAt: Date;
   updatedAt: Date;
+  
+  // Relationships
+  organization?: Organization;
+  auditLogs?: AuditLog[];
+  sentInvitations?: TeamInvitation[];
+  receivedInvitations?: TeamInvitation[];
+}
+
+export interface CreateUserDto {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  password?: string;
+  organizationId?: string;
+  role?: UserRole;
+  permissions?: Record<string, unknown>;
+  phone?: string;
+  jobTitle?: string;
+  department?: string;
+  googleId?: string;
+  microsoftId?: string;
+}
+
+export interface UpdateUserDto {
+  firstName?: string;
+  lastName?: string;
+  role?: UserRole;
+  permissions?: Record<string, unknown>;
+  avatarUrl?: string;
+  phone?: string;
+  jobTitle?: string;
+  department?: string;
+  onboardingStep?: number;
+  preferences?: Record<string, unknown>;
+  isActive?: boolean;
+  emailVerified?: boolean;
+  lastLoginAt?: Date;
+  failedLoginCount?: number;
+  lockoutUntil?: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
+}
+
+export interface UserFilterParams {
+  organizationId?: string;
+  role?: UserRole | UserRole[];
+  isActive?: boolean;
+  emailVerified?: boolean;
+  search?: string;
+  onboardingStep?: number;
+  page?: number;
+  limit?: number;
 }
 
 // ========================================
