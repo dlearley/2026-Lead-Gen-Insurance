@@ -1527,8 +1527,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Broker Scale
-export * from './broker-scale.js';
-
-// Attribution (Phase 12.4)
-export * from './attribution.js';
+// Advanced AI & Verticals
+export * from './ai-verticals.js';
