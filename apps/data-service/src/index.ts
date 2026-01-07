@@ -33,7 +33,7 @@ import { createRetentionRoutes } from './routes/retention.routes.js';
 import { createCampaignsRoutes } from './routes/campaigns.routes.js';
 import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
-import { createCommunityNetworkRoutes } from './routes/community-network.routes.js';
+import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import { BehaviorAnalyticsService } from './services/behavior-analytics.js';
@@ -107,6 +107,9 @@ const start = async (): Promise<void> => {
   app.use('/api/v1/community/mentorship', createMentorshipRoutes());
   app.use('/api/v1/community/profiles', createAgentProfileRoutes());
   app.use('/api/v1/community/connections', createAgentConnectionsRoutes());
+
+  // Setup broker education routes
+  app.use('/api/v1/broker-education', createBrokerEducationRoutes());
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));

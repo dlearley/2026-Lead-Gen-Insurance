@@ -1365,223 +1365,310 @@ enum Direction {
 }
 
 // ========================================
-// WORKFLOW & ORCHESTRATION
+// BROKER EDUCATION & COMPETENCY (Phase 12.3)
 // ========================================
 
-model Workflow {
-  id          String          @id @default(uuid())
-  name        String
-  description String?
-  version     Int             @default(1)
-  status      WorkflowStatus  @default(DRAFT)
-  category    String
-  triggers    Json
-  steps       Json
-  errorHandlers Json?
-  timeout     Int?
-  metadata    Json?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+model Course {
+  id              String       @id @default(uuid())
+  title           String
+  description     String       @db.Text
+  category        String
+  level           CompetencyLevel
+  status          CourseStatus @default(DRAFT)
+  thumbnailUrl    String?
+  estimatedHours  Int
+  prerequisites   String[]
+  tags            String[]
+  objectives      String[]
+  instructorName  String?
+  version         Int          @default(1)
+  publishedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  // Relations
-  executions  WorkflowExecution[]
+  relations       Module[]
+  enrollments     Enrollment[]
+  assessments     Assessment[]
+  certificates    Certificate[]
 
   @@index([status])
   @@index([category])
-  @@map("workflows")
+  @@index([level])
+  @@map("courses")
 }
 
-enum WorkflowStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
-  COMPLETED
-  FAILED
-  CANCELLED
+model Module {
+  id          String   @id @default(uuid())
+  courseId    String
+  title       String
+  description String   @db.Text
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@index([courseId])
+  @@index([order])
+  @@map("modules")
 }
 
-model WorkflowExecution {
-  id              String          @id @default(uuid())
-  workflowId      String
-  workflowVersion Int
-  status          ExecutionStatus @default(PENDING)
-  input           Json
-  output          Json?
-  currentStepId   String?
-  startedAt       DateTime        @default(now())
-  completedAt     DateTime?
-  error           String?
-  metadata        Json?
+model Lesson {
+  id              String   @id @default(uuid())
+  moduleId        String
+  title           String
+  content         String   @db.Text
+  videoUrl        String?
+  resourcesUrl    String?
+  order           Int
+  durationMinutes Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  // Relations
-  workflow        Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  stepsExecuted   StepExecution[]
+  module          Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress        LessonProgress[]
 
-  @@index([workflowId])
-  @@index([status])
-  @@index([startedAt])
-  @@map("workflow_executions")
+  @@index([moduleId])
+  @@index([order])
+  @@map("lessons")
 }
 
-enum ExecutionStatus {
-  PENDING
-  RUNNING
-  COMPLETED
-  FAILED
-  CANCELLED
-  RETRYING
+model Assessment {
+  id               String         @id @default(uuid())
+  courseId         String
+  title            String
+  description      String?        @db.Text
+  type             AssessmentType
+  timeLimitMinutes Int?
+  passingScore     Int
+  maxAttempts      Int
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions        Question[]
+  attempts         AssessmentAttempt[]
+  certificates     Certificate[]
+
+  @@index([courseId])
+  @@index([type])
+  @@map("assessments")
 }
 
-model StepExecution {
-  id            String          @id @default(uuid())
-  executionId    String
-  stepId        String
-  stepName      String
-  status        ExecutionStatus @default(PENDING)
-  input         Json?
-  output        Json?
-  startedAt     DateTime        @default(now())
+model Question {
+  id            String       @id @default(uuid())
+  assessmentId  String
+  type          QuestionType
+  text          String       @db.Text
+  options       String[]
+  correctAnswer String
+  explanation   String?      @db.Text
+  points        Int
+  order         Int
+
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([order])
+  @@map("questions")
+}
+
+model AssessmentAttempt {
+  id            String   @id @default(uuid())
+  assessmentId  String
+  agentId       String
+  attemptNumber Int
+  score         Int
+  passed        Boolean
+  startedAt     DateTime @default(now())
   completedAt   DateTime?
-  duration      Int?
-  attempt       Int             @default(1)
-  error         String?
-  logs          Json?
+  answers       Json
 
-  // Relations
-  execution     WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
 
-  @@index([executionId])
-  @@index([stepId])
+  @@index([assessmentId])
+  @@index([agentId])
+  @@index([passed])
+  @@map("assessment_attempts")
+}
+
+model Enrollment {
+  id               String         @id @default(uuid())
+  courseId         String
+  agentId          String
+  status           EnrollmentStatus @default(NOT_STARTED)
+  progress         Int            @default(0)
+  currentLessonId  String?
+  enrolledAt       DateTime       @default(now())
+  completedAt      DateTime?
+  lastAccessedAt   DateTime?
+
+  course           Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress   LessonProgress[]
+
+  @@unique([courseId, agentId])
+  @@index([agentId])
   @@index([status])
-  @@map("step_executions")
+  @@map("enrollments")
 }
 
-model Webhook {
-  id          String   @id @default(uuid())
+model LessonProgress {
+  id               String   @id @default(uuid())
+  enrollmentId     String
+  lessonId         String
+  completed        Boolean  @default(false)
+  timeSpentMinutes Int      @default(0)
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson           Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([enrollmentId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+model Competency {
+  id          String           @id @default(uuid())
   name        String
-  url         String
-  method      HttpMethod @default(POST)
-  headers     Json?
-  secret      String?
-  isActive    Boolean  @default(true)
-  retryPolicy Json?
-  timeout     Int?
-  events      String[]
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  events      WebhookEvent[]
-
-  @@index([isActive])
-  @@map("webhooks")
-}
-
-enum HttpMethod {
-  GET
-  POST
-  PUT
-  PATCH
-  DELETE
-}
-
-model WebhookEvent {
-  id          String   @id @default(uuid())
-  webhookId   String
-  eventType  String
-  payload    Json
-  statusCode Int?
-  response   String?  @db.Text
-  success    Boolean
-  attempt    Int      @default(1)
-  sentAt     DateTime @default(now())
-  completedAt DateTime?
-  error      String?
-
-  // Relations
-  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId])
-  @@index([eventType])
-  @@index([success])
-  @@index([sentAt])
-  @@map("webhook_events")
-}
-
-model TransformationRule {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  inputSchema Json
-  outputSchema Json
-  transformations Json
-  isActive    Boolean  @default(true)
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([isActive])
-  @@map("transformation_rules")
-}
-
-model OrchestrationMetrics {
-  id                       String          @id @default(uuid())
-  workflowId               String
-  totalExecutions          Int             @default(0)
-  successfulExecutions     Int             @default(0)
-  failedExecutions         Int             @default(0)
-  averageExecutionTime     Float           @default(0)
-  averageStepExecutionTime Float           @default(0)
-  successRate              Float           @default(0)
-  lastExecutionAt          DateTime?
-  lastExecutionStatus      ExecutionStatus?
-  createdAt                DateTime        @default(now())
-  updatedAt                DateTime        @updatedAt
-
-  @@unique([workflowId])
-  @@index([workflowId])
-  @@map("orchestration_metrics")
-}
-
-model CircuitBreaker {
-  id               String              @id @default(uuid())
-  serviceId        String             @unique
-  state            CircuitBreakerState @default(CLOSED)
-  failureCount     Int                @default(0)
-  lastFailureTime  DateTime?
-  lastSuccessTime  DateTime?
-  threshold        Int                @default(5)
-  timeout          Int                @default(60000)
-  halfOpenMaxCalls Int                @default(3)
-  halfOpenCalls    Int                @default(0)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-
-  @@index([serviceId])
-  @@index([state])
-  @@map("circuit_breakers")
-}
-
-enum CircuitBreakerState {
-  CLOSED
-  OPEN
-  HALF_OPEN
-}
-
-model WorkflowTemplate {
-  id          String   @id @default(uuid())
-  name        String
-  description String
+  description String           @db.Text
   category    String
-  version     String
-  definition  Json
-  parameters  Json
-  isPublic    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  level       CompetencyLevel
+  skills      String[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  agentCompetencies AgentCompetency[]
 
   @@index([category])
-  @@index([isPublic])
-  @@map("workflow_templates")
+  @@index([level])
+  @@map("competencies")
+}
+
+model AgentCompetency {
+  id               String           @id @default(uuid())
+  agentId          String
+  competencyId     String
+  level            CompetencyLevel
+  assessedAt       DateTime         @default(now())
+  evidence         String[]
+  assessmentMethod String?
+
+  competency       Competency       @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, competencyId])
+  @@index([agentId])
+  @@index([competencyId])
+  @@map("agent_competencies")
+}
+
+model LearningPath {
+  id                String         @id @default(uuid())
+  title             String
+  description       String         @db.Text
+  category          String
+  targetRole        String?
+  targetLevel       CompetencyLevel
+  estimatedWeeks    Int
+  requiredCourses   String[]
+  electiveCourses   String[]
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  pathEnrollments   PathEnrollment[]
+
+  @@index([category])
+  @@index([targetRole])
+  @@index([isActive])
+  @@map("learning_paths")
+}
+
+model PathEnrollment {
+  id               String         @id @default(uuid())
+  learningPathId   String
+  agentId          String
+  status           EnrollmentStatus @default(NOT_STARTED)
+  progress         Int            @default(0)
+  enrolledAt       DateTime       @default(now())
+  completedAt      DateTime?
+  completedCourses String[]
+
+  learningPath     LearningPath   @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+
+  @@unique([learningPathId, agentId])
+  @@index([agentId])
+  @@index([status])
+  @@map("path_enrollments")
+}
+
+model Certificate {
+  id               String           @id @default(uuid())
+  agentId          String
+  courseId         String?
+  assessmentId     String?
+  certificateNumber String          @unique
+  title            String
+  description      String          @db.Text
+  issueDate        DateTime         @default(now())
+  expiryDate       DateTime?
+  status           CertificateStatus @default(ACTIVE)
+  verificationUrl  String?
+  credentialId     String?
+
+  course           Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  assessment       Assessment?      @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([certificateNumber])
+  @@index([status])
+  @@map("certificates")
+}
+
+// Enums for Education
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  DROPPED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+}
+
+enum AssessmentType {
+  QUIZ
+  EXAM
+  CERTIFICATION
+}
+
+enum CompetencyLevel {
+  NOVICE
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum CertificateStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
 }
