@@ -835,5 +835,6 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Compliance Framework
-export * from './compliance.js';
+// Global Expansion Types
+export * from './global.js';
+export * from './i18n.js';

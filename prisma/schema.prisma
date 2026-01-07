@@ -239,139 +239,237 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// Compliance Framework Models
+// ========================================
+// GLOBAL EXPANSION MODELS (Phase 28)
+// ========================================
 
-// Compliance Policies and Rules
-model CompliancePolicy {
-  id                String      @id @default(cuid())
-  name              String      // e.g., "GDPR Data Processing", "HIPAA Privacy Rules"
-  description       String?
-  domain            String      // "GDPR", "HIPAA", "CCPA", "GLBA", "Insurance", etc.
-  jurisdiction      String?     // "EU", "US", "CA", "state-specific"
-  riskLevel         String      // "Critical", "High", "Medium", "Low"
-  status            String      @default("Active") // "Active", "Draft", "Archived"
-  requirements      RequiredField[]
-  violations        ComplianceViolation[]
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+// Language model - supported languages
+model Language {
+  id                String   @id @default(uuid())
+  code              String   @unique // 'en', 'es', 'fr', etc.
+  name              String   // 'English', 'Spanish', etc.
+  nativeName         String   // 'English', 'Español', etc.
+  textDirection     TextDirection @default(LTR)
+  isDefault         Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  @@index([domain])
-  @@index([jurisdiction])
-  @@index([status])
+  // Relationships
+  translations      Translation[]
+  customerPreferences CustomerLocalizationPreferences[]
+  agentCapabilities  AgentLanguageCapability[]
+  leadRegionalData   LeadRegionalData[]
+
+  @@index([code])
+  @@index([isActive])
 }
 
-model RequiredField {
-  id                String      @id @default(cuid())
-  policyId          String
-  policy            CompliancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  name              String      // e.g., "Consent Required", "Data Retention"
-  description       String?
-  validationRule    String      // JSON schema or custom validation logic
-  enforcementLevel  String      // "Mandatory", "Recommended"
-  createdAt         DateTime    @default(now())
+// Currency model - supported currencies
+model Currency {
+  id                String   @id @default(uuid())
+  code              String   @unique // 'USD', 'EUR', etc.
+  name              String   // 'US Dollar', 'Euro', etc.
+  symbol            String   // ', '€', etc.
+  decimalPlaces     Int      @default(2)
+  isDefault         Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  @@index([policyId])
+  // Relationships
+  customerPreferences CustomerLocalizationPreferences[]
+  agentCapabilities    AgentLanguageCapability[]
+  leadRegionalData     LeadRegionalData[]
+
+  @@index([code])
+  @@index([isActive])
 }
 
-// Compliance Violations and Alerts
-model ComplianceViolation {
-  id                String      @id @default(cuid())
-  policyId          String
-  policy            CompliancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  leadId            String?
-  agentId           String?
-  violationType     String      // "Missing Consent", "Retention Expired", etc.
-  severity          String      // "Critical", "High", "Medium", "Low"
-  status            String      @default("Open") // "Open", "Resolved", "Waived"
-  description       String
-  detectedAt        DateTime    @default(now())
-  resolvedAt        DateTime?
-  resolution        String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+// RegionalSettings model - regional configuration
+model RegionalSettings {
+  id                    String   @id @default(uuid())
+  regionCode            String   @unique // 'US', 'CA', 'GB', etc.
+  name                  String   // 'United States', 'Canada', etc.
+  defaultLocale         String   // 'en', 'es', etc.
+  defaultCurrency       String   // 'USD', 'CAD', etc.
+  defaultTimezone       String   // 'America/New_York', etc.
+  gdprEnabled          Boolean  @default(false)
+  ccpaEnabled          Boolean  @default(false)
+  dataRetentionDays     Int      @default(2555) // 7 years default
+  consentRequired       Boolean  @default(true)
+  privacyPolicyUrl     String?
+  termsOfServiceUrl    String?
+  dateFormat           String   @default("MM/DD/YYYY")
+  timeFormat           String   @default("12-hour")
+  numberFormat         String   @default("1,234.56")
+  currencyFormat       String   @default("$1,234.56")
+  addressFormat        String   @default("street, city, state zip")
+  phoneFormat          String   @default("+1 (XXX) XXX-XXXX")
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  @@index([policyId])
-  @@index([leadId])
+  // Relationships
+  customerPreferences CustomerLocalizationPreferences[]
+  agentCapabilities    AgentLanguageCapability[]
+  agentExpertise      AgentRegionalExpertise[]
+  leadRegionalData     LeadRegionalData[]
+
+  @@index([regionCode])
+  @@index([isActive])
+}
+
+// Translation model - translation key-value storage
+model Translation {
+  id                String   @id @default(uuid())
+  key               String   // 'common.save', 'nav.dashboard', etc.
+  namespace         String   @default('common') // 'common', 'nav', 'forms', etc.
+  value             String   // translated value
+  locale            String   // 'en', 'es', 'fr', etc.
+  context           String?  // optional context
+  description       String?  // optional description
+  isActive          Boolean  @default(true)
+  lastUpdated       DateTime @default(now())
+  updatedBy         String?  // user id who last updated
+
+  // Relationships
+  language          Language @relation(fields: [locale: code], references: [code])
+
+  @@unique([key, locale])
+  @@index([key])
+  @@index([locale])
+  @@index([namespace])
+}
+
+// CustomerLocalizationPreferences model - customer locale preferences
+model CustomerLocalizationPreferences {
+  id                    String   @id @default(uuid())
+  customerId            String   @unique
+  locale                String   @default('en')
+  regionCode            String   @default('US')
+  currencyCode          String   @default('USD')
+  timezone              String   @default('UTC')
+  dateFormat            String   @default('MM/DD/YYYY')
+  numberFormat          String   @default('1,234.56')
+  addressFormat        String   @default('street, city, state zip')
+  phoneFormat          String   @default('+1 (XXX) XXX-XXXX')
+  communicationLanguage String  @default('en')
+  marketingConsent      Boolean  @default(false)
+  privacyConsent        Boolean  @default(false)
+  gdprConsent           Boolean?
+  ccpaConsent           Boolean?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relationships
+  language             Language?        @relation(fields: [locale: code], references: [code])
+  region              RegionalSettings? @relation(fields: [regionCode: regionCode], references: [regionCode])
+  currency            Currency?        @relation(fields: [currencyCode: code], references: [code])
+
+  @@index([customerId])
+  @@index([locale])
+  @@index([regionCode])
+  @@index([currencyCode])
+}
+
+// AgentLanguageCapability model - agent language skills
+model AgentLanguageCapability {
+  id                String   @id @default(uuid())
+  agentId           String
+  locale            String   @default('en')
+  regionCode        String   @default('US')
+  currencyCode      String   @default('USD')
+  proficiencyLevel  ProficiencyLevel @default(BASIC)
+  certification     String?
+  isVerified        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  agent             Agent    @relation(fields: [agentId: id], references: [id], onDelete: Cascade)
+  language          Language?        @relation(fields: [locale: code], references: [code])
+  region           RegionalSettings? @relation(fields: [regionCode: regionCode], references: [regionCode])
+  currency         Currency?        @relation(fields: [currencyCode: code], references: [code])
+
+  @@unique([agentId, locale])
   @@index([agentId])
-  @@index([severity])
-  @@index([status])
-  @@index([detectedAt])
+  @@index([locale])
+  @@index([regionCode])
+  @@index([proficiencyLevel])
 }
 
-// Immutable Audit Trail
-model ComplianceAuditLog {
-  id                String      @id @default(cuid())
-  userId            String
-  action            String      // "LeadCreated", "ConsentGiven", "DataDeleted", etc.
-  entityType        String      // "Lead", "Agent", "Document", etc.
-  entityId          String
-  changes           String      // JSON of what changed
-  compliancePolicies String?    // JSON array of policies involved
-  ipAddress         String?
-  userAgent         String?
-  timestamp         DateTime    @default(now()) // Immutable
-  createdAt         DateTime    @default(now())
-  
-  @@index([userId])
-  @@index([entityId])
-  @@index([timestamp])
-  @@index([action])
+// AgentRegionalExpertise model - agent regional expertise
+model AgentRegionalExpertise {
+  id                String   @id @default(uuid())
+  agentId           String
+  regionCode        String   @default('US')
+  specialization    String[] // ['auto-insurance', 'commercial', etc.]
+  experienceYears   Int      @default(0)
+  localKnowledge    String[] // ['US-tax-law', 'state-regulations', etc.]
+  culturalCompetence String[] // ['direct-communication', 'formal-greetings', etc.]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  agent             Agent    @relation(fields: [agentId: id], references: [id], onDelete: Cascade)
+  region           RegionalSettings @relation(fields: [regionCode: regionCode], references: [regionCode])
+
+  @@unique([agentId, regionCode])
+  @@index([agentId])
+  @@index([regionCode])
 }
 
-// Compliance Status Dashboard Data
-model ComplianceStatus {
-  id                String      @id @default(cuid())
-  domain            String      // "GDPR", "HIPAA", etc.
-  jurisdiction      String?
-  totalPolicies     Int
-  activePolicies    Int
-  openViolations    Int
-  resolvedViolations Int
-  complianceScore   Float       // 0-100
-  lastAssessment    DateTime
-  nextAssessment    DateTime
-  updatedAt         DateTime    @updatedAt
+// LeadRegionalData model - lead regional information
+model LeadRegionalData {
+  id                  String   @id @default(uuid())
+  leadId              String   @unique
+  locale              String   @default('en')
+  regionCode          String   @default('US')
+  timezone            String   @default('UTC')
+  currencyCode        String   @default('USD')
+  addressCountry      String   @default('US')
+  phoneCountry       String   @default('US')
+  communicationStyle  CommunicationStyle @default(DIRECT)
+  businessHoursStart  String?  // '09:00'
+  businessHoursEnd    String?  // '17:00'
+  holidays            String[] // ['2025-01-01', '2025-12-25']
+  culturalPreferences Json?    // flexible storage for cultural data
+  complianceFlags     Json?    // compliance requirements and status
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  @@index([domain])
-  @@index([jurisdiction])
-}
-
-// Data Subject Requests (GDPR DSAR, CCPA Requests)
-model DataSubjectRequest {
-  id                String      @id @default(cuid())
-  leadId            String
-  requestType       String      // "AccessRequest", "DeletionRequest", "PortabilityRequest"
-  jurisdiction      String      // "GDPR", "CCPA", "Other"
-  status            String      @default("Pending") // "Pending", "InProgress", "Completed", "Denied"
-  requestDate       DateTime
-  dueDate           DateTime    // Legal deadline (30-45 days typically)
-  completionDate    DateTime?
-  documents         String[]    // JSON array of document paths for fulfillment
-  notes             String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  // Relationships
+  lead                Lead     @relation(fields: [leadId: id], references: [id], onDelete: Cascade)
+  language           Language?        @relation(fields: [locale: code], references: [code])
+  region            RegionalSettings? @relation(fields: [regionCode: regionCode], references: [regionCode])
+  currency          Currency?        @relation(fields: [currencyCode: code], references: [code])
 
   @@index([leadId])
-  @@index([status])
-  @@index([requestDate])
-  @@index([jurisdiction])
+  @@index([locale])
+  @@index([regionCode])
+  @@index([currencyCode])
 }
 
-// Regulatory Requirements Checklist
-model RegulatoryRequirement {
-  id                String      @id @default(cuid())
-  domain            String      // "GDPR", "HIPAA", "Insurance"
-  jurisdiction      String      // "EU", "US", "State", etc.
-  requirement       String      // Specific requirement text
-  description       String?
-  status            String      @default("NotStarted") // "NotStarted", "InProgress", "Completed"
-  implementedDate   DateTime?
-  lastVerified      DateTime?
-  verificationNotes String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+// ========================================
+// ENUMS FOR GLOBAL EXPANSION
+// ========================================
 
-  @@index([domain])
-  @@index([jurisdiction])
-  @@index([status])
+enum TextDirection {
+  LTR
+  RTL
+}
+
+enum ProficiencyLevel {
+  BASIC
+  CONVERSATIONAL
+  FLUENT
+  NATIVE
+}
+
+enum CommunicationStyle {
+  DIRECT
+  INDIRECT
+  FORMAL
+  INFORMAL
 }

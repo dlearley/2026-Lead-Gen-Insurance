@@ -1,0 +1,1 @@
+export { regionalService, RegionalService } from './regional-service.js';

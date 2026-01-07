@@ -1,0 +1,1 @@
+export { createLocalizationRoutes } from './localization.routes.js';
