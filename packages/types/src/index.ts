@@ -835,5 +835,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Competitive Intelligence
-export * from './competitive-intelligence.js';
+// Performance Optimization
+export * from './performance.js';

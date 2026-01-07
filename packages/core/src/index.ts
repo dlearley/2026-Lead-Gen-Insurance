@@ -8,6 +8,7 @@ export { initializeSLOs, updateSLOMetrics, getErrorBudgetStatus, getAllSLODefini
 export * from './cache/index.js';
 export * from './middleware/index.js';
 export * from './database/index.js';
+export * from './pagination/index.js';
 
 // Security exports
 export * from './security/index.js';
