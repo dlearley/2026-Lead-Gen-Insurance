@@ -1,5 +1,8 @@
 // Prisma schema for Insurance Lead Generation AI Platform
 // This schema defines the relational data model for PostgreSQL
+datasource db {
+  provider = "postgresql"
+}
 
 generator client {
   provider = "prisma-client-js"
@@ -214,9 +217,7 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
-  routingHistory  LeadRoutingHistory[]
-  assignmentQueue AssignmentQueue?
-  routingEvents   RoutingEvent[]
+  attributions    Attribution[]
 
   // Indexes for performance
   @@index([email])
@@ -515,316 +516,132 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
-// ========================================
-// REGULATORY REPORTING & SUBMISSIONS (Phase 25.1F)
-// ========================================
+// MarketingSource model - tracks different marketing sources and channels
+model MarketingSource {
+  id          String     @id @default(uuid())
+  name        String
+  type        MarketingSourceType
+  description String?
+  costPerLead Float?     @default(0.0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-model ComplianceReport {
-  id                  String   @id @default(cuid())
-  reportId            String   @unique
-  reportType          String
-  jurisdiction        String
-  reportPeriod        String
-  startDate           DateTime
-  endDate             DateTime
+  // Relationships
+  campaigns   Campaign[]
+  attributions Attribution[]
+  metrics      MarketingSourceMetric[]
 
-  title               String
-  summary             String
-  reportContent       String
-  attachments         String[]
+  // Indexes
+  @@index([name])
+  @@index([type])
+  @@index([isActive])
+}
 
-  metrics             String
-  keyFindings         String[]
-  violations          Int      @default(0)
-  violations_critical Int      @default(0)
-  violations_high     Int      @default(0)
-  violations_medium   Int      @default(0)
-  violations_low      Int      @default(0)
+// Campaign model - tracks marketing campaigns
+model Campaign {
+  id              String     @id @default(uuid())
+  name            String
+  description     String?
+  sourceId        String
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Float      @default(0.0)
+  status          CampaignStatus @default(DRAFT)
+  objective       String?
+  targetAudience  String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  remediationActions  String?
-  completedRemediation Int     @default(0)
-  pendingRemediation  Int      @default(0)
+  // Relationships
+  source          MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  attributions    Attribution[]
+  metrics         CampaignMetric[]
 
-  status              String
-  generatedDate       DateTime @default(now())
-  approvedDate        DateTime?
-  approvedBy          String?
-  submittedDate       DateTime?
-  submittedTo         String?
-  submissionRef       String?
-
-  generateType        String
-  generatedBy         String
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  submissions         RegulatorySubmission[]
-  reportMetrics       ComplianceReportMetrics[]
-
-  @@index([reportType])
-  @@index([jurisdiction])
+  // Indexes
+  @@index([name])
   @@index([status])
   @@index([startDate])
+  @@index([endDate])
 }
 
-model RegulatorySubmission {
-  id                     String   @id @default(cuid())
-  submissionId           String   @unique
-  reportId               String
-  reportType             String
+// Attribution model - tracks attribution data for leads
+model Attribution {
+  id              String     @id @default(uuid())
+  leadId          String
+  sourceId        String
+  campaignId      String?
+  attributionType AttributionType @default(FIRST_TOUCH)
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmTerm         String?
+  utmContent      String?
+  referralSource  String?
+  referringDomain String?
+  landingPage     String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  regulatoryBody         String
-  jurisdiction           String
-  submissionUrl          String
-  submissionMethod       String
-  submissionDate         DateTime @default(now())
+  // Relationships
+  lead             Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  source           MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  campaign         Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
-  status                 String
-  referenceNumber        String?
-  acknowledgmentDate     DateTime?
-  acknowledgmentDocument String?
-
-  regulatoryResponse     String?
-  responseDate           DateTime?
-  requiredActions        String?
-  deadline               DateTime?
-
-  submittedBy            String
-  notes                  String?
-
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  report                 ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([submissionDate])
+  // Indexes
+  @@index([leadId])
+  @@index([sourceId])
+  @@index([campaignId])
+  @@index([attributionType])
+  @@index([createdAt])
 }
 
-model DataBreachNotification {
-  id                        String   @id @default(cuid())
-  breachId                  String   @unique
-  breachDate                DateTime
-  discoveryDate             DateTime
+// CampaignMetric model - tracks campaign performance metrics
+model CampaignMetric {
+  id                    String     @id @default(uuid())
+  campaignId            String
+  date                  DateTime   @default(now())
+  leadsGenerated        Int        @default(0)
+  leadsQualified        Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  costPerLead           Float      @default(0.0)
+  costPerConversion     Float      @default(0.0)
+  revenueGenerated      Float      @default(0.0)
+  roi                   Float      @default(0.0)
+  clickThroughRate      Float      @default(0.0)
+  engagementScore       Float      @default(0.0)
 
-  breachType                String
-  description               String
-  affectedDataTypes         String[]
-  affectedRecords           Int
-  affectedIndividuals       Int
+  // Relationships
+  campaign              Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  systemsAffected           String[]
-  severity                  String
-  potentialHarm             String
-  remediation               String
-  preventionMeasures        String?
-
-  notificationSent          Boolean  @default(false)
-  notificationDate          DateTime?
-  notificationMethod        String?
-  templateUsed              String?
-  individualsNotified       Int      @default(0)
-
-  regulatorNotified         Boolean  @default(false)
-  regulatorNotificationDate DateTime?
-  regulators                String[]
-  regulatoryRef             String?
-  filingRequired            Boolean  @default(true)
-
-  investigationStart        DateTime?
-  investigationComplete     DateTime?
-  rootCause                 String?
-  investigationNotes        String?
-  resolutionDate            DateTime?
-
-  status                    String
-
-  complianceRequirements    String[]
-  legalCounsel              String?
-  insuranceClaim            String?
-
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-
-  recipients                BreachNotificationRecipient[]
-
-  @@index([breachDate])
-  @@index([status])
+  // Indexes
+  @@index([campaignId])
+  @@index([date])
+  @@unique([campaignId, date])
 }
 
-model BreachNotificationRecipient {
-  id                  String   @id @default(cuid())
-  breachId            String
-  leadId              String
-  email               String?
-  phone               String?
-  mailingAddress      String?
+// MarketingSourceMetric model - tracks source-level performance
+model MarketingSourceMetric {
+  id                    String     @id @default(uuid())
+  sourceId              String
+  date                  DateTime   @default(now())
+  leadsGenerated        Int        @default(0)
+  leadsQualified        Int        @default(0)
+  leadsConverted        Int        @default(0)
+  conversionRate        Float      @default(0.0)
+  costPerLead           Float      @default(0.0)
+  costPerConversion     Float      @default(0.0)
+  revenueGenerated      Float      @default(0.0)
+  roi                   Float      @default(0.0)
 
-  notificationSent    Boolean  @default(false)
-  notificationMethod  String?
-  notificationDate    DateTime?
-  readDate            DateTime?
-  responseDate        DateTime?
-  acknowledged        Boolean  @default(false)
+  // Relationships
+  source                MarketingSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
-  proof               String?
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  breach              DataBreachNotification @relation(fields: [breachId], references: [breachId], onDelete: Cascade)
-  lead                Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@unique([breachId, leadId])
-}
-
-model RegulatoryReportTemplate {
-  id                  String   @id @default(cuid())
-  templateName        String   @unique
-  jurisdiction        String
-  reportType          String
-  description         String?
-
-  sections            String
-  requiredMetrics     String[]
-  formatRequirements  String?
-  frequency           String
-  dueDate             String?
-
-  regulatoryBody      String
-  contactInfo         String?
-  submissionURL       String?
-  submissionEmail     String?
-
-  status              String   @default("Active")
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-}
-
-model ScheduledReport {
-  id              String   @id @default(cuid())
-  reportType      String
-  jurisdiction    String
-
-  schedule        String
-  frequency       String
-  nextRunDate     DateTime
-  lastRunDate     DateTime?
-
-  autoGenerate    Boolean  @default(true)
-  autoSubmit      Boolean  @default(false)
-  requireApproval Boolean  @default(true)
-  notifyOn        String[]
-
-  status          String   @default("Active")
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([reportType, jurisdiction])
-}
-
-model RegulatoryFilingChecklist {
-  id               String   @id @default(cuid())
-  filingId         String   @unique
-  reportType       String
-  jurisdiction     String
-  dueDate          DateTime
-
-  items            String
-  completionStatus Int
-
-  status           String
-  submittedDate    DateTime?
-  notes            String?
-
-  assignedTo       String
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-}
-
-model RegulatoryFilingArchive {
-  id                    String   @id @default(cuid())
-  filingId              String   @unique
-  reportId              String
-  reportType            String
-  jurisdiction          String
-  filingYear            Int
-
-  archivedDate          DateTime
-  archiveLocation       String
-  retention             String
-  retentionExpiry       DateTime?
-  checksum              String
-
-  retrievalInstructions String?
-
-  createdAt             DateTime @default(now())
-
-  report                ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-}
-
-model RegulatoryDeadline {
-  id                String     @id @default(cuid())
-  deadlineId         String     @unique
-  reportType         String
-  jurisdiction       String
-
-  description        String
-  dueDate            DateTime
-  reminderDates      DateTime[]
-
-  isRecurring        Boolean    @default(false)
-  recurrencePattern  String?
-
-  status             String     @default("Upcoming")
-  completionDate     DateTime?
-
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-
-  @@index([dueDate])
-}
-
-model ComplianceReportMetrics {
-  id         String   @id @default(cuid())
-  reportId   String
-  metricType String
-
-  data       String
-  trend      String?
-
-  createdAt  DateTime @default(now())
-
-  report     ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-}
-
-model RegulatoryCommLog {
-  id               String   @id @default(cuid())
-  commId           String   @unique
-  regulatoryBody   String
-  jurisdiction     String
-
-  commType         String
-  subject          String
-  content          String
-
-  sentDate         DateTime
-  sentBy           String
-  sentTo           String
-  deliveryProof    String?
-
-  responseReceived Boolean  @default(false)
-  responseDate     DateTime?
-  responseContent  String?
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([sentDate])
+  // Indexes
+  @@index([sourceId])
+  @@index([date])
+  @@unique([sourceId, date])
 }
 
 // Enums for type safety
@@ -868,199 +685,33 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// API Client model - represents external partner applications
-model ApiClient {
-  id                  String     @id @default(uuid())
-  name                String
-  description         String?
-  redirectUris        String[]
-  website             String?
-  logoUrl             String?
-  contactEmail        String
-  status              ApiClientStatus @default(ACTIVE)
-  rateLimitTier       RateLimitTier @default(BASIC)
-  webhookUrl          String?
-  webhookSecret       String?
-  scopes              String[]
-  metadata            Json?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relationships
-  apiKeys             ApiKey[]
-  webhookSubscriptions WebhookSubscription[]
-  apiUsageLogs        ApiUsageLog[]
-  apiRateLimits       ApiRateLimit[]
-
-  // Indexes
-  @@index([status])
-  @@index([rateLimitTier])
-  @@index([contactEmail])
-  @@index([createdAt])
+enum MarketingSourceType {
+  ORGANIC_SEARCH
+  PAID_SEARCH
+  SOCIAL_MEDIA
+  EMAIL
+  REFERRAL
+  DIRECT
+  AFFILIATE
+  CONTENT_MARKETING
+  EVENT
+  OTHER
 }
 
-// API Key model - for authentication
-model ApiKey {
-  id                  String     @id @default(uuid())
-  clientId            String
-  keyId               String     @unique
-  keyHash             String
-  keyPrefix           String
-  name                String
-  status              ApiKeyStatus @default(ACTIVE)
-  lastUsedAt          DateTime?
-  expiresAt           DateTime?
-  scopes              String[]
-  rateLimitOverride   Int?
-  metadata            Json?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relationships
-  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([clientId])
-  @@index([keyId])
-  @@index([keyPrefix])
-  @@index([status])
-  @@index([expiresAt])
-}
-
-// Webhook Subscription model - for event subscriptions
-model WebhookSubscription {
-  id                  String     @id @default(uuid())
-  clientId            String
-  url                 String
-  secret              String
-  events              String[]
-  status              WebhookStatus @default(ACTIVE)
-  retryConfig         Json?
-  metadata            Json?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relationships
-  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  deliveries          WebhookDelivery[]
-
-  // Indexes
-  @@index([clientId])
-  @@index([status])
-  @@index([events])
-  @@index([createdAt])
-}
-
-// Webhook Delivery model - tracks webhook deliveries
-model WebhookDelivery {
-  id                  String     @id @default(uuid())
-  subscriptionId      String
-  eventType           String
-  payload             Json
-  responseCode        Int?
-  responseBody        String?
-  attemptCount        Int        @default(0)
-  status              DeliveryStatus @default(PENDING)
-  scheduledFor        DateTime   @default(now())
-  deliveredAt         DateTime?
-  nextRetryAt         DateTime?
-  errorMessage        String?
-  metadata            Json?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relationships
-  subscription        WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([subscriptionId])
-  @@index([eventType])
-  @@index([status])
-  @@index([scheduledFor])
-  @@index([nextRetryAt])
-  @@index([createdAt])
-}
-
-// API Usage Log model - tracks API usage
-model ApiUsageLog {
-  id                  String     @id @default(uuid())
-  clientId            String
-  apiKeyId            String?
-  endpoint            String
-  method              String
-  statusCode          Int
-  responseTimeMs      Int
-  requestIp           String?
-  userAgent           String?
-  requestSize         Int?
-  responseSize        Int?
-  timestamp           DateTime   @default(now())
-
-  // Relationships
-  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([clientId])
-  @@index([endpoint])
-  @@index([method])
-  @@index([statusCode])
-  @@index([timestamp])
-  @@index([clientId, timestamp])
-}
-
-// API Rate Limit model - tracks rate limiting
-model ApiRateLimit {
-  id                  String     @id @default(uuid())
-  clientId            String
-  window              String
-  requestCount        Int        @default(0)
-  requestLimit        Int
-  resetAt             DateTime
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relationships
-  apiClient           ApiClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([clientId])
-  @@index([window])
-  @@index([resetAt])
-  @@unique([clientId, window])
-}
-
-// Enums for API Ecosystem
-enum ApiClientStatus {
-  ACTIVE
-  SUSPENDED
-  REVOKED
-  PENDING_VERIFICATION
-}
-
-enum ApiKeyStatus {
-  ACTIVE
-  SUSPENDED
-  REVOKED
-  EXPIRED
-}
-
-enum WebhookStatus {
+enum CampaignStatus {
+  DRAFT
   ACTIVE
   PAUSED
-  DISABLED
+  COMPLETED
+  CANCELLED
+  ARCHIVED
 }
 
-enum DeliveryStatus {
-  PENDING
-  DELIVERED
-  FAILED
-  RETRYING
-  MAX_RETRIES_EXCEEDED
-}
-
-enum RateLimitTier {
-  BASIC
-  STANDARD
-  PREMIUM
-  ENTERPRISE
+enum AttributionType {
+  FIRST_TOUCH
+  LAST_TOUCH
+  MULTI_TOUCH
+  LINEAR
+  TIME_DECAY
+  POSITION_BASED
 }

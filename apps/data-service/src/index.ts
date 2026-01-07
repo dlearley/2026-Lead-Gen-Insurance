@@ -113,8 +113,9 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup API ecosystem routes
-  app.use('/api/v1', apiEcosystemRoutes);
+  // Setup attribution routes
+  import attributionRoutes from './routes/attribution.routes.js';
+  app.use('/api/v1/attribution', attributionRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {

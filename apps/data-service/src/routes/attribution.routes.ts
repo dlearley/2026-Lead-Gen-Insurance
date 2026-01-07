@@ -1,387 +1,399 @@
-import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { AttributionService } from '../services/attribution.service.js';
-import {
-  CreateTouchpointDto,
-  UpdateTouchpointDto,
-  CreateConversionDto,
-  UpdateConversionDto,
-  CalculateAttributionDto,
-  AttributionReportParams,
-  BatchAttributionDto,
-  CreateAttributionDisputeDto,
-  ResolveAttributionDisputeDto,
-  TouchpointFilterParams,
-  AttributionFilterParams,
-  ConversionFilterParams,
-} from '@insurance/shared-types';
+// Attribution Routes - Marketing ROI Tracking API
 
-export function createAttributionRoutes(prisma: PrismaClient): Router {
-  const router = Router();
-  const attributionService = new AttributionService(prisma);
+import express from 'express';
+import { AttributionService } from '../services/attribution.service';
+import { 
+  CreateMarketingSourceDto, 
+  UpdateMarketingSourceDto, 
+  CreateCampaignDto, 
+  UpdateCampaignDto, 
+  CreateAttributionDto, 
+  UpdateAttributionDto 
+} from '@insurance-lead-gen/types';
+import { z } from 'zod';
+import { validateRequest } from '../validation';
 
-  // ========================================
-  // TOUCHPOINT ROUTES
-  // ========================================
+const router = express.Router();
+const attributionService = new AttributionService();
 
-  router.post('/touchpoints', async (req: Request, res: Response) => {
-    try {
-      const dto: CreateTouchpointDto = req.body;
-      const touchpoint = await attributionService.createTouchpoint(dto);
-      res.status(201).json({ success: true, data: touchpoint });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create touchpoint';
-      res.status(400).json({ success: false, error: { code: 'TOUCHPOINT_CREATE_FAILED', message } });
+// ========================================
+// MARKETING SOURCE ROUTES
+// ========================================
+
+/**
+ * @route POST /api/v1/attribution/sources
+ * @description Create a new marketing source
+ * @access Private
+ */
+router.post('/sources', validateRequest(CreateMarketingSourceDto), async (req, res) => {
+  try {
+    const source = await attributionService.createMarketingSource(req.body);
+    res.status(201).json({ success: true, data: source });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/attribution/sources/:id
+ * @description Get a marketing source by ID
+ * @access Private
+ */
+router.get('/sources/:id', async (req, res) => {
+  try {
+    const source = await attributionService.getMarketingSource(req.params.id);
+    if (!source) {
+      return res.status(404).json({ success: false, error: 'Source not found' });
     }
-  });
+    res.json({ success: true, data: source });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.get('/touchpoints/:id', async (req: Request, res: Response) => {
-    try {
-      const touchpoint = await attributionService.getTouchpointById(req.params.id);
-      if (!touchpoint) {
-        return res.status(404).json({ success: false, error: { code: 'TOUCHPOINT_NOT_FOUND', message: 'Touchpoint not found' } });
-      }
-      res.json({ success: true, data: touchpoint });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get touchpoint';
-      res.status(400).json({ success: false, error: { code: 'TOUCHPOINT_GET_FAILED', message } });
+/**
+ * @route PUT /api/v1/attribution/sources/:id
+ * @description Update a marketing source
+ * @access Private
+ */
+router.put('/sources/:id', validateRequest(UpdateMarketingSourceDto), async (req, res) => {
+  try {
+    const source = await attributionService.updateMarketingSource(req.params.id, req.body);
+    res.json({ success: true, data: source });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/attribution/sources
+ * @description List all marketing sources
+ * @access Private
+ */
+router.get('/sources', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const type = req.query.type as string;
+    const isActive = req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
+    const search = req.query.search as string;
+    
+    const result = await attributionService.listMarketingSources(page, limit, {
+      type,
+      isActive,
+      search,
+    });
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/attribution/sources/:id
+ * @description Delete a marketing source
+ * @access Private
+ */
+router.delete('/sources/:id', async (req, res) => {
+  try {
+    await attributionService.deleteMarketingSource(req.params.id);
+    res.json({ success: true, data: {} });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ========================================
+// CAMPAIGN ROUTES
+// ========================================
+
+/**
+ * @route POST /api/v1/attribution/campaigns
+ * @description Create a new campaign
+ * @access Private
+ */
+router.post('/campaigns', validateRequest(CreateCampaignDto), async (req, res) => {
+  try {
+    const campaign = await attributionService.createCampaign(req.body);
+    res.status(201).json({ success: true, data: campaign });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/attribution/campaigns/:id
+ * @description Get a campaign by ID
+ * @access Private
+ */
+router.get('/campaigns/:id', async (req, res) => {
+  try {
+    const campaign = await attributionService.getCampaign(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
-  });
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.get('/touchpoints', async (req: Request, res: Response) => {
-    try {
-      const filter: TouchpointFilterParams = {
-        leadId: req.query.leadId as string,
-        sessionId: req.query.sessionId as string,
-        channel: req.query.channel as any,
-        source: req.query.source as string,
-        campaign: req.query.campaign as string,
-        partnerId: req.query.partnerId as string,
-        brokerId: req.query.brokerId as string,
-        converted: req.query.converted === 'true' ? true : req.query.converted === 'false' ? false : undefined,
-        dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-        dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
-        page: req.query.page ? parseInt(req.query.page as string) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
-      };
+/**
+ * @route PUT /api/v1/attribution/campaigns/:id
+ * @description Update a campaign
+ * @access Private
+ */
+router.put('/campaigns/:id', validateRequest(UpdateCampaignDto), async (req, res) => {
+  try {
+    const campaign = await attributionService.updateCampaign(req.params.id, req.body);
+    res.json({ success: true, data: campaign });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-      const result = await attributionService.getTouchpoints(filter);
-      res.json({ success: true, ...result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get touchpoints';
-      res.status(400).json({ success: false, error: { code: 'TOUCHPOINTS_GET_FAILED', message } });
+/**
+ * @route GET /api/v1/attribution/campaigns
+ * @description List all campaigns
+ * @access Private
+ */
+router.get('/campaigns', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const sourceId = req.query.sourceId as string;
+    const status = req.query.status as string;
+    const search = req.query.search as string;
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    
+    const result = await attributionService.listCampaigns(page, limit, {
+      sourceId,
+      status,
+      search,
+      startDate,
+      endDate,
+    });
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route DELETE /api/v1/attribution/campaigns/:id
+ * @description Delete a campaign
+ * @access Private
+ */
+router.delete('/campaigns/:id', async (req, res) => {
+  try {
+    await attributionService.deleteCampaign(req.params.id);
+    res.json({ success: true, data: {} });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/attribution/campaigns/:id/metrics
+ * @description Get campaign metrics
+ * @access Private
+ */
+router.get('/campaigns/:id/metrics', async (req, res) => {
+  try {
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    
+    const metrics = await attributionService.getCampaignMetrics(req.params.id, {
+      startDate,
+      endDate,
+    });
+    
+    res.json({ success: true, data: metrics });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/attribution/campaigns/:id/roi
+ * @description Calculate ROI for a campaign
+ * @access Private
+ */
+router.get('/campaigns/:id/roi', async (req, res) => {
+  try {
+    const roiData = await attributionService.calculateRoi(req.params.id);
+    res.json({ success: true, data: roiData });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ========================================
+// ATTRIBUTION ROUTES
+// ========================================
+
+/**
+ * @route POST /api/v1/attribution/attributions
+ * @description Create a new attribution record
+ * @access Private
+ */
+router.post('/attributions', validateRequest(CreateAttributionDto), async (req, res) => {
+  try {
+    const attribution = await attributionService.createAttribution(req.body);
+    res.status(201).json({ success: true, data: attribution });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /api/v1/attribution/attributions/:id
+ * @description Get an attribution record by ID
+ * @access Private
+ */
+router.get('/attributions/:id', async (req, res) => {
+  try {
+    const attribution = await attributionService.getAttribution(req.params.id);
+    if (!attribution) {
+      return res.status(404).json({ success: false, error: 'Attribution not found' });
     }
-  });
+    res.json({ success: true, data: attribution });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.put('/touchpoints/:id', async (req: Request, res: Response) => {
-    try {
-      const dto: UpdateTouchpointDto = req.body;
-      const touchpoint = await attributionService.updateTouchpoint(req.params.id, dto);
-      if (!touchpoint) {
-        return res.status(404).json({ success: false, error: { code: 'TOUCHPOINT_NOT_FOUND', message: 'Touchpoint not found' } });
-      }
-      res.json({ success: true, data: touchpoint });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update touchpoint';
-      res.status(400).json({ success: false, error: { code: 'TOUCHPOINT_UPDATE_FAILED', message } });
-    }
-  });
+/**
+ * @route PUT /api/v1/attribution/attributions/:id
+ * @description Update an attribution record
+ * @access Private
+ */
+router.put('/attributions/:id', validateRequest(UpdateAttributionDto), async (req, res) => {
+  try {
+    const attribution = await attributionService.updateAttribution(req.params.id, req.body);
+    res.json({ success: true, data: attribution });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.delete('/touchpoints/:id', async (req: Request, res: Response) => {
-    try {
-      const success = await attributionService.deleteTouchpoint(req.params.id);
-      if (!success) {
-        return res.status(404).json({ success: false, error: { code: 'TOUCHPOINT_NOT_FOUND', message: 'Touchpoint not found' } });
-      }
-      res.json({ success: true, message: 'Touchpoint deleted successfully' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete touchpoint';
-      res.status(400).json({ success: false, error: { code: 'TOUCHPOINT_DELETE_FAILED', message } });
-    }
-  });
+/**
+ * @route GET /api/v1/attribution/attributions
+ * @description List all attribution records
+ * @access Private
+ */
+router.get('/attributions', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const leadId = req.query.leadId as string;
+    const sourceId = req.query.sourceId as string;
+    const campaignId = req.query.campaignId as string;
+    const attributionType = req.query.attributionType as string;
+    const search = req.query.search as string;
+    
+    const result = await attributionService.listAttributions(page, limit, {
+      leadId,
+      sourceId,
+      campaignId,
+      attributionType,
+      search,
+    });
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.get('/leads/:leadId/touchpoints', async (req: Request, res: Response) => {
-    try {
-      const touchpoints = await attributionService.getTouchpointsByLead(req.params.leadId);
-      res.json({ success: true, data: touchpoints });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get lead touchpoints';
-      res.status(400).json({ success: false, error: { code: 'TOUCHPOINTS_GET_FAILED', message } });
-    }
-  });
+/**
+ * @route DELETE /api/v1/attribution/attributions/:id
+ * @description Delete an attribution record
+ * @access Private
+ */
+router.delete('/attributions/:id', async (req, res) => {
+  try {
+    await attributionService.deleteAttribution(req.params.id);
+    res.json({ success: true, data: {} });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  // ========================================
-  // CONVERSION ROUTES
-  // ========================================
+// ========================================
+// ANALYTICS & REPORTING ROUTES
+// ========================================
 
-  router.post('/conversions', async (req: Request, res: Response) => {
-    try {
-      const dto: CreateConversionDto = req.body;
-      const conversion = await attributionService.createConversion(dto);
-      res.status(201).json({ success: true, data: conversion });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create conversion';
-      res.status(400).json({ success: false, error: { code: 'CONVERSION_CREATE_FAILED', message } });
-    }
-  });
+/**
+ * @route GET /api/v1/attribution/analytics
+ * @description Get attribution analytics
+ * @access Private
+ */
+router.get('/analytics', async (req, res) => {
+  try {
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    
+    const analytics = await attributionService.getAttributionAnalytics({
+      startDate,
+      endDate,
+    });
+    
+    res.json({ success: true, data: analytics });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.get('/conversions/:id', async (req: Request, res: Response) => {
-    try {
-      const conversion = await attributionService.getConversionById(req.params.id);
-      if (!conversion) {
-        return res.status(404).json({ success: false, error: { code: 'CONVERSION_NOT_FOUND', message: 'Conversion not found' } });
-      }
-      res.json({ success: true, data: conversion });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get conversion';
-      res.status(400).json({ success: false, error: { code: 'CONVERSION_GET_FAILED', message } });
-    }
-  });
-
-  router.get('/conversions', async (req: Request, res: Response) => {
-    try {
-      const filter: ConversionFilterParams = {
-        leadId: req.query.leadId as string,
-        type: req.query.type as any,
-        policyId: req.query.policyId as string,
-        dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-        dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
-        page: req.query.page ? parseInt(req.query.page as string) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
-      };
-
-      const result = await attributionService.getConversions(filter);
-      res.json({ success: true, ...result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get conversions';
-      res.status(400).json({ success: false, error: { code: 'CONVERSIONS_GET_FAILED', message } });
-    }
-  });
-
-  router.put('/conversions/:id', async (req: Request, res: Response) => {
-    try {
-      const dto: UpdateConversionDto = req.body;
-      const conversion = await attributionService.updateConversion(req.params.id, dto);
-      if (!conversion) {
-        return res.status(404).json({ success: false, error: { code: 'CONVERSION_NOT_FOUND', message: 'Conversion not found' } });
-      }
-      res.json({ success: true, data: conversion });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update conversion';
-      res.status(400).json({ success: false, error: { code: 'CONVERSION_UPDATE_FAILED', message } });
-    }
-  });
-
-  // ========================================
-  // ATTRIBUTION CALCULATION ROUTES
-  // ========================================
-
-  router.post('/attribution/calculate', async (req: Request, res: Response) => {
-    try {
-      const dto: CalculateAttributionDto = req.body;
-      const calculation = await attributionService.calculateAttribution(dto);
-      res.json({ success: true, data: calculation });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to calculate attribution';
-      res.status(400).json({ success: false, error: { code: 'ATTRIBUTION_CALCULATION_FAILED', message } });
-    }
-  });
-
-  router.post('/attribution/calculate-and-save', async (req: Request, res: Response) => {
-    try {
-      const dto: CalculateAttributionDto = req.body;
-      const records = await attributionService.calculateAndSaveAttribution(dto);
-      res.status(201).json({ success: true, data: records });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to calculate and save attribution';
-      res.status(400).json({ success: false, error: { code: 'ATTRIBUTION_SAVE_FAILED', message } });
-    }
-  });
-
-  router.post('/attribution/batch', async (req: Request, res: Response) => {
-    try {
-      const dto: BatchAttributionDto = req.body;
-      const result = await attributionService.processBatchAttribution(dto);
-      res.json({ success: true, data: result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to process batch attribution';
-      res.status(400).json({ success: false, error: { code: 'BATCH_ATTRIBUTION_FAILED', message } });
-    }
-  });
-
-  // ========================================
-  // ATTRIBUTION RECORD ROUTES
-  // ========================================
-
-  router.get('/attributions/:id', async (req: Request, res: Response) => {
-    try {
-      const attribution = await attributionService.getAttributionById(req.params.id);
-      if (!attribution) {
-        return res.status(404).json({ success: false, error: { code: 'ATTRIBUTION_NOT_FOUND', message: 'Attribution not found' } });
-      }
-      res.json({ success: true, data: attribution });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get attribution';
-      res.status(400).json({ success: false, error: { code: 'ATTRIBUTION_GET_FAILED', message } });
-    }
-  });
-
-  router.get('/attributions', async (req: Request, res: Response) => {
-    try {
-      const filter: AttributionFilterParams = {
-        leadId: req.query.leadId as string,
-        conversionId: req.query.conversionId as string,
-        channel: req.query.channel as any,
-        model: req.query.model as any,
-        partnerId: req.query.partnerId as string,
-        brokerId: req.query.brokerId as string,
-        campaignId: req.query.campaignId as string,
-        status: req.query.status as any,
-        dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-        dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
-        page: req.query.page ? parseInt(req.query.page as string) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
-      };
-
-      const result = await attributionService.getAttributions(filter);
-      res.json({ success: true, ...result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get attributions';
-      res.status(400).json({ success: false, error: { code: 'ATTRIBUTIONS_GET_FAILED', message } });
-    }
-  });
-
-  router.put('/attributions/:id', async (req: Request, res: Response) => {
-    try {
-      const { revenueAttributed, commissionAmount, status, metadata } = req.body;
-      const attribution = await attributionService.updateAttribution(req.params.id, {
-        revenueAttributed,
-        commissionAmount,
-        status,
-        metadata,
+/**
+ * @route POST /api/v1/attribution/reports
+ * @description Generate an attribution report
+ * @access Private
+ */
+router.post('/reports', async (req, res) => {
+  try {
+    const { reportName, startDate, endDate } = req.body;
+    
+    if (!reportName || !startDate || !endDate) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'reportName, startDate, and endDate are required' 
       });
-      if (!attribution) {
-        return res.status(404).json({ success: false, error: { code: 'ATTRIBUTION_NOT_FOUND', message: 'Attribution not found' } });
-      }
-      res.json({ success: true, data: attribution });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update attribution';
-      res.status(400).json({ success: false, error: { code: 'ATTRIBUTION_UPDATE_FAILED', message } });
     }
-  });
+    
+    const report = await attributionService.generateAttributionReport(reportName, {
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+    });
+    
+    res.json({ success: true, data: report });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  // ========================================
-  // ATTRIBUTION REPORTING ROUTES
-  // ========================================
+/**
+ * @route GET /api/v1/attribution/sources/:id/metrics
+ * @description Get source metrics
+ * @access Private
+ */
+router.get('/sources/:id/metrics', async (req, res) => {
+  try {
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    
+    const metrics = await attributionService.getSourceMetrics(req.params.id, {
+      startDate,
+      endDate,
+    });
+    
+    res.json({ success: true, data: metrics });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
-  router.get('/reports/attribution', async (req: Request, res: Response) => {
-    try {
-      const params: AttributionReportParams = {
-        startDate: new Date(req.query.startDate as string),
-        endDate: new Date(req.query.endDate as string),
-        model: req.query.model as any,
-        channel: req.query.channel as any,
-        partnerId: req.query.partnerId as string,
-        brokerId: req.query.brokerId as string,
-        campaignId: req.query.campaignId as string,
-      };
-
-      const report = await attributionService.generateAttributionReport(params);
-      res.json({ success: true, data: report });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to generate attribution report';
-      res.status(400).json({ success: false, error: { code: 'REPORT_GENERATION_FAILED', message } });
-    }
-  });
-
-  router.get('/analytics/attribution', async (req: Request, res: Response) => {
-    try {
-      const startDate = new Date(req.query.startDate as string);
-      const endDate = new Date(req.query.endDate as string);
-      const analytics = await attributionService.getAttributionAnalytics(startDate, endDate);
-      res.json({ success: true, data: analytics });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get attribution analytics';
-      res.status(400).json({ success: false, error: { code: 'ANALYTICS_GET_FAILED', message } });
-    }
-  });
-
-  // ========================================
-  // ATTRIBUTION MODEL CONFIG ROUTES
-  // ========================================
-
-  router.get('/attribution/models/:model/config', async (req: Request, res: Response) => {
-    try {
-      const config = await attributionService.getAttributionModelConfig(req.params.model as any);
-      res.json({ success: true, data: config });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get model config';
-      res.status(400).json({ success: false, error: { code: 'MODEL_CONFIG_GET_FAILED', message } });
-    }
-  });
-
-  router.post('/attribution/models/config', async (req: Request, res: Response) => {
-    try {
-      const { model, positionBasedWeights, timeDecayConfig, customWeights, isDefault } = req.body;
-      const config = await attributionService.setAttributionModelConfig({
-        model,
-        positionBasedWeights,
-        timeDecayConfig,
-        customWeights,
-        isDefault,
-      });
-      res.status(201).json({ success: true, data: config });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to set model config';
-      res.status(400).json({ success: false, error: { code: 'MODEL_CONFIG_SET_FAILED', message } });
-    }
-  });
-
-  // ========================================
-  // ATTRIBUTION DISPUTE ROUTES
-  // ========================================
-
-  router.post('/disputes', async (req: Request, res: Response) => {
-    try {
-      const dto: CreateAttributionDisputeDto = req.body;
-      const dispute = await attributionService.createDispute(dto);
-      res.status(201).json({ success: true, data: dispute });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create dispute';
-      res.status(400).json({ success: false, error: { code: 'DISPUTE_CREATE_FAILED', message } });
-    }
-  });
-
-  router.get('/disputes', async (req: Request, res: Response) => {
-    try {
-      const result = await attributionService.getDisputes({
-        attributionId: req.query.attributionId as string,
-        status: req.query.status as string,
-        page: req.query.page ? parseInt(req.query.page as string) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
-      });
-      res.json({ success: true, ...result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get disputes';
-      res.status(400).json({ success: false, error: { code: 'DISPUTES_GET_FAILED', message } });
-    }
-  });
-
-  router.put('/disputes/:id/resolve', async (req: Request, res: Response) => {
-    try {
-      const dto: ResolveAttributionDisputeDto = req.body;
-      const dispute = await attributionService.resolveDispute(req.params.id, dto);
-      if (!dispute) {
-        return res.status(404).json({ success: false, error: { code: 'DISPUTE_NOT_FOUND', message: 'Dispute not found' } });
-      }
-      res.json({ success: true, data: dispute });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to resolve dispute';
-      res.status(400).json({ success: false, error: { code: 'DISPUTE_RESOLVE_FAILED', message } });
-    }
-  });
-
-  return router;
-}
-
-export default createAttributionRoutes;
+export default router;

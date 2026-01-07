@@ -1,520 +1,597 @@
-# Phase 12.4: Attribution System
+# Phase 12.4: Attribution - Prove Marketing ROI
 
-## 📋 Overview
+## Overview
 
-Phase 12.4 implements a comprehensive multi-touch attribution system for the Insurance Lead Generation AI Platform. This system tracks and credits various marketing channels, partners, and brokers for their contributions to lead generation and conversions, enabling accurate ROI calculation and optimization of marketing spend.
+This phase implements a comprehensive attribution system that enables insurance agencies to track the source of leads, measure marketing campaign effectiveness, and calculate return on investment (ROI). The attribution system provides insights into which marketing channels, campaigns, and sources are generating the most valuable leads and conversions.
 
-## 🎯 Objectives
+## Features Implemented
 
-1. **Multi-Touch Tracking**: Track every customer interaction across all channels
-2. **Attribution Modeling**: Support multiple attribution models for flexible credit allocation
-3. **Revenue Attribution**: Accurately attribute revenue and commissions to touchpoints
-4. **Partner & Broker Attribution**: Track attribution for partners and brokers separately
-5. **Reporting & Analytics**: Generate comprehensive attribution reports and insights
-6. **Dispute Resolution**: Handle attribution disputes with evidence-based resolution
+### 1. Marketing Source Management
 
-## 🏗️ Architecture
+#### Marketing Source Model
 
-### Data Flow
+- **Source Tracking**: Comprehensive tracking of different marketing sources (organic search, paid search, social media, email, referrals, etc.)
+- **Cost Tracking**: Track cost per lead for each source
+- **Performance Metrics**: Monitor source effectiveness over time
+- **Status Management**: Active/inactive source management
+
+#### Source Types Supported
+
+- `ORGANIC_SEARCH`: Organic search engine traffic
+- `PAID_SEARCH`: Paid search advertising (Google Ads, Bing Ads)
+- `SOCIAL_MEDIA`: Social media platforms (Facebook, LinkedIn, Twitter)
+- `EMAIL`: Email marketing campaigns
+- `REFERRAL`: Referral traffic from other websites
+- `DIRECT`: Direct traffic (typed URLs, bookmarks)
+- `AFFILIATE`: Affiliate marketing programs
+- `CONTENT_MARKETING`: Content marketing efforts
+- `EVENT`: Event-based marketing
+- `OTHER`: Custom source types
+
+### 2. Campaign Management
+
+#### Campaign Model
+
+- **Campaign Tracking**: Create and manage marketing campaigns
+- **Budget Management**: Track campaign budgets and spending
+- **Date Ranges**: Define campaign start and end dates
+- **Status Tracking**: Campaign lifecycle management (Draft → Active → Paused → Completed → Cancelled → Archived)
+- **Objective Tracking**: Define campaign objectives and target audiences
+
+#### Campaign Statuses
+
+- **DRAFT**: Campaign is being planned
+- **ACTIVE**: Campaign is currently running
+- **PAUSED**: Campaign is temporarily paused
+- **COMPLETED**: Campaign has finished successfully
+- **CANCELLED**: Campaign was cancelled
+- **ARCHIVED**: Campaign is archived for historical reference
+
+### 3. Attribution Tracking
+
+#### Attribution Model
+
+- **Lead Attribution**: Track which source and campaign generated each lead
+- **UTM Parameter Support**: Capture UTM parameters (source, medium, campaign, term, content)
+- **Referral Tracking**: Track referral sources and domains
+- **Landing Page Tracking**: Record the landing page URL
+- **Attribution Types**: Support multiple attribution models
+
+#### Attribution Types
+
+- **FIRST_TOUCH**: Credit to the first interaction
+- **LAST_TOUCH**: Credit to the last interaction before conversion
+- **MULTI_TOUCH**: Distribute credit across multiple touchpoints
+- **LINEAR**: Equal credit to all touchpoints
+- **TIME_DECAY**: More credit to recent touchpoints
+- **POSITION_BASED**: More credit to first and last touchpoints
+
+### 4. Performance Metrics
+
+#### Campaign Metrics
+
+- **Leads Generated**: Total leads from the campaign
+- **Leads Qualified**: Leads that passed qualification
+- **Leads Converted**: Leads that resulted in sales
+- **Conversion Rate**: Percentage of leads that converted
+- **Cost Per Lead**: Marketing cost per lead generated
+- **Cost Per Conversion**: Marketing cost per conversion
+- **Revenue Generated**: Total revenue from campaign conversions
+- **ROI**: Return on investment calculation
+- **Click Through Rate**: Engagement metrics
+- **Engagement Score**: Overall engagement quality
+
+#### Source Metrics
+
+- **Leads Generated**: Total leads from the source
+- **Leads Qualified**: Qualified leads from the source
+- **Leads Converted**: Converted leads from the source
+- **Conversion Rate**: Source conversion performance
+- **Cost Per Lead**: Cost efficiency
+- **Cost Per Conversion**: Conversion cost efficiency
+- **Revenue Generated**: Revenue attribution
+- **ROI**: Source-level ROI
+
+### 5. ROI Calculation
+
+#### ROI Formula
 
 ```
-Lead Interaction → Touchpoint → Conversion → Attribution Calculation → Report/Analytics
-                      ↓              ↓               ↓                    ↓
-              Channel/Source    Revenue       Credit Allocation        Insights
-              Partner/Broker    Policy        Commission Tracking       Trends
-              Campaign          Type          Status Management         ROI
+ROI = (Total Revenue - Total Cost) / Total Cost * 100
 ```
 
-### Components
+#### Key ROI Metrics
 
-1. **Touchpoint Service**: Captures and manages customer interactions
-2. **Conversion Service**: Tracks lead-to-customer conversions
-3. **Attribution Engine**: Calculates attribution using various models
-4. **Report Generator**: Creates comprehensive attribution reports
-5. **Analytics Service**: Provides insights and trend analysis
+- **Total Spend**: Total marketing expenditure
+- **Total Revenue**: Revenue generated from marketing efforts
+- **ROI**: Return on investment percentage
+- **ROI Percentage**: ROI expressed as percentage
+- **Cost Per Lead**: Marketing cost per lead
+- **Cost Per Conversion**: Marketing cost per conversion
+- **Conversion Rate**: Lead-to-conversion rate
 
-## 📊 Attribution Models Supported
+### 6. Analytics & Reporting
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| **First Touch** | 100% credit to first interaction | Brand awareness campaigns |
-| **Last Touch** | 100% credit to last interaction | Direct response campaigns |
-| **Linear** | Equal credit to all touchpoints | Customer journey analysis |
-| **Time Decay** | More credit to recent touchpoints | Short sales cycles |
-| **Position Based** | 40% first, 20% middle, 40% last | Balanced approach |
-| **Data Driven** | ML-based weight distribution | Advanced optimization |
+#### Attribution Analytics
 
-## 📱 Touchpoint Types
+- **Overall Performance**: Aggregate metrics across all sources and campaigns
+- **Top Sources**: Best performing marketing sources
+- **Top Campaigns**: Most effective campaigns
+- **Trend Analysis**: Performance over time
+- **Conversion Funnel**: Lead progression analysis
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `organic_search` | Unpaid search results | Google search |
-| `paid_search` | Paid search ads | Google Ads |
-| `social_media` | Social media interactions | Facebook, LinkedIn |
-| `email` | Email campaigns | Newsletter, promotional |
-| `display_ad` | Display/banner ads | Google Display Network |
-| `referral` | Word-of-mouth referrals | Customer referrals |
-| `direct` | Direct website visits | Direct URL entry |
-| `partner_referral` | Partner-sourced leads | Partner network |
-| `broker_referral` | Broker-sourced leads | Insurance brokers |
-| `affiliate` | Affiliate marketing | Affiliate partners |
-| `webinar` | Webinar registrations | Educational content |
-| `event` | Offline events | Conferences, meetups |
-| `phone_call` | Phone inquiries | Call tracking |
-| `chat` | Live chat interactions | Website chat |
-| `other` | Miscellaneous | Other channels |
+#### Report Generation
 
-## 🗄️ Database Schema
+- **Custom Date Ranges**: Analyze specific time periods
+- **Performance Breakdown**: Detailed metrics by source and campaign
+- **ROI Analysis**: Comprehensive ROI calculations
+- **Recommendations**: AI-generated optimization suggestions
 
-### Touchpoint Model
-```prisma
-model Touchpoint {
-  id                 String        @id @default(uuid())
-  leadId             String
-  sessionId          String?
-  channel            TouchpointType
-  source             String?
-  medium             String?
-  campaign           String?
-  content            String?
-  term               String?
-  referralCode       String?
-  partnerId          String?
-  brokerId           String?
-  timestamp          DateTime      @default(now())
-  converted          Boolean       @default(false)
-  conversionValue    Float?
-  conversionTimestamp DateTime?
+## API Endpoints
+
+### Marketing Source Management
+
+#### Create Marketing Source
+
+```http
+POST /api/v1/attribution/sources
+Content-Type: application/json
+
+{
+  "name": "Google Ads",
+  "type": "PAID_SEARCH",
+  "description": "Google Ads search campaigns",
+  "costPerLead": 15.50,
+  "isActive": true
 }
 ```
 
-### Conversion Model
-```prisma
-model Conversion {
-  id               String            @id @default(uuid())
-  leadId           String
-  type             ConversionType
-  value            Float
-  currency         String            @default("USD")
-  policyId         String?
-  policyNumber     String?
-  commissionRate   Float?
-  commissionAmount Float?
-  occurredAt       DateTime          @default(now())
-  attributions     AttributionRecord[]
+#### Get Marketing Source
+
+```http
+GET /api/v1/attribution/sources/:id
+```
+
+#### Update Marketing Source
+
+```http
+PUT /api/v1/attribution/sources/:id
+Content-Type: application/json
+
+{
+  "name": "Google Ads - Updated",
+  "costPerLead": 16.25
 }
 ```
 
-### AttributionRecord Model
-```prisma
-model AttributionRecord {
-  id               String            @id @default(uuid())
-  leadId           String
-  conversionId     String?
-  touchpointId     String
-  channel          TouchpointType
-  model            AttributionModel
-  credit           Float
-  percentage       Float
-  revenueAttributed Float?
-  commissionAmount Float?
-  partnerId        String?
-  brokerId         String?
-  campaignId       String?
-  calculatedAt     DateTime          @default(now())
-  status           AttributionStatus @default(PENDING)
+#### List Marketing Sources
+
+```http
+GET /api/v1/attribution/sources?type=PAID_SEARCH&isActive=true&page=1&limit=50
+```
+
+#### Delete Marketing Source
+
+```http
+DELETE /api/v1/attribution/sources/:id
+```
+
+#### Get Source Metrics
+
+```http
+GET /api/v1/attribution/sources/:id/metrics?startDate=2024-01-01&endDate=2024-12-31
+```
+
+### Campaign Management
+
+#### Create Campaign
+
+```http
+POST /api/v1/attribution/campaigns
+Content-Type: application/json
+
+{
+  "name": "Q1 Auto Insurance Campaign",
+  "description": "Targeted campaign for auto insurance leads",
+  "sourceId": "source-uuid",
+  "startDate": "2024-01-01T00:00:00Z",
+  "endDate": "2024-03-31T23:59:59Z",
+  "budget": 5000.00,
+  "status": "ACTIVE",
+  "objective": "Generate 200 qualified auto insurance leads",
+  "targetAudience": "Adults 25-55 with clean driving records"
 }
 ```
 
-## 🔧 API Endpoints
+#### Get Campaign
 
-### Touchpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/attribution/touchpoints` | Create touchpoint |
-| GET | `/api/v1/attribution/touchpoints/:id` | Get touchpoint by ID |
-| GET | `/api/v1/attribution/touchpoints` | List touchpoints |
-| PUT | `/api/v1/attribution/touchpoints/:id` | Update touchpoint |
-| DELETE | `/api/v1/attribution/touchpoints/:id` | Delete touchpoint |
-| GET | `/api/v1/attribution/leads/:leadId/touchpoints` | Get lead touchpoints |
+```http
+GET /api/v1/attribution/campaigns/:id
+```
 
-### Conversions
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/attribution/conversions` | Create conversion |
-| GET | `/api/v1/attribution/conversions/:id` | Get conversion by ID |
-| GET | `/api/v1/attribution/conversions` | List conversions |
-| PUT | `/api/v1/attribution/conversions/:id` | Update conversion |
+#### Update Campaign
+
+```http
+PUT /api/v1/attribution/campaigns/:id
+Content-Type: application/json
+
+{
+  "status": "PAUSED",
+  "budget": 5500.00
+}
+```
+
+#### List Campaigns
+
+```http
+GET /api/v1/attribution/campaigns?sourceId=source-uuid&status=ACTIVE&page=1&limit=50
+```
+
+#### Delete Campaign
+
+```http
+DELETE /api/v1/attribution/campaigns/:id
+```
+
+#### Get Campaign Metrics
+
+```http
+GET /api/v1/attribution/campaigns/:id/metrics?startDate=2024-01-01&endDate=2024-12-31
+```
+
+#### Calculate Campaign ROI
+
+```http
+GET /api/v1/attribution/campaigns/:id/roi
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "roi": 15000,
+    "roiPercentage": 300,
+    "costPerLead": 25,
+    "costPerConversion": 100,
+    "conversionRate": 25,
+    "totalSpend": 5000,
+    "totalRevenue": 20000
+  }
+}
+```
+
+### Attribution Management
+
+#### Create Attribution
+
+```http
+POST /api/v1/attribution/attributions
+Content-Type: application/json
+
+{
+  "leadId": "lead-uuid",
+  "sourceId": "source-uuid",
+  "campaignId": "campaign-uuid",
+  "attributionType": "FIRST_TOUCH",
+  "utmSource": "google",
+  "utmMedium": "cpc",
+  "utmCampaign": "auto_insurance_q1",
+  "utmTerm": "cheap auto insurance",
+  "utmContent": "ad_variant_1",
+  "referralSource": "referral-partner.com",
+  "referringDomain": "referral-partner.com",
+  "landingPage": "https://insurance.com/auto-quote"
+}
+```
+
+#### Get Attribution
+
+```http
+GET /api/v1/attribution/attributions/:id
+```
+
+#### Update Attribution
+
+```http
+PUT /api/v1/attribution/attributions/:id
+Content-Type: application/json
+
+{
+  "attributionType": "LAST_TOUCH",
+  "campaignId": "new-campaign-uuid"
+}
+```
+
+#### List Attributions
+
+```http
+GET /api/v1/attribution/attributions?leadId=lead-uuid&sourceId=source-uuid&campaignId=campaign-uuid&attributionType=FIRST_TOUCH&page=1&limit=50
+```
+
+#### Delete Attribution
+
+```http
+DELETE /api/v1/attribution/attributions/:id
+```
+
+### Analytics & Reporting
+
+#### Get Attribution Analytics
+
+```http
+GET /api/v1/attribution/analytics?startDate=2024-01-01&endDate=2024-12-31
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalLeads": 1500,
+    "totalConversions": 375,
+    "overallConversionRate": 25,
+    "averageCostPerLead": 12.50,
+    "averageCostPerConversion": 50,
+    "totalRevenue": 75000,
+    "overallRoi": 150,
+    "topSources": [
+      {
+        "sourceId": "source-uuid",
+        "sourceName": "Google Ads",
+        "leads": 800,
+        "conversions": 240,
+        "conversionRate": 30,
+        "revenue": 48000,
+        "roi": 200
+      }
+    ],
+    "topCampaigns": [
+      {
+        "campaignId": "campaign-uuid",
+        "campaignName": "Q1 Auto Campaign",
+        "leads": 600,
+        "conversions": 180,
+        "conversionRate": 30,
+        "revenue": 36000,
+        "roi": 180
+      }
+    ]
+  }
+}
+```
+
+#### Generate Attribution Report
+
+```http
+POST /api/v1/attribution/reports
+Content-Type: application/json
+
+{
+  "reportName": "Q1 Marketing Performance Report",
+  "startDate": "2024-01-01",
+  "endDate": "2024-03-31"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "reportId": "report-uuid",
+    "reportName": "Q1 Marketing Performance Report",
+    "generatedAt": "2024-04-01T10:30:00Z",
+    "dateRange": {
+      "startDate": "2024-01-01T00:00:00Z",
+      "endDate": "2024-03-31T23:59:59Z"
+    },
+    "overallPerformance": {
+      "totalLeads": 1500,
+      "totalConversions": 375,
+      "conversionRate": 25,
+      "totalRevenue": 75000,
+      "totalCost": 25000,
+      "roi": 200
+    },
+    "sourcePerformance": [],
+    "campaignPerformance": [],
+    "recommendations": [
+      "Overall conversion rate is good at 25%. Consider optimizing top-performing campaigns.",
+      "Google Ads source shows strong performance with 30% conversion rate."
+    ]
+  }
+}
+```
+
+## Database Models
+
+### MarketingSource
+
+```prisma
+model MarketingSource {
+  id          String
+  name        String
+  type        MarketingSourceType
+  description String?
+  costPerLead Float?
+  isActive    Boolean
+  createdAt   DateTime
+  updatedAt   DateTime
+  campaigns   Campaign[]
+  attributions Attribution[]
+}
+```
+
+### Campaign
+
+```prisma
+model Campaign {
+  id              String
+  name            String
+  description     String?
+  sourceId        String
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Float
+  status          CampaignStatus
+  objective       String?
+  targetAudience  String?
+  createdAt       DateTime
+  updatedAt       DateTime
+  source          MarketingSource
+  attributions    Attribution[]
+  metrics         CampaignMetric[]
+}
+```
 
 ### Attribution
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/attribution/attribution/calculate` | Calculate attribution |
-| POST | `/api/v1/attribution/attribution/calculate-and-save` | Calculate and save |
-| POST | `/api/v1/attribution/attribution/batch` | Batch processing |
-| GET | `/api/v1/attribution/attributions/:id` | Get attribution by ID |
-| GET | `/api/v1/attribution/attributions` | List attributions |
-| PUT | `/api/v1/attribution/attributions/:id` | Update attribution |
 
-### Reports & Analytics
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/attribution/reports/attribution` | Generate report |
-| GET | `/api/v1/attribution/analytics/attribution` | Get analytics |
-| GET | `/api/v1/attribution/attribution/models/:model/config` | Get model config |
-| POST | `/api/v1/attribution/attribution/models/config` | Set model config |
-
-### Disputes
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/attribution/disputes` | Create dispute |
-| GET | `/api/v1/attribution/disputes` | List disputes |
-| PUT | `/api/v1/attribution/disputes/:id/resolve` | Resolve dispute |
-
-## 💻 TypeScript Types
-
-### Core Types
-
-```typescript
-// Attribution Models
-type AttributionModel = 
-  | 'first_touch'
-  | 'last_touch'
-  | 'linear'
-  | 'time_decay'
-  | 'position_based'
-  | 'data_driven';
-
-// Touchpoint Types
-type TouchpointType = 
-  | 'organic_search' | 'paid_search' | 'social_media' | 'email'
-  | 'display_ad' | 'referral' | 'direct' | 'partner_referral'
-  | 'broker_referral' | 'affiliate' | 'webinar' | 'event'
-  | 'phone_call' | 'chat' | 'other';
-
-// Conversion Types
-type ConversionType = 
-  | 'sale' | 'signup' | 'quote_request' | 'policy_bound' | 'renewal';
-
-// Attribution Status
-type AttributionStatus = 
-  | 'pending' | 'calculated' | 'approved' | 'disputed' | 'paid';
-```
-
-### Key Interfaces
-
-```typescript
-interface Touchpoint {
-  id: string;
-  leadId: string;
-  sessionId?: string;
-  channel: TouchpointType;
-  source?: string;
-  medium?: string;
-  campaign?: string;
-  referralCode?: string;
-  partnerId?: string;
-  brokerId?: string;
-  timestamp: Date;
-  converted: boolean;
-  conversionValue?: number;
-}
-
-interface Conversion {
-  id: string;
-  leadId: string;
-  type: ConversionType;
-  value: number;
-  currency: string;
-  policyId?: string;
-  commissionRate?: number;
-  commissionAmount?: number;
-  occurredAt: Date;
-}
-
-interface AttributionRecord {
-  id: string;
-  leadId: string;
-  conversionId?: string;
-  touchpointId: string;
-  channel: TouchpointType;
-  model: AttributionModel;
-  credit: number;
-  percentage: number;
-  revenueAttributed?: number;
-  commissionAmount?: number;
-  partnerId?: string;
-  brokerId?: string;
-  status: AttributionStatus;
-}
-
-interface AttributionReport {
-  reportId: string;
-  period: { start: Date; end: Date };
-  model: AttributionModel;
-  summary: {
-    totalConversions: number;
-    totalRevenue: number;
-    totalCommission: number;
-    attributedRevenue: number;
-  };
-  byChannel: ChannelAttributionSummary[];
-  byPartner: PartnerAttributionSummary[];
-  byBroker: BrokerAttributionSummary[];
+```prisma
+model Attribution {
+  id              String
+  leadId          String
+  sourceId        String
+  campaignId      String?
+  attributionType AttributionType
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmTerm         String?
+  utmContent      String?
+  referralSource  String?
+  referringDomain String?
+  landingPage     String?
+  createdAt       DateTime
+  updatedAt       DateTime
+  lead             Lead
+  source           MarketingSource
+  campaign         Campaign?
 }
 ```
 
-## 🚀 Usage Examples
+### CampaignMetric
 
-### 1. Creating a Touchpoint
-
-```typescript
-// Track a new touchpoint
-const touchpoint = await attributionService.createTouchpoint({
-  leadId: 'lead-123',
-  sessionId: 'sess-456',
-  channel: 'paid_search',
-  source: 'google',
-  medium: 'cpc',
-  campaign: 'home-insurance-q4',
-  term: 'home insurance quotes',
-  referralCode: 'PARTNER001',
-  partnerId: 'partner-abc',
-});
+```prisma
+model CampaignMetric {
+  id                    String
+  campaignId            String
+  date                  DateTime
+  leadsGenerated        Int
+  leadsQualified        Int
+  leadsConverted        Int
+  conversionRate        Float
+  costPerLead           Float
+  costPerConversion     Float
+  revenueGenerated      Float
+  roi                   Float
+  clickThroughRate      Float
+  engagementScore       Float
+  campaign              Campaign
+}
 ```
 
-### 2. Creating a Conversion
+### MarketingSourceMetric
 
-```typescript
-// Record a conversion
-const conversion = await attributionService.createConversion({
-  leadId: 'lead-123',
-  type: 'policy_bound',
-  value: 1500.00,
-  currency: 'USD',
-  policyId: 'policy-789',
-  policyNumber: 'POL-2024-001',
-  commissionRate: 0.10,
-});
+```prisma
+model MarketingSourceMetric {
+  id                    String
+  sourceId              String
+  date                  DateTime
+  leadsGenerated        Int
+  leadsQualified        Int
+  leadsConverted        Int
+  conversionRate        Float
+  costPerLead           Float
+  costPerConversion     Float
+  revenueGenerated      Float
+  roi                   Float
+  source                MarketingSource
+}
 ```
 
-### 3. Calculating Attribution
+## Integration Points
+
+### Lead Creation Integration
+
+When leads are created, the system should capture attribution data:
 
 ```typescript
-// Calculate attribution for a lead
-const calculation = await attributionService.calculateAttribution({
-  leadId: 'lead-123',
-  model: 'position_based',
-  conversionValue: 1500.00,
-  commissionRate: 0.10,
-});
-
-// Result:
-// {
-//   leadId: 'lead-123',
-//   conversionValue: 1500,
-//   attributions: [
-//     { touchpointId: 'tp-1', channel: 'paid_search', percentage: 40, revenue: 600 },
-//     { touchpointId: 'tp-2', channel: 'email', percentage: 20, revenue: 300 },
-//     { touchpointId: 'tp-3', channel: 'direct', percentage: 40, revenue: 600 }
-//   ],
-//   calculatedAt: 2024-01-15T10:30:00Z
-// }
-```
-
-### 4. Generating Reports
-
-```typescript
-// Generate attribution report
-const report = await attributionService.generateAttributionReport({
-  startDate: new Date('2024-01-01'),
-  endDate: new Date('2024-01-31'),
-  model: 'position_based',
-  channel: 'paid_search',
-});
-
-// Report includes:
-// - Summary statistics
-// - Channel performance breakdown
-// - Partner attribution summary
-// - Broker attribution summary
-// - Campaign performance
-// - Trend analysis
-```
-
-### 5. Handling Disputes
-
-```typescript
-// Create an attribution dispute
-const dispute = await attributionService.createDispute({
-  attributionId: 'attr-123',
-  disputeType: 'partner',
-  reason: 'Incorrect channel attribution',
-  evidence: {
-    originalSource: 'partner_referral',
-    attributedChannel: 'direct',
-    timestamps: [...],
+// Example: Creating attribution when a lead is received
+const attribution = await attributionService.createAttributionFromLead(
+  lead.id,
+  {
+    utmSource: req.query.utm_source,
+    utmMedium: req.query.utm_medium,
+    utmCampaign: req.query.utm_campaign,
+    utmTerm: req.query.utm_term,
+    utmContent: req.query.utm_content,
   },
-});
-
-// Resolve dispute
-await attributionService.resolveDispute(dispute.id, {
-  status: 'resolved',
-  resolution: 'Adjusted attribution to correct channel',
-  resolvedBy: 'admin-user',
-});
+  {
+    referralSource: req.headers.referer,
+    referringDomain: getDomainFromReferrer(req.headers.referer),
+    landingPage: req.originalUrl,
+  }
+);
 ```
 
-## 📈 Analytics & Insights
+### Conversion Tracking Integration
 
-### Channel Performance
+When leads are converted, update attribution metrics:
+
 ```typescript
-interface ChannelAttributionSummary {
-  channel: TouchpointType;
-  totalTouchpoints: number;
-  convertingTouchpoints: number;
-  conversionRate: number;
-  totalRevenue: number;
-  attributionPercentage: number;
-}
+// Example: Updating metrics when a lead converts
+const campaignMetrics = await attributionService.getCampaignMetrics(campaignId);
+const updatedMetrics = campaignMetrics.map(metric => ({
+  ...metric,
+  leadsConverted: metric.leadsConverted + 1,
+  conversionRate: (metric.leadsConverted + 1) / metric.leadsGenerated * 100,
+  // Update revenue based on policy value
+  revenueGenerated: metric.revenueGenerated + policyValue,
+  roi: (metric.revenueGenerated + policyValue - campaignBudget) / campaignBudget * 100
+}));
 ```
 
-### Partner Attribution
-```typescript
-interface PartnerAttributionSummary {
-  partnerId: string;
-  partnerName: string;
-  totalTouchpoints: number;
-  conversions: number;
-  totalRevenue: number;
-  totalCommission: number;
-  topChannels: Array<{
-    channel: TouchpointType;
-    count: number;
-    revenue: number;
-  }>;
-}
-```
+## Business Value
 
-### Trend Analysis
-```typescript
-interface AttributionTrend {
-  date: string;
-  conversions: number;
-  revenue: number;
-  commission: number;
-}
-```
+### Key Benefits
 
-## 🔒 Security & Compliance
+1. **Data-Driven Decision Making**: Make informed decisions about marketing spend allocation
+2. **ROI Proof**: Demonstrate the return on investment for marketing activities
+3. **Performance Optimization**: Identify and focus on high-performing channels and campaigns
+4. **Budget Allocation**: Allocate marketing budgets to the most effective sources
+5. **Campaign Optimization**: Improve campaign performance based on real data
+6. **Stakeholder Reporting**: Provide clear reports to stakeholders on marketing effectiveness
 
-### Data Privacy
-- PII protection for customer touchpoints
-- GDPR/CCPA compliance for data retention
-- Secure handling of partner/broker information
+### Success Metrics
 
-### Access Control
-- Role-based access to attribution data
-- Partner/Broker isolation for sensitive data
-- Audit logging for all attribution changes
+- **Marketing Efficiency**: Reduction in cost per lead and cost per conversion
+- **ROI Improvement**: Increase in overall marketing ROI
+- **Conversion Rate**: Improvement in lead-to-conversion rates
+- **Budget Optimization**: Better allocation of marketing budgets
+- **Campaign Performance**: Higher performing marketing campaigns
 
-## 📊 Performance Metrics
+## Implementation Notes
 
-| Metric | Target | Description |
-|--------|--------|-------------|
-| Attribution Calculation Time | < 100ms | Per lead calculation |
-| Report Generation Time | < 5s | For 30-day report |
-| Touchpoint Ingestion Rate | 1000/sec | Peak throughput |
-| Data Retention | 24 months | Historical data |
+### Technical Implementation
 
-## 🧪 Testing Strategy
+- **Database**: PostgreSQL with Prisma ORM
+- **Services**: Dedicated attribution service with comprehensive methods
+- **API**: RESTful API endpoints for all attribution functionality
+- **Integration**: Seamless integration with existing lead management system
+- **Analytics**: Advanced analytics and reporting capabilities
 
-### Unit Tests
-- Attribution model calculations
-- Weight distribution accuracy
-- Commission calculations
+### Future Enhancements
 
-### Integration Tests
-- Touchpoint → Conversion → Attribution flow
-- API endpoint responses
-- Database operations
+- **Multi-Touch Attribution**: Enhanced multi-touch attribution models
+- **AI-Powered Insights**: Machine learning for attribution insights
+- **Real-Time Analytics**: Real-time dashboard updates
+- **Predictive ROI**: AI-driven ROI predictions
+- **Automated Optimization**: Automatic campaign optimization suggestions
 
-### E2E Tests
-- Complete attribution workflow
-- Report generation and accuracy
-- Dispute resolution process
+## Conclusion
 
-## 🚀 Deployment Considerations
-
-### Database Migrations
-```bash
-# Generate migration
-npx prisma generate
-
-# Apply migrations
-npx prisma migrate deploy
-
-# Push schema changes
-npx prisma db push
-```
-
-### Scaling
-- Read replicas for analytics queries
-- Caching for frequently accessed attributions
-- Batch processing for large datasets
-
-### Monitoring
-- Attribution calculation latency
-- Touchpoint ingestion rate
-- Dispute resolution time
-
-## 📝 Files Created/Modified
-
-### New Files
-- `packages/types/src/attribution.ts` - TypeScript type definitions
-- `apps/data-service/src/services/attribution.service.ts` - Attribution service
-- `apps/data-service/src/routes/attribution.routes.ts` - API routes
-- `apps/api/src/routes/attribution.ts` - API proxy routes
-- `docs/PHASE_12.4.md` - This documentation
-
-### Modified Files
-- `packages/types/src/index.ts` - Export attribution types
-- `prisma/schema.prisma` - Add attribution models
-- `apps/data-service/src/index.ts` - Register attribution routes
-- `apps/api/src/app.ts` - Register API routes
-
-## ✅ Acceptance Criteria
-
-- [x] Touchpoint tracking for all channels
-- [x] Multi-touch attribution with 6 models
-- [x] Partner & Broker attribution tracking
-- [x] Conversion tracking with commission
-- [x] Comprehensive reporting & analytics
-- [x] Attribution dispute resolution
-- [x] API endpoints for all operations
-- [x] TypeScript types for all entities
-- [x] Database schema with indexes
-- [x] Documentation complete
-
-## 🎯 Business Value
-
-1. **Marketing ROI**: Understand which channels drive the most value
-2. **Partner Compensation**: Accurate commission tracking for partners
-3. **Broker Attribution**: Proper credit for broker-sourced leads
-4. **Budget Optimization**: Data-driven marketing budget allocation
-5. **Channel Performance**: Identify best-performing channels
-6. **Conversion Insights**: Understand customer journey patterns
-
-## 📅 Timeline
-
-| Week | Deliverable |
-|------|-------------|
-| Week 1 | Schema, Types, Service Foundation |
-| Week 2 | Attribution Calculation Engine |
-| Week 3 | API Routes & Integration |
-| Week 4 | Reporting & Analytics |
-| Week 5 | Testing & Documentation |
-
----
-
-**Phase 12.4 Attribution System** enables accurate tracking and credit allocation for all customer interactions, providing the foundation for data-driven marketing decisions and fair partner/broker compensation.
+Phase 12.4 provides a comprehensive attribution system that enables insurance agencies to track marketing performance, calculate ROI, and make data-driven decisions about marketing investments. The system integrates seamlessly with existing lead management workflows and provides powerful analytics to optimize marketing spend and improve overall business performance.

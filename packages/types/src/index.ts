@@ -1714,5 +1714,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Agent Configuration & Customization
-export * from './agent-config.js';
+// Attribution & Marketing ROI
+export * from './attribution.js';

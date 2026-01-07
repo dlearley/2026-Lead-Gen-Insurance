@@ -1,529 +1,305 @@
-// ========================================
-// ATTRIBUTION TYPES
-// ========================================
+// Attribution Types for Marketing ROI Tracking
 
-export type AttributionModel = 
-  | 'first_touch'
-  | 'last_touch'
-  | 'linear'
-  | 'time_decay'
-  | 'position_based'
-  | 'data_driven';
+import { z } from 'zod';
 
-export type TouchpointType = 
-  | 'organic_search'
-  | 'paid_search'
-  | 'social_media'
-  | 'email'
-  | 'display_ad'
-  | 'referral'
-  | 'direct'
-  | 'partner_referral'
-  | 'broker_referral'
-  | 'affiliate'
-  | 'webinar'
-  | 'event'
-  | 'phone_call'
-  | 'chat'
-  | 'other';
+// Marketing Source Types
+export type MarketingSourceType = 
+  | 'ORGANIC_SEARCH'
+  | 'PAID_SEARCH'
+  | 'SOCIAL_MEDIA'
+  | 'EMAIL'
+  | 'REFERRAL'
+  | 'DIRECT'
+  | 'AFFILIATE'
+  | 'CONTENT_MARKETING'
+  | 'EVENT'
+  | 'OTHER';
 
-export type AttributionStatus = 
-  | 'pending'
-  | 'calculated'
-  | 'approved'
-  | 'disputed'
-  | 'paid';
+export type CampaignStatus = 
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'PAUSED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'ARCHIVED';
 
-// ========================================
-// TOUCHPOINT TYPES
-// ========================================
+export type AttributionType = 
+  | 'FIRST_TOUCH'
+  | 'LAST_TOUCH'
+  | 'MULTI_TOUCH'
+  | 'LINEAR'
+  | 'TIME_DECAY'
+  | 'POSITION_BASED';
 
-export interface Touchpoint {
+// Marketing Source DTOs
+export const CreateMarketingSourceDto = z.object({
+  name: z.string().min(1, 'Name is required'),
+  type: z.nativeEnum({
+    ORGANIC_SEARCH: 'ORGANIC_SEARCH',
+    PAID_SEARCH: 'PAID_SEARCH',
+    SOCIAL_MEDIA: 'SOCIAL_MEDIA',
+    EMAIL: 'EMAIL',
+    REFERRAL: 'REFERRAL',
+    DIRECT: 'DIRECT',
+    AFFILIATE: 'AFFILIATE',
+    CONTENT_MARKETING: 'CONTENT_MARKETING',
+    EVENT: 'EVENT',
+    OTHER: 'OTHER'
+  } as const),
+  description: z.string().optional(),
+  costPerLead: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const UpdateMarketingSourceDto = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  type: z.nativeEnum({
+    ORGANIC_SEARCH: 'ORGANIC_SEARCH',
+    PAID_SEARCH: 'PAID_SEARCH',
+    SOCIAL_MEDIA: 'SOCIAL_MEDIA',
+    EMAIL: 'EMAIL',
+    REFERRAL: 'REFERRAL',
+    DIRECT: 'DIRECT',
+    AFFILIATE: 'AFFILIATE',
+    CONTENT_MARKETING: 'CONTENT_MARKETING',
+    EVENT: 'EVENT',
+    OTHER: 'OTHER'
+  } as const).optional(),
+  description: z.string().optional(),
+  costPerLead: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type MarketingSource = {
   id: string;
-  leadId: string;
-  sessionId?: string;
-  channel: TouchpointType;
-  source?: string;
-  medium?: string;
-  campaign?: string;
-  content?: string;
-  term?: string;
-  referralCode?: string;
-  partnerId?: string;
-  brokerId?: string;
-  timestamp: Date;
-  metadata?: Record<string, unknown>;
-  converted: boolean;
-  conversionValue?: number;
-  conversionTimestamp?: Date;
-}
-
-export interface CreateTouchpointDto {
-  leadId: string;
-  sessionId?: string;
-  channel: TouchpointType;
-  source?: string;
-  medium?: string;
-  campaign?: string;
-  content?: string;
-  term?: string;
-  referralCode?: string;
-  partnerId?: string;
-  brokerId?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface UpdateTouchpointDto {
-  converted?: boolean;
-  conversionValue?: number;
-  conversionTimestamp?: Date;
-  metadata?: Record<string, unknown>;
-}
-
-export interface TouchpointFilterParams {
-  leadId?: string;
-  sessionId?: string;
-  channel?: TouchpointType;
-  source?: string;
-  campaign?: string;
-  partnerId?: string;
-  brokerId?: string;
-  converted?: boolean;
-  dateFrom?: Date;
-  dateTo?: Date;
-  page?: number;
-  limit?: number;
-}
-
-// ========================================
-// ATTRIBUTION RECORD TYPES
-// ========================================
-
-export interface AttributionRecord {
-  id: string;
-  leadId: string;
-  conversionId?: string;
-  touchpointId: string;
-  channel: TouchpointType;
-  model: AttributionModel;
-  credit: number;
-  percentage: number;
-  revenueAttributed?: number;
-  commissionAmount?: number;
-  partnerId?: string;
-  brokerId?: string;
-  campaignId?: string;
-  calculatedAt: Date;
-  status: AttributionStatus;
-  metadata?: Record<string, unknown>;
+  name: string;
+  type: MarketingSourceType;
+  description: string | null;
+  costPerLead: number | null;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-}
+};
 
-export interface CreateAttributionDto {
-  leadId: string;
-  conversionId?: string;
-  touchpointId: string;
-  channel: TouchpointType;
-  model: AttributionModel;
-  credit: number;
-  percentage: number;
-  revenueAttributed?: number;
-  commissionAmount?: number;
-  partnerId?: string;
-  brokerId?: string;
-  campaignId?: string;
-  status?: AttributionStatus;
-  metadata?: Record<string, unknown>;
-}
+// Campaign DTOs
+export const CreateCampaignDto = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  sourceId: z.string().min(1, 'Source ID is required'),
+  startDate: z.date(),
+  endDate: z.date().optional(),
+  budget: z.number().min(0).optional(),
+  status: z.nativeEnum({
+    DRAFT: 'DRAFT',
+    ACTIVE: 'ACTIVE',
+    PAUSED: 'PAUSED',
+    COMPLETED: 'COMPLETED',
+    CANCELLED: 'CANCELLED',
+    ARCHIVED: 'ARCHIVED'
+  } as const).optional(),
+  objective: z.string().optional(),
+  targetAudience: z.string().optional(),
+});
 
-export interface UpdateAttributionDto {
-  revenueAttributed?: number;
-  commissionAmount?: number;
-  status?: AttributionStatus;
-  metadata?: Record<string, unknown>;
-}
+export const UpdateCampaignDto = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  description: z.string().optional(),
+  sourceId: z.string().min(1, 'Source ID is required').optional(),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
+  budget: z.number().min(0).optional(),
+  status: z.nativeEnum({
+    DRAFT: 'DRAFT',
+    ACTIVE: 'ACTIVE',
+    PAUSED: 'PAUSED',
+    COMPLETED: 'COMPLETED',
+    CANCELLED: 'CANCELLED',
+    ARCHIVED: 'ARCHIVED'
+  } as const).optional(),
+  objective: z.string().optional(),
+  targetAudience: z.string().optional(),
+});
 
-export interface AttributionFilterParams {
-  leadId?: string;
-  conversionId?: string;
-  channel?: TouchpointType;
-  model?: AttributionModel;
-  partnerId?: string;
-  brokerId?: string;
-  campaignId?: string;
-  status?: AttributionStatus;
-  dateFrom?: Date;
-  dateTo?: Date;
-  page?: number;
-  limit?: number;
-}
-
-// ========================================
-// CONVERSION TYPES
-// ========================================
-
-export interface Conversion {
+export type Campaign = {
   id: string;
-  leadId: string;
-  type: 'sale' | 'signup' | 'quote_request' | 'policy_bound' | 'renewal';
-  value: number;
-  currency: string;
-  policyId?: string;
-  policyNumber?: string;
-  commissionRate?: number;
-  commissionAmount?: number;
-  occurredAt: Date;
-  metadata?: Record<string, unknown>;
+  name: string;
+  description: string | null;
+  sourceId: string;
+  startDate: Date;
+  endDate: Date | null;
+  budget: number;
+  status: CampaignStatus;
+  objective: string | null;
+  targetAudience: string | null;
   createdAt: Date;
   updatedAt: Date;
-}
+  source?: MarketingSource;
+};
 
-export interface CreateConversionDto {
+// Attribution DTOs
+export const CreateAttributionDto = z.object({
+  leadId: z.string().min(1, 'Lead ID is required'),
+  sourceId: z.string().min(1, 'Source ID is required'),
+  campaignId: z.string().min(1, 'Campaign ID is required').optional(),
+  attributionType: z.nativeEnum({
+    FIRST_TOUCH: 'FIRST_TOUCH',
+    LAST_TOUCH: 'LAST_TOUCH',
+    MULTI_TOUCH: 'MULTI_TOUCH',
+    LINEAR: 'LINEAR',
+    TIME_DECAY: 'TIME_DECAY',
+    POSITION_BASED: 'POSITION_BASED'
+  } as const).optional(),
+  utmSource: z.string().optional(),
+  utmMedium: z.string().optional(),
+  utmCampaign: z.string().optional(),
+  utmTerm: z.string().optional(),
+  utmContent: z.string().optional(),
+  referralSource: z.string().optional(),
+  referringDomain: z.string().optional(),
+  landingPage: z.string().optional(),
+});
+
+export const UpdateAttributionDto = z.object({
+  sourceId: z.string().min(1, 'Source ID is required').optional(),
+  campaignId: z.string().min(1, 'Campaign ID is required').optional(),
+  attributionType: z.nativeEnum({
+    FIRST_TOUCH: 'FIRST_TOUCH',
+    LAST_TOUCH: 'LAST_TOUCH',
+    MULTI_TOUCH: 'MULTI_TOUCH',
+    LINEAR: 'LINEAR',
+    TIME_DECAY: 'TIME_DECAY',
+    POSITION_BASED: 'POSITION_BASED'
+  } as const).optional(),
+  utmSource: z.string().optional(),
+  utmMedium: z.string().optional(),
+  utmCampaign: z.string().optional(),
+  utmTerm: z.string().optional(),
+  utmContent: z.string().optional(),
+  referralSource: z.string().optional(),
+  referringDomain: z.string().optional(),
+  landingPage: z.string().optional(),
+});
+
+export type Attribution = {
+  id: string;
   leadId: string;
-  type: Conversion['type'];
-  value: number;
-  currency?: string;
-  policyId?: string;
-  policyNumber?: string;
-  commissionRate?: number;
-  occurredAt?: Date;
-  metadata?: Record<string, unknown>;
-}
+  sourceId: string;
+  campaignId: string | null;
+  attributionType: AttributionType;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  referralSource: string | null;
+  referringDomain: string | null;
+  landingPage: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lead?: any;
+  source?: MarketingSource;
+  campaign?: Campaign;
+};
 
-export interface UpdateConversionDto {
-  type?: Conversion['type'];
-  value?: number;
-  currency?: string;
-  policyId?: string;
-  policyNumber?: string;
-  commissionRate?: number;
-  commissionAmount?: number;
-  metadata?: Record<string, unknown>;
-}
-
-export interface ConversionFilterParams {
-  leadId?: string;
-  type?: Conversion['type'];
-  policyId?: string;
-  dateFrom?: Date;
-  dateTo?: Date;
-  page?: number;
-  limit?: number;
-}
-
-// ========================================
-// ATTRIBUTION REPORT TYPES
-// ========================================
-
-export interface ChannelAttributionSummary {
-  channel: TouchpointType;
-  totalTouchpoints: number;
-  convertingTouchpoints: number;
-  conversionRate: number;
-  totalRevenue: number;
-  averageRevenuePerConversion: number;
-  attributionPercentage: number;
-  partnerAttributions: number;
-  brokerAttributions: number;
-}
-
-export interface PartnerAttributionSummary {
-  partnerId: string;
-  partnerName: string;
-  totalTouchpoints: number;
-  conversions: number;
-  conversionRate: number;
-  totalRevenue: number;
-  totalCommission: number;
-  averageCommission: number;
-  attributionPercentage: number;
-  topChannels: Array<{
-    channel: TouchpointType;
-    count: number;
-    revenue: number;
-  }>;
-}
-
-export interface BrokerAttributionSummary {
-  brokerId: string;
-  brokerName: string;
-  totalTouchpoints: number;
-  conversions: number;
-  conversionRate: number;
-  totalRevenue: number;
-  totalCommission: number;
-  averageCommission: number;
-  attributionPercentage: number;
-  topChannels: Array<{
-    channel: TouchpointType;
-    count: number;
-    revenue: number;
-  }>;
-}
-
-export interface CampaignAttributionSummary {
+// Metrics DTOs
+export type CampaignMetric = {
+  id: string;
   campaignId: string;
-  campaignName: string;
-  source: string;
-  medium: string;
-  totalTouchpoints: number;
-  conversions: number;
+  date: Date;
+  leadsGenerated: number;
+  leadsQualified: number;
+  leadsConverted: number;
   conversionRate: number;
-  totalRevenue: number;
-  cost?: number;
-  roi?: number;
-  attributionPercentage: number;
-}
+  costPerLead: number;
+  costPerConversion: number;
+  revenueGenerated: number;
+  roi: number;
+  clickThroughRate: number;
+  engagementScore: number;
+  campaign?: Campaign;
+};
 
-export interface AttributionReport {
-  reportId: string;
-  period: {
-    start: Date;
-    end: Date;
-  };
-  model: AttributionModel;
-  generatedAt: Date;
-  summary: {
-    totalConversions: number;
-    totalRevenue: number;
-    totalCommission: number;
-    attributedRevenue: number;
-    attributionRate: number;
-  };
-  byChannel: ChannelAttributionSummary[];
-  byPartner: PartnerAttributionSummary[];
-  byBroker: BrokerAttributionSummary[];
-  byCampaign: CampaignAttributionSummary[];
-  topPerformingChannels: Array<{
-    channel: TouchpointType;
+export type MarketingSourceMetric = {
+  id: string;
+  sourceId: string;
+  date: Date;
+  leadsGenerated: number;
+  leadsQualified: number;
+  leadsConverted: number;
+  conversionRate: number;
+  costPerLead: number;
+  costPerConversion: number;
+  revenueGenerated: number;
+  roi: number;
+  source?: MarketingSource;
+};
+
+// Analytics DTOs
+export type AttributionAnalytics = {
+  totalLeads: number;
+  totalConversions: number;
+  overallConversionRate: number;
+  averageCostPerLead: number;
+  averageCostPerConversion: number;
+  totalRevenue: number;
+  overallRoi: number;
+  topSources: Array<{
+    sourceId: string;
+    sourceName: string;
+    leads: number;
+    conversions: number;
     conversionRate: number;
     revenue: number;
+    roi: number;
   }>;
-  trend: Array<{
-    date: string;
+  topCampaigns: Array<{
+    campaignId: string;
+    campaignName: string;
+    leads: number;
     conversions: number;
+    conversionRate: number;
     revenue: number;
-    commission: number;
+    roi: number;
   }>;
-}
+};
 
-export interface AttributionReportParams {
-  startDate: Date;
-  endDate: Date;
-  model?: AttributionModel;
-  channel?: TouchpointType;
-  partnerId?: string;
-  brokerId?: string;
-  campaignId?: string;
-  includeDetails?: boolean;
-}
-
-// ========================================
-// ATTRIBUTION CALCULATION TYPES
-// ========================================
-
-export interface AttributionCalculation {
-  leadId: string;
-  conversionValue: number;
-  touchpoints: Array<{
-    touchpointId: string;
-    channel: TouchpointType;
-    timestamp: Date;
-    isPartner: boolean;
-    isBroker: boolean;
-    weight: number;
-  }>;
-  model: AttributionModel;
-  attributions: Array<{
-    touchpointId: string;
-    channel: TouchpointType;
-    percentage: number;
-    revenue: number;
-    partnerId?: string;
-    brokerId?: string;
-  }>;
-  calculatedAt: Date;
-}
-
-export interface CalculateAttributionDto {
-  leadId: string;
-  model?: AttributionModel;
-  conversionValue: number;
-  commissionRate?: number;
-}
-
-// ========================================
-// MULTI-TOUCH ATTRIBUTION WEIGHTS
-// ========================================
-
-export interface PositionBasedWeights {
-  first: number;
-  middle: number;
-  last: number;
-}
-
-export interface TimeDecayWeights {
-  halfLifeDays: number;
-}
-
-export interface AttributionModelConfig {
-  model: AttributionModel;
-  positionBasedWeights?: PositionBasedWeights;
-  timeDecayConfig?: TimeDecayWeights;
-  customWeights?: Record<string, number>;
-}
-
-export interface SetAttributionModelDto {
-  model: AttributionModel;
-  positionBasedWeights?: PositionBasedWeights;
-  timeDecayConfig?: TimeDecayConfig;
-  isDefault?: boolean;
-}
-
-export interface TimeDecayConfig {
-  halfLifeDays: number;
-}
-
-export interface AttributionModelFilterParams {
-  isDefault?: boolean;
-  page?: number;
-  limit?: number;
-}
-
-// ========================================
-// ATTRIBUTION DISPUTE TYPES
-// ========================================
-
-export interface AttributionDispute {
-  id: string;
-  attributionId: string;
-  disputedBy: string;
-  disputeType: 'partner' | 'broker' | 'internal';
-  reason: string;
-  evidence?: Record<string, unknown>;
-  status: 'pending' | 'resolved' | 'rejected';
-  resolution?: string;
-  resolvedBy?: string;
-  resolvedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CreateAttributionDisputeDto {
-  attributionId: string;
-  disputeType: AttributionDispute['disputeType'];
-  reason: string;
-  evidence?: Record<string, unknown>;
-}
-
-export interface ResolveAttributionDisputeDto {
-  status: 'resolved' | 'rejected';
-  resolution: string;
-  resolvedBy: string;
-}
-
-export interface AttributionDisputeFilterParams {
-  attributionId?: string;
-  disputedBy?: string;
-  disputeType?: AttributionDispute['disputeType'];
-  status?: AttributionDispute['status'];
-  dateFrom?: Date;
-  dateTo?: Date;
-  page?: number;
-  limit?: number;
-}
-
-// ========================================
-// ANALYTICS TYPES
-// ========================================
-
-export interface AttributionAnalytics {
-  period: {
-    start: Date;
-    end: Date;
-  };
-  totalAttributions: number;
+export type RoiAnalysis = {
+  campaignId: string;
+  campaignName: string;
+  totalSpend: number;
   totalRevenue: number;
-  totalCommission: number;
-  averageAttributionValue: number;
-  modelDistribution: Record<AttributionModel, number>;
-  channelPerformance: Array<{
-    channel: TouchpointType;
-    touchpoints: number;
+  roi: number;
+  roiPercentage: number;
+  costPerLead: number;
+  costPerConversion: number;
+  conversionRate: number;
+  leadsGenerated: number;
+  conversions: number;
+  attributionBreakdown: Array<{
+    attributionType: AttributionType;
+    leads: number;
     conversions: number;
     revenue: number;
-    percentage: number;
   }>;
-  topPartners: Array<{
-    partnerId: string;
-    revenue: number;
-    commission: number;
-    conversions: number;
-  }>;
-  topBrokers: Array<{
-    brokerId: string;
-    revenue: number;
-    commission: number;
-    conversions: number;
-  }>;
-  conversionJourney: {
-    averageTouchpoints: number;
-    medianTouchpoints: number;
-    distribution: Record<number, number>;
+};
+
+export type AttributionReport = {
+  reportId: string;
+  reportName: string;
+  generatedAt: Date;
+  dateRange: {
+    startDate: Date;
+    endDate: Date;
   };
-}
-
-export interface AttributionTrendParams {
-  metric: 'revenue' | 'conversions' | 'commission' | 'attributions';
-  period: 'day' | 'week' | 'month' | 'quarter' | 'year';
-  startDate?: Date;
-  endDate?: Date;
-  channel?: TouchpointType;
-  partnerId?: string;
-  brokerId?: string;
-}
-
-// ========================================
-// API RESPONSE TYPES
-// ========================================
-
-export interface AttributionResponse {
-  success: boolean;
-  data?: {
-    touchpoints?: Touchpoint[];
-    attributions?: AttributionRecord[];
-    conversion?: Conversion;
-    report?: AttributionReport;
-    analytics?: AttributionAnalytics;
+  overallPerformance: {
+    totalLeads: number;
+    totalConversions: number;
+    conversionRate: number;
+    totalRevenue: number;
+    totalCost: number;
+    roi: number;
   };
-  error?: {
-    code: string;
-    message: string;
-    details?: Record<string, unknown>;
-  };
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface BatchAttributionDto {
-  leadIds: string[];
-  model: AttributionModel;
-  conversionValue: number;
-  commissionRate?: number;
-}
-
-export interface BatchAttributionResult {
-  processed: number;
-  successful: number;
-  failed: number;
-  attributions: Array<{
-    leadId: string;
-    success: boolean;
-    error?: string;
-  }>;
-}
+  sourcePerformance: MarketingSourceMetric[];
+  campaignPerformance: CampaignMetric[];
+  recommendations: string[];
+};
