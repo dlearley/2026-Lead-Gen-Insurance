@@ -841,6 +841,7 @@ export * from './predictive-maintenance.js';
 
 // VIP & Community
 export * from './vip.js';
+export * from './predictive-analytics.js';
 export * from './community.js';
 
 // Underwriting & Recommendations
