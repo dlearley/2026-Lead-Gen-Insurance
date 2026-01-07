@@ -1502,5 +1502,6 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Orchestration Types
-export * from './orchestration.js';
+// Machine Learning & Feature Store Types (Phase 16.3.3)
+export * from './ml.js';
+export * from './feature-store.js';
