@@ -1,276 +1,263 @@
-// ========================================
-// AI COPILOT TYPES
-// ========================================
-
-export type CopilotSuggestionType =
-  | 'response_template'
-  | 'next_action'
-  | 'objection_handling'
-  | 'product_recommendation'
-  | 'competitive_insight'
-  | 'policy_explanation'
-  | 'risk_assessment'
-  | 'cross_sell'
-  | 'upsell'
-  | 'follow_up';
-
-export type CopilotSuggestionPriority = 'low' | 'medium' | 'high' | 'critical';
-
-export type CopilotSessionStatus = 'active' | 'paused' | 'completed' | 'expired';
-
-export type CopilotFeedbackType = 'accepted' | 'rejected' | 'modified' | 'ignored';
-
-export interface CopilotSuggestion {
-  id: string;
-  sessionId: string;
-  type: CopilotSuggestionType;
-  priority: CopilotSuggestionPriority;
-  title: string;
-  content: string;
-  reasoning?: string;
-  confidence: number;
-  context?: Record<string, unknown>;
-  alternatives?: string[];
-  metadata?: Record<string, unknown>;
-  createdAt: Date;
-  expiresAt?: Date;
-  acceptedAt?: Date;
-  rejectedAt?: Date;
-}
-
-export interface CopilotSession {
-  id: string;
-  userId: string;
-  leadId?: string;
-  agentId?: string;
-  status: CopilotSessionStatus;
-  context: CopilotContext;
-  suggestions: CopilotSuggestion[];
-  insights: CopilotInsight[];
-  startedAt: Date;
-  lastActivityAt: Date;
-  completedAt?: Date;
-}
-
-export interface CopilotContext {
-  leadId?: string;
-  agentId?: string;
-  currentPage?: string;
-  leadData?: Record<string, unknown>;
-  agentData?: Record<string, unknown>;
-  conversationHistory?: ConversationMessage[];
-  insuranceType?: string;
-  stage?: string;
-  metadata?: Record<string, unknown>;
-}
-
 export interface ConversationMessage {
+  id: string;
   role: 'agent' | 'lead' | 'system';
   content: string;
-  timestamp: Date;
+  timestamp: number;
   metadata?: Record<string, unknown>;
 }
 
-export interface CopilotInsight {
+export interface ConversationContext {
+  conversationId: string;
+  agentId: string;
+  leadId?: string;
+  insuranceType?: string;
+  messages: ConversationMessage[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface SentimentAnalysis {
+  score: number; // -1 to 1
+  label: 'positive' | 'neutral' | 'negative';
+  confidence: number; // 0-100
+  emotion?: string;
+  keywords: string[];
+}
+
+export interface IntentDetection {
+  primary: string;
+  confidence: number; // 0-100
+  categories: string[];
+  urgency: number; // 0-100
+  purchaseIntent: number; // 0-100
+}
+
+export interface EntityExtraction {
+  entity: string;
+  type: string; // PRODUCT, AMOUNT, DATE, CONTACT, LOCATION, POLICY, NAME, ORGANIZATION
+  value: string;
+  confidence: number; // 0-100
+  start?: number;
+  end?: number;
+}
+
+export interface ConversationAnalysis {
+  sentiment: SentimentAnalysis;
+  intent: IntentDetection;
+  entities: EntityExtraction[];
+  summary: string;
+  keyTopics: string[];
+  engagement: number; // 0-100
+  churnRisk: number; // 0-100
+}
+
+export type RecommendationType = 'response' | 'action' | 'knowledge' | 'coaching';
+export type RecommendationPriority = 'high' | 'medium' | 'low';
+
+export interface BaseRecommendation {
   id: string;
-  sessionId: string;
-  type: InsightType;
+  type: RecommendationType;
+  confidence: number;
+  priority: RecommendationPriority;
+  timestamp: number;
+}
+
+export interface ResponseRecommendation extends BaseRecommendation {
+  type: 'response';
+  title: string;
+  content: string;
+  category?: string;
+  metadata?: {
+    tone?: string;
+    length?: string;
+    followUp?: boolean;
+  };
+}
+
+export interface ActionRecommendation extends BaseRecommendation {
+  type: 'action';
   title: string;
   description: string;
-  severity?: 'info' | 'warning' | 'critical';
-  actionable: boolean;
-  recommendedActions?: string[];
-  data?: Record<string, unknown>;
-  createdAt: Date;
+  action: {
+    type: string;
+    payload?: Record<string, unknown>;
+  };
+  expectedOutcome?: string;
 }
 
-export type InsightType =
-  | 'risk_alert'
-  | 'opportunity'
-  | 'competitive_intelligence'
-  | 'policy_gap'
-  | 'price_sensitivity'
-  | 'churn_risk'
-  | 'upsell_opportunity'
-  | 'engagement_pattern'
-  | 'sentiment_analysis'
-  | 'compliance_issue';
-
-export interface RealTimeInsight {
-  id: string;
-  type: InsightType;
-  leadId?: string;
-  agentId?: string;
+export interface KnowledgeRecommendation extends BaseRecommendation {
+  type: 'knowledge';
   title: string;
-  message: string;
-  severity: 'info' | 'warning' | 'critical';
+  content: string;
+  source: string;
+  relevance: number;
+  category?: string;
+}
+
+export interface CoachingRecommendation extends BaseRecommendation {
+  type: 'coaching';
+  title: string;
+  insight: string;
+  suggestion: string;
+  performanceArea: string;
+}
+
+export type Recommendation = 
+  | ResponseRecommendation 
+  | ActionRecommendation 
+  | KnowledgeRecommendation 
+  | CoachingRecommendation;
+
+export interface PerformanceInsight {
+  id: string;
+  type: 'performance' | 'coaching' | 'trend' | 'opportunity';
+  title: string;
+  description: string;
+  severity?: 'high' | 'medium' | 'low' | 'info';
   actionable: boolean;
-  actions?: InsightAction[];
-  data?: Record<string, unknown>;
-  timestamp: Date;
+  actions?: Array<{
+    label: string;
+    type: string;
+    payload?: Record<string, unknown>;
+  }>;
+  metrics?: Record<string, number>;
+  timestamp: number;
+  validUntil?: number;
 }
 
-export interface InsightAction {
-  id: string;
-  label: string;
-  action: string;
-  params?: Record<string, unknown>;
+export interface CopilotMessage {
+  type: 'message' | 'analysis' | 'recommendation' | 'insight' | 'typing' | 'system';
+  payload: {
+    conversationId: string;
+    messageId?: string;
+    content?: string;
+    timestamp: number;
+    metadata?: Record<string, unknown>;
+  };
 }
 
-export interface CopilotFeedback {
-  id: string;
-  suggestionId: string;
-  userId: string;
-  feedbackType: CopilotFeedbackType;
-  rating?: number;
-  comment?: string;
-  modificationsApplied?: string;
-  createdAt: Date;
+export interface WebSocketAuth {
+  token: string;
+  agentId: string;
+  agentName?: string;
 }
 
-// Request/Response DTOs
-
-export interface CreateCopilotSessionRequest {
-  userId: string;
-  context: CopilotContext;
-}
-
-export interface CreateCopilotSessionResponse {
-  session: CopilotSession;
-}
-
-export interface UpdateCopilotContextRequest {
-  context: Partial<CopilotContext>;
-}
-
-export interface GetSuggestionsRequest {
-  sessionId: string;
-  types?: CopilotSuggestionType[];
-  limit?: number;
-}
-
-export interface GetSuggestionsResponse {
-  suggestions: CopilotSuggestion[];
-  count: number;
-}
-
-export interface ProvideFeedbackRequest {
-  suggestionId: string;
-  feedbackType: CopilotFeedbackType;
-  rating?: number;
-  comment?: string;
-  modificationsApplied?: string;
-}
-
-export interface ProvideFeedbackResponse {
-  feedback: CopilotFeedback;
-  nextSuggestions?: CopilotSuggestion[];
-}
-
-export interface GenerateSuggestionRequest {
-  sessionId: string;
-  type: CopilotSuggestionType;
-  context?: Record<string, unknown>;
-  userInput?: string;
-}
-
-export interface GenerateSuggestionResponse {
-  suggestion: CopilotSuggestion;
-}
-
-export interface GetInsightsRequest {
-  sessionId?: string;
+export interface ConversationSummary {
+  conversationId: string;
+  agentId: string;
   leadId?: string;
-  agentId?: string;
-  types?: InsightType[];
-  severity?: 'info' | 'warning' | 'critical';
-  limit?: number;
-}
-
-export interface GetInsightsResponse {
-  insights: RealTimeInsight[];
-  count: number;
-}
-
-// WebSocket Message Types
-
-export interface CopilotWebSocketMessage {
-  type: CopilotMessageType;
-  payload: unknown;
-  timestamp: Date;
-}
-
-export type CopilotMessageType =
-  | 'suggestion_generated'
-  | 'insight_created'
-  | 'context_updated'
-  | 'session_started'
-  | 'session_completed'
-  | 'feedback_received'
-  | 'error';
-
-export interface SuggestionGeneratedMessage {
-  type: 'suggestion_generated';
-  payload: {
-    suggestion: CopilotSuggestion;
-  };
-  timestamp: Date;
-}
-
-export interface InsightCreatedMessage {
-  type: 'insight_created';
-  payload: {
-    insight: RealTimeInsight;
-  };
-  timestamp: Date;
-}
-
-export interface ContextUpdatedMessage {
-  type: 'context_updated';
-  payload: {
-    context: CopilotContext;
-  };
-  timestamp: Date;
-}
-
-// Analytics and Metrics
-
-export interface CopilotMetrics {
-  sessionId: string;
-  totalSuggestions: number;
-  acceptedSuggestions: number;
-  rejectedSuggestions: number;
-  modifiedSuggestions: number;
-  averageConfidence: number;
-  averageResponseTime: number;
-  topSuggestionTypes: Array<{
-    type: CopilotSuggestionType;
-    count: number;
-  }>;
+  startTime: number;
+  endTime?: number;
+  messageCount: number;
+  finalSentiment: SentimentAnalysis;
+  primaryIntent: string;
+  recommendationsProvided: number;
   insightsGenerated: number;
-  averageFeedbackRating?: number;
+  outcome?: 'converted' | 'follow_up' | 'not_interested' | 'disconnected';
 }
 
-export interface CopilotPerformanceStats {
-  period: {
-    start: Date;
-    end: Date;
+export interface AgentPerformance {
+  agentId: string;
+  date: string;
+  metrics: {
+    conversationsHandled: number;
+    averageResponseTime: number;
+    conversionRate: number;
+    customerSatisfaction: number;
+    recommendationsAccepted: number;
+    coachingInsightsApplied: number;
   };
-  totalSessions: number;
-  activeSessions: number;
-  completedSessions: number;
-  totalSuggestions: number;
-  acceptanceRate: number;
-  averageSessionDuration: number;
-  topPerformingSuggestionTypes: Array<{
-    type: CopilotSuggestionType;
-    acceptanceRate: number;
-    count: number;
+  improvements: string[];
+  strengths: string[];
+}
+
+export interface KnowledgeArticle {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  source: string;
+  confidence?: number;
+  updatedAt: number;
+  createdAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeSearchResult {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  source: string;
+  relevance: number;
+  tags: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface RealTimeAnalysis {
+  sentiment: SentimentAnalysis;
+  intent: IntentDetection;
+  entities: EntityExtraction[];
+  engagement: number;
+  churnRisk: number;
+}
+
+// WebSocket Event Types
+export interface WebSocketEvent {
+  type: string;
+  payload: any;
+  timestamp: number;
+  id: string;
+}
+
+export interface TypingEvent {
+  conversationId: string;
+  agentId: string;
+  isTyping: boolean;
+  role: 'agent' | 'lead';
+}
+
+export interface ReadReceiptEvent {
+  messageId: string;
+  conversationId: string;
+  agentId: string;
+  timestamp: number;
+}
+
+export interface ConversationEndEvent {
+  conversationId: string;
+  reason: 'completed' | 'transferred' | 'abandoned' | 'timeout';
+  timestamp: number;
+}
+
+// API Response Types
+export interface CopilotAnalysisResponse {
+  analysis?: ConversationAnalysis;
+  recommendations: Recommendation[];
+  insights: PerformanceInsight[];
+  streaming?: boolean;
+}
+
+export interface CopilotHealthResponse {
+  uptime: number;
+  message: string;
+  timestamp: number;
+  version: string;
+  activeConversations?: number;
+  activeConnections?: number;
+}
+
+export interface CopilotMetricsResponse {
+  activeConnections: number;
+  connectionDetails: Array<{
+    socketId: string;
+    agentId: string;
+    agentName: string;
+    connectedAt: number;
+    conversationId?: string;
   }>;
-  userSatisfactionScore?: number;
-  impactMetrics?: {
-    timesSaved: number;
-    conversionsInfluenced: number;
-    revenueImpact: number;
-  };
+  totalConversations: number;
+  totalMessages: number;
+  avgResponseTime: number;
+  recommendationAcceptanceRate: number;
 }

@@ -1716,5 +1716,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Observability Types
-export * from './observability.js';
+// Copilot Types (Phase 17)
+export * from './copilot.js';
