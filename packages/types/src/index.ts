@@ -835,5 +835,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// CRM Integration Types
-export * from './crm.js';
+// NLP & Document Processing Types
+export * from './nlp.js';

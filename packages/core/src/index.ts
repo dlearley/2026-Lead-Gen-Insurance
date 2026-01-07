@@ -13,5 +13,5 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// CRM exports
-export * from './crm/index.js';
+// NLP and Document Processing Services
+export * from './services/index.js';
