@@ -1,0 +1,85 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Log Analysis Dashboard",
+    "tags": ["logs", "analysis", "observability"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Log Volume by Service",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_log_lines_total[5m])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "yAxes": [
+          {
+            "label": "Logs/sec",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Error Rate by Service",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_log_errors_total[5m])) by (service)",
+            "legendFormat": "{{service}} errors"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "yAxes": [
+          {
+            "label": "Errors/sec",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Log Alerting",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(insurechain_log_anomalies_total[1h])",
+            "legendFormat": "Anomalies detected"
+          },
+          {
+            "expr": "increase(insurechain_log_pattern_anomalies[1h])",
+            "legendFormat": "Pattern anomalies"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Log Cost vs Business Impact Ratio",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(loki_distributor_bytes_received_total[1h]) / 1024 / 1024 / 1024 * 0.01) / sum(rate(insurechain_business_event_value[1h]))",
+            "legendFormat": "Log cost per business event"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 36,
+    "version": 1
+  }
+}

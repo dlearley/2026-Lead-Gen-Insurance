@@ -1,0 +1,248 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Business Metrics Dashboard",
+    "tags": ["business", "leads", "ai", "queue"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Leads Processed (5m)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(insurechain_leads_processed_total[5m])) * 300",
+            "legendFormat": "Total"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "AI Processing Rate (5m)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(insurechain_ai_processing_duration_seconds_count[5m]))",
+            "legendFormat": "calls/sec"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Queue Depth",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(insurechain_queue_depth{queue=~\"lead-processing|ai-processing|notification\"})",
+            "legendFormat": "Total"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 5000}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Rate %",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(sum(rate(insurechain_lead_processing_errors_total[5m])) / sum(rate(insurechain_leads_processed_total[5m]))) * 100",
+            "legendFormat": "error_rate"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Lead Processing Timeline",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(insurechain_leads_processed_total[5m])) by (status)",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "AI Processing Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(insurechain_ai_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(insurechain_ai_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "50th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Queue Processing Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(insurechain_queue_processed_total{queue=~\"lead-processing|ai-processing|notification\"}[5m])) by (queue)",
+            "legendFormat": "{{queue}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "Database Query Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(insurechain_db_query_duration_seconds_bucket[5m])) by (le, operation))",
+            "legendFormat": "95th percentile - {{operation}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Lead Quality Score Distribution",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum(rate(insurechain_lead_quality_score_bucket[5m])) by (le)",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "options": {
+          "calculate": false,
+          "color": {
+            "mode": "spectrum"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "AI Provider Latency Comparison",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(insurechain_ai_provider_latency_seconds_bucket[5m])) by (le, provider))",
+            "legendFormat": "95th percentile - {{provider}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "yAxes": [
+          {
+            "label": "Latency (seconds)",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Cost Tracking",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(insurechain_ai_calls_total[5m]) * 0.01) by (provider, model)",
+            "legendFormat": "AI Cost - {{provider}}:{{model}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "yAxes": [
+          {
+            "label": "Cost ($/hour)",
+            "min": 0
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 36,
+    "version": 1
+  }
+}
