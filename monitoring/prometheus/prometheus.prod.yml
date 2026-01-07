@@ -1,0 +1,203 @@
+# ============================================
+# Production Prometheus Configuration
+# Insurance Lead Generation Platform - Phase 19.2
+# ============================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+      scheme: http
+      timeout: 10s
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+  - "/etc/prometheus/rules/*.yaml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Node Exporter - Infrastructure metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 'node-exporter:9100'
+
+  # API Service monitoring
+  - job_name: 'api-service'
+    static_configs:
+      - targets: ['api:3000']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'api'
+
+  # Data Service monitoring
+  - job_name: 'data-service'
+    static_configs:
+      - targets: ['data-service:3001']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'data-service'
+
+  # Orchestrator Service monitoring
+  - job_name: 'orchestrator-service'
+    static_configs:
+      - targets: ['orchestrator:3002']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'orchestrator'
+
+  # Backend Service monitoring
+  - job_name: 'backend-service'
+    static_configs:
+      - targets: ['backend:8000']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'backend'
+
+  # Frontend Service monitoring
+  - job_name: 'frontend-service'
+    static_configs:
+      - targets: ['frontend:3000']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'frontend'
+
+  # PostgreSQL Database monitoring
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'postgres'
+
+  # Redis monitoring
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'redis'
+
+  # Nginx monitoring
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'nginx'
+
+  # AlertManager monitoring
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Jaeger monitoring
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "https://your-prometheus-remote-storage.com/api/v1/write"
+    headers:
+      X-API-Key: "your-remote-storage-api-key"
+    queue_config:
+      max_samples_per_send: 10000
+      max_shards: 200
+      capacity: 2500
+    write_relabel_configs:
+      - source_labels: [__name__]
+        regex: "up|.*_errors_total|.*_duration_seconds.*"
+        target_label: __name__
+        replacement: "production_${1}"
+
+# Remote read configuration
+remote_read:
+  - url: "https://your-prometheus-remote-storage.com/api/v1/read"
+    headers:
+      X-API-Key: "your-remote-storage-api-key"
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 50GB
+    wal-compression: true
+
+# Query configuration
+query:
+  timeout: 2m
+  max-concurrency: 20
+  max-samples: 50000000
+
+# Web configuration
+web:
+  console.templates: "/etc/prometheus/consoles"
+  console.libraries: "/etc/prometheus/console_libraries"
+  page-title: "Insurance Lead Gen - Production Monitoring"
+  cors.origin: ".*"
+  enable-lifecycle: true
+  enable-admin-api: true

@@ -1,0 +1,590 @@
+# ============================================
+# Production API Service with Security Hardening
+# Insurance Lead Generation Platform - Phase 19.2
+# ============================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    environment: production
+    security-policy: strict
+    monitoring: enabled
+  annotations:
+    description: "Production namespace for Insurance Lead Generation Platform"
+    contact: "devops@your-company.com"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-service
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/insurance-lead-gen-api-service-role
+automountServiceAccountToken: true
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-service-secrets
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+type: Opaque
+data:
+  # These should be populated from AWS Secrets Manager
+  database-url: <base64-encoded-db-url>
+  redis-password: <base64-encoded-redis-password>
+  jwt-secret: <base64-encoded-jwt-secret>
+  encryption-key: <base64-encoded-encryption-key>
+  openai-api-key: <base64-encoded-openai-key>
+stringData:
+  # Human-readable references (optional)
+  secret-arn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:insurance-lead-gen/production/api"
+  description: "Production API service secrets"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-service-config
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  JAEGER_ENDPOINT: "http://jaeger-collector.monitoring.svc.cluster.local:14268/api/traces"
+  OTEL_SERVICE_NAME: "insurance-lead-gen-api"
+  OTEL_SERVICE_VERSION: "1.0.0"
+  CORS_ORIGIN: "https://your-production-domain.com,https://www.your-production-domain.com"
+  RATE_LIMIT_MAX: "100"
+  RATE_LIMIT_WINDOW: "60"
+  METRICS_ENABLED: "true"
+  HEALTH_CHECK_ENABLED: "true"
+  SECURITY_HEADERS_ENABLED: "true"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+    version: "1.0.0"
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    description: "Production API Gateway Service"
+    contact: "devops@your-company.com"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api-service
+      component: api
+      environment: production
+  template:
+    metadata:
+      labels:
+        app: api-service
+        component: api
+        environment: production
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+        config.linkerd.io/proxy-cpu-request: "100m"
+        config.linkerd.io/proxy-memory-request: "128Mi"
+        config.linkerd.io/proxy-cpu-limit: "500m"
+        config.linkerd.io/proxy-memory-limit: "512Mi"
+    spec:
+      serviceAccountName: api-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - api-service
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - general
+      tolerations:
+      - key: "node-type"
+        operator: "Equal"
+        value: "general"
+        effect: "NoSchedule"
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      initContainers:
+      - name: init-db
+        image: postgres:16-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h $DATABASE_HOST -p 5432; do
+            echo "Waiting for database..."
+            sleep 5
+          done
+          echo "Database is ready"
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: api-service-secrets
+              key: database-url
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      - name: init-redis
+        image: redis:7-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until redis-cli -h $REDIS_HOST -p 6379 ping; do
+            echo "Waiting for Redis..."
+            sleep 5
+          done
+          echo "Redis is ready"
+        env:
+        - name: REDIS_HOST
+          value: "insurance-lead-gen-production-redis.xxxx.cache.amazonaws.com"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      containers:
+      - name: api-service
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/insurance-lead-gen/api:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+          hostPort: 3000
+        - name: metrics
+          containerPort: 3001
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: api-service-config
+        - secretRef:
+            name: api-service-secrets
+        env:
+        # Database connection
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-service-secrets
+              key: database-url
+        # Redis connection
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@insurance-lead-gen-production-redis.xxxx.cache.amazonaws.com:6379"
+          valueFrom:
+            secretKeyRef:
+              name: api-service-secrets
+              key: redis-password
+        # Service mesh
+        - name: LINKERD2_PROXY_LOG
+          value: warn,linkerd=info
+        - name: LINKERD2_PROXY_LOG_FORMAT
+          value: json
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+        - name: secrets-store
+          mountPath: "/mnt/secrets-store"
+          readOnly: true
+      - name: proxy
+        image: cr.l5d.io/linkerd/proxy:stable-2.14.1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 2102
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: linkerd-proxy-identity
+          mountPath: /var/run/linkerd/identity
+          readOnly: true
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir:
+          sizeLimit: "256Mi"
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: aws-secrets-manager
+      - name: linkerd-proxy-identity
+        csi:
+          driver: linkerd.io/identity
+          readOnly: true
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "10254"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-attributes: "load_balancing.cross_zone.enabled=true"
+    linkerd.io/inject: "enabled"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 3001
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: api-service
+    component: api
+    environment: production
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-service-network-policy
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: api-service
+      component: api
+      environment: production
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: api-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: backend-service
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: data-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: orchestrator-service
+    - namespaceSelector:
+        matchLabels:
+          name: production
+      podSelector:
+        matchLabels:
+          app: backend-service
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 3002
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6379
+    - protocol: TCP
+      port: 5432
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-service-pdb
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: api-service
+      component: api
+      environment: production
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-service-hpa
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-service
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: api-service-metrics
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+    environment: production
+spec:
+  selector:
+    matchLabels:
+      app: api-service
+      component: api
+      environment: production
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: api-service-security
+  namespace: production
+  labels:
+    app: api-service
+    component: api
+spec:
+  headers:
+    accessControlAllowMethods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+    accessControlAllowOriginList:
+    - "https://your-production-domain.com"
+    - "https://www.your-production-domain.com"
+    accessControlMaxAge: 100
+    hostsProxyHeaders:
+    - "X-Forwarded-Host"
+    referrerPolicy: "strict-origin-when-cross-origin"
+    stsSeconds: 63072000
+    stsIncludeSubdomains: true
+    stsPreload: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    frameDeny: false
+    customFrameOptionsValue: "SAMEORIGIN"
+    contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https:; frame-src 'none';"
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Forwarded-Port: "443"
+    customResponseHeaders:
+      X-Frame-Options: "SAMEORIGIN"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+      Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
