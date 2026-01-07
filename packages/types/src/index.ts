@@ -845,5 +845,5 @@ export * from './predictive-maintenance.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Marketplace (Phase 12.6)
-export * from './marketplace.js';
+// Underwriting & Recommendations
+export * from './underwriting.js';

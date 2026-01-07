@@ -33,7 +33,8 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
-  importRecords   DataImportRecord[]
+  underwritingDecisions UnderwritingDecision[] @relation("LeadUnderwriting")
+  customer        Customer?  @relation("CustomerLead")
 
   // Indexes for performance
   @@index([email])
@@ -781,45 +782,450 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
-// ========================================
-// MARKETPLACE ECOSYSTEM REVENUE (Phase 12.6)
-// ========================================
 
-model EcosystemRevenue {
-  id              String         @id @default(uuid())
-  type            RevenueType
-  amount          Float
-  currency        String         @default("USD")
-  status          RevenueStatus  @default(PENDING)
-  sourceId        String
-  sourceType      String
-  brokerId        String?
-  carrierId       String?
-  metadata        Json?
-  processedAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  @@index([type])
-  @@index([status])
-  @@index([sourceId])
-  @@index([brokerId])
-  @@index([carrierId])
-  @@index([createdAt])
-  @@map("ecosystem_revenue")
+// Underwriting Enums
+enum UnderwritingDecision {
+  APPROVED
+  DENIED
+  MANUAL_REVIEW
+  CONDITIONAL
 }
 
-enum RevenueType {
-  PLATFORM_FEE
-  SUBSCRIPTION
-  SERVICE_FEE
-  REFERRAL_COMMISSION
-  MARKET_ACCESS_FEE
+enum RuleType {
+  APPROVAL
+  RISK_ASSESSMENT
+  COVERAGE_REQUIREMENT
 }
 
-enum RevenueStatus {
-  PENDING
+enum DecisionAction {
+  AUTO_APPROVE
+  AUTO_DENY
+  MANUAL_REVIEW
+  FLAG_EXCEPTION
+}
+
+enum GapSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ExceptionSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum RecommendationType {
+  NEW_POLICY
+  COVERAGE_UPGRADE
+  CROSS_SELL
+  UPSELL
+  RETENTION
+}
+
+enum RecommendationStatus {
+  IDENTIFIED
+  RECOMMENDED
+  ACCEPTED
+  DECLINED
+}
+
+enum UrgencyLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ExperimentStatus {
+  ACTIVE
+  PAUSED
   COMPLETED
-  FAILED
-  REFUNDED
+}
+
+// Automated Underwriting Rules
+model UnderwritingRule {
+  id                   String        @id @default(uuid())
+  ruleName             String        @db.VarChar(255)
+  insuranceLine        String?       @db.VarChar(50)
+  ruleType             RuleType
+  conditionLogic       Json
+  riskScoreAdjustment  Float
+  decisionAction       DecisionAction
+  priority             Int
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relationships
+  appliedDecisions     UnderwritingDecision[] @relation("RuleDecisions")
+
+  // Indexes
+  @@index([isActive, priority])
+  @@index([insuranceLine])
+  @@index([ruleType])
+}
+
+// Underwriting Decision History
+model UnderwritingDecision {
+  id                      String               @id @default(uuid())
+  leadId                  String
+  policyType              String?              @db.VarChar(50)
+  riskScore               Float
+  riskScoreComponents     Json
+  decision                UnderwritingDecision
+  decisionReason          String?              @db.Text
+  appliedRules            Json                 // Array of rule IDs
+  exceptionsFlagged       Json                 // Array of exceptions
+  coverageRecommended     Json                 // {limits, deductibles, options}
+  premiumCalculated       Decimal              @db.Decimal(10, 2)
+  underwriterId           String?
+  underwriterNotes        String?              @db.Text
+  decisionTimestamp       DateTime             @default(now())
+  decisionEffectiveDate   DateTime?
+  createdAt               DateTime             @default(now())
+
+  // Relationships
+  lead                    Lead?                @relation("LeadUnderwriting", fields: [leadId], references: [id], onDelete: Cascade)
+  appliedRules            UnderwritingRule[]   @relation("RuleDecisions")
+
+  // Indexes
+  @@index([leadId])
+  @@index([decision, decisionTimestamp(sort: Desc)])
+  @@index([decisionTimestamp])
+}
+
+// Customer model - stores customer information for recommendations
+model Customer {
+  id              String            @id @default(uuid())
+  leadId          String            @unique
+  email           String
+  phoneNumber     String?
+  isVerified      Boolean           @default(false)
+  lastLoginAt     DateTime?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  lead            Lead?             @relation("CustomerLead", fields: [leadId], references: [id], onDelete: Cascade)
+  profile         CustomerProfile?
+  policies        Policy[]
+  coverageGaps    CoverageGap[]
+  recommendations PolicyRecommendation[]
+  gapsExposure    CustomerGapExposure[]
+
+  // Indexes
+  @@index([email])
+  @@index([leadId])
+  @@index([isVerified])
+}
+
+// Customer Profile
+model CustomerProfile {
+  id              String        @id @default(uuid())
+  customerId      String        @unique
+  dateOfBirth     DateTime?
+  maritalStatus   String?       @db.VarChar(50)
+  dependents      Int           @default(0)
+  annualIncome    Decimal?      @db.Decimal(12, 2)
+  occupation      String?       @db.VarChar(100)
+  address         Json?         // {street, city, state, zip, country}
+  preferences     Json?         // {language, timezone, notifications}
+  riskTolerance   String?       @db.VarChar(20) // conservative, moderate, aggressive
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relationships
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([customerId])
+}
+
+// Policy model - stores policy information
+model Policy {
+  id                String            @id @default(uuid())
+  customerId        String
+  policyNumber      String            @unique
+  insuranceType     InsuranceType
+  carrier           String?
+  productName       String?          @db.VarChar(255)
+  status            String            @default("draft") @db.VarChar(50)
+  effectiveDate     DateTime
+  expirationDate    DateTime
+  cancelledAt       DateTime?
+  cancellationReason String?         @db.Text
+  premium           Decimal           @db.Decimal(10, 2)
+  billingFrequency  String            @default("monthly") @db.VarChar(20)
+  coverage          Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relationships
+  customer          Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  endorsements      PolicyEndorsement[]
+  invoices          PolicyInvoice[]
+
+  // Indexes
+  @@index([customerId])
+  @@index([policyNumber])
+  @@index([insuranceType])
+  @@index([status])
+  @@index([effectiveDate])
+  @@index([expirationDate])
+}
+
+// Policy Endorsements
+model PolicyEndorsement {
+  id              String      @id @default(uuid())
+  policyId        String
+  type            String      @db.VarChar(100)
+  effectiveDate   DateTime
+  description     String?     @db.Text
+  changes         Json?
+  premiumDelta    Decimal?    @db.Decimal(10, 2)
+  createdAt       DateTime    @default(now())
+  createdBy       String?
+
+  // Relationships
+  policy          Policy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([policyId])
+  @@index([effectiveDate])
+}
+
+// Policy Invoices
+model PolicyInvoice {
+  id              String      @id @default(uuid())
+  policyId        String
+  invoiceNumber   String      @unique
+  amount          Decimal     @db.Decimal(10, 2)
+  currency        String      @default("USD")
+  dueDate         DateTime
+  status          String      @default("open") @db.VarChar(20)
+  paidAt          DateTime?
+  createdAt       DateTime    @default(now())
+
+  // Relationships
+  policy          Policy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([policyId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// Coverage Gap Analysis
+model CoverageGap {
+  id                    String              @id @default(uuid())
+  customerId            String
+  gapType               String              @db.VarChar(100)
+  insuranceLine         String?             @db.VarChar(50)
+  currentCoverage       Json
+  recommendedCoverage   Json
+  financialExposure     Decimal             @db.Decimal(12, 2)
+  gapSeverity           GapSeverity
+  identifiedDate        DateTime            @default(now())
+  recommendationStatus  RecommendationStatus @default(IDENTIFIED)
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  customer              Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([customerId, gapSeverity])
+  @@index([insuranceLine])
+  @@index([recommendationStatus])
+  @@index([identifiedDate])
+}
+
+// Policy Recommendations
+model PolicyRecommendation {
+  id                      String                @id @default(uuid())
+  customerId              String
+  insuranceLine           String                @db.VarChar(50)
+  recommendationType      RecommendationType
+  recommendedCoverage     Json
+  estimatedPremium        Decimal               @db.Decimal(10, 2)
+  recommendationScore     Float
+  relevanceScore          Float
+  conversionProbability   Float
+  urgencyLevel            UrgencyLevel
+  reasonText              String?               @db.Text
+  influencingFactors      Json                  // Array of strings
+  agentCommissionAmount   Decimal               @db.Decimal(10, 2)
+  recommendationExpiry    DateTime?
+  acceptedAt              DateTime?
+  declinedAt              DateTime?
+  createdBy               String                @default("ai_engine")
+  createdAt               DateTime              @default(now())
+
+  // Relationships
+  customer                Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  performanceTracking     RecommendationPerformance[]
+
+  // Indexes
+  @@index([customerId, createdAt(sort: Desc)])
+  @@index([insuranceLine])
+  @@index([recommendationType])
+  @@index([urgencyLevel])
+  @@index([recommendationExpiry])
+  @@index([createdBy])
+}
+
+// Recommendation Performance Tracking
+model RecommendationPerformance {
+  id                          String      @id @default(uuid())
+  recommendationId            String
+  recommendedAt                DateTime    @default(now())
+  viewedAt                    DateTime?
+  acceptedAt                  DateTime?
+  conversionOutcome           Boolean     @default(false)
+  policyId                    String?
+  actualPremium               Decimal?    @db.Decimal(10, 2)
+  expectedPremium             Decimal?    @db.Decimal(10, 2)
+  recommendationAccuracyScore Float?
+  createdAt                   DateTime    @default(now())
+
+  // Relationships
+  recommendation              PolicyRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([recommendationId])
+  @@index([recommendedAt])
+  @@index([conversionOutcome])
+}
+
+// Underwriting Risk Models
+model UnderwritingRiskModel {
+  id                  String      @id @default(uuid())
+  name                String      @db.VarChar(255)
+  insuranceLine       String?     @db.VarChar(50)
+  modelVersion        Int
+  modelType           String      @db.VarChar(100)
+  trainingDate        DateTime?
+  performanceMetrics  Json        // {accuracy, precision, recall, auc}
+  featureImportance   Json
+  isActive            Boolean     @default(false)
+  createdAt           DateTime    @default(now())
+
+  // Indexes
+  @@index([insuranceLine])
+  @@index([isActive])
+  @@index([modelType])
+}
+
+// A/B Tests for Recommendations
+model RecommendationExperiment {
+  id                        String            @id @default(uuid())
+  name                      String            @db.VarChar(255)
+  recommendationStrategy    String            @db.VarChar(100)
+  variantAStrategy          Json
+  variantBStrategy          Json
+  status                    ExperimentStatus   @default(ACTIVE)
+  trafficPercentage         Float
+  startDate                 DateTime
+  endDate                   DateTime?
+  successMetric             String            @db.VarChar(100)
+  controlGroupPerformance   Float
+  createdAt                 DateTime          @default(now())
+
+  // Relationships
+  metrics                   ExperimentMetric[]
+
+  // Indexes
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([recommendationStrategy])
+}
+
+// Experiment Metrics
+model ExperimentMetric {
+  id                  String                    @id @default(uuid())
+  experimentId        String
+  variant             String                    @db.VarChar(10) // A or B
+  totalParticipants   Int                       @default(0)
+  acceptanceRate      Float                     @default(0)
+  conversionRate      Float                     @default(0)
+  averageRevenue      Decimal                   @default(0) @db.Decimal(10, 2)
+  customerSatisfaction Float                     @default(0)
+  recordedAt          DateTime                  @default(now())
+
+  // Relationships
+  experiment          RecommendationExperiment   @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([experimentId])
+  @@index([variant])
+  @@index([recordedAt])
+}
+
+// Exception Log
+model UnderwritingException {
+  id                String            @id @default(uuid())
+  leadId            String
+  policyType        String?           @db.VarChar(50)
+  exceptionType     String            @db.VarChar(100)
+  exceptionReason   String?           @db.Text
+  severity          ExceptionSeverity
+  flaggedForReview  Boolean           @default(true)
+  reviewerId        String?
+  reviewNotes       String?           @db.Text
+  resolutionAction  String?           @db.VarChar(255)
+  resolvedAt        DateTime?
+  createdAt         DateTime          @default(now())
+
+  // Indexes
+  @@index([leadId])
+  @@index([policyType])
+  @@index([flaggedForReview, severity])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+// Underwriting Analytics (Materialized View)
+model UnderwritingAnalytics {
+  id                      String      @id @default(uuid())
+  periodDate              Date        @unique
+  insuranceLine           String      @db.VarChar(50)
+  totalApplications       Int         @default(0)
+  autoApproved            Int         @default(0)
+  manualReview            Int         @default(0)
+  denied                  Int         @default(0)
+  approvalRate            Float       @default(0)
+  averageDecisionTime     Float       @default(0)
+  exceptionsRate          Float       @default(0)
+  averagePremium          Decimal     @default(0) @db.Decimal(10, 2)
+  updatedAt               DateTime    @default(now())
+
+  // Indexes
+  @@index([insuranceLine, periodDate(sort: Desc)])
+  @@index([periodDate])
+}
+
+// Customer Gap Exposure tracking
+model CustomerGapExposure {
+  id                    String      @id @default(uuid())
+  customerId            String
+  totalExposure         Decimal     @default(0) @db.Decimal(12, 2)
+  criticalExposure      Decimal     @default(0) @db.Decimal(12, 2)
+  highExposure          Decimal     @default(0) @db.Decimal(12, 2)
+  mediumExposure        Decimal     @default(0) @db.Decimal(12, 2)
+  lowExposure           Decimal     @default(0) @db.Decimal(12, 2)
+  gapCount              Int         @default(0)
+  calculatedAt          DateTime    @default(now())
+
+  // Relationships
+  customer              Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([customerId])
+  @@index([calculatedAt])
 }

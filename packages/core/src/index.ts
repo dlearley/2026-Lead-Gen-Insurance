@@ -13,5 +13,5 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// NLP and Document Processing Services
+// Underwriting & Recommendations exports
 export * from './services/index.js';
