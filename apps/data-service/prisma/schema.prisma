@@ -89,6 +89,7 @@ model Lead {
   tasks         Task[]
   assignments   LeadAssignment[]
   events        LeadEvent[]
+  importRecords DataImportRecord[]
 
   @@index([status])
   @@index([email])
@@ -770,361 +771,230 @@ enum Direction {
 }
 
 // ========================================
-// PHASE 9.6c & 12.5: COMMUNITY & VIP PROGRAM
+// CRM INTEGRATION (Phase 15.1.2)
 // ========================================
 
-// VIP Program Models
-model AgentVIPStatus {
-  id        String   @id @default(uuid())
-  agentId   String   @unique
-  points    Int      @default(0)
-  tier      VIPTier  @default(SILVER)
-  tierSince DateTime @default(now())
-  expiresAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model CrmIntegration {
+  id                  String              @id @default(uuid())
+  name                String
+  provider            CrmProvider
+  isActive            Boolean             @default(true)
+  isConnected         Boolean             @default(false)
+  accessToken         String?
+  refreshToken        String?
+  tokenExpiresAt      DateTime?
+  instanceUrl         String?
+  apiKey              String?
+  apiSecret           String?
+  webhookSecret       String?
+  lastSyncAt          DateTime?
+  syncStatus          SyncStatus          @default(IDLE)
+  syncDirection       SyncDirection       @default(BIDIRECTIONAL)
+  syncFrequency       Int                 @default(3600)
+  autoSync            Boolean             @default(true)
+  errorCount          Int                 @default(0)
+  lastError           String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
-  // Relations
-  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  fieldMappings       CrmFieldMapping[]
+  syncLogs            CrmSyncLog[]
+  importJobs          DataImportJob[]
 
-  @@index([points])
-  @@index([tier])
-  @@map("agent_vip_status")
-}
-
-enum VIPTier {
-  SILVER
-  GOLD
-  PLATINUM
-  DIAMOND
-}
-
-// Community Models
-model CommunityPost {
-  id          String        @id @default(uuid())
-  authorId    String
-  title       String
-  content     String        @db.Text
-  category    PostCategory  @default(GENERAL)
-  isPinned    Boolean       @default(false)
-  isFeatured  Boolean       @default(false)
-  viewCount   Int           @default(0)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  // Relations
-  author      Agent              @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments    CommunityComment[]
-  likes       CommunityLike[]
-  
-  // Phase 12.5: Group posts
-  groupId     String?
-  group       CommunityGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
-
-  @@index([authorId])
-  @@index([category])
-  @@index([isPinned])
-  @@index([isFeatured])
+  @@index([provider])
+  @@index([isActive])
+  @@index([isConnected])
+  @@index([syncStatus])
   @@index([createdAt])
-  @@index([groupId])
-  @@map("community_posts")
+  @@map("crm_integrations")
 }
 
-enum PostCategory {
-  GENERAL
-  SUCCESS_STORY
-  TIP
-  QUESTION
-  ANNOUNCEMENT
-  TRAINING
-  RESOURCES
-  EVENT
+model CrmFieldMapping {
+  id                  String              @id @default(uuid())
+  integrationId       String
+  sourceField         String
+  targetField         String
+  fieldType           FieldType
+  isRequired          Boolean             @default(false)
+  defaultValue        String?
+  transformFunction   String?
+  validationRules     Json?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([sourceField])
+  @@index([targetField])
+  @@unique([integrationId, sourceField, targetField])
+  @@map("crm_field_mappings")
 }
 
-model CommunityComment {
-  id        String   @id @default(uuid())
-  postId    String
-  authorId  String
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model CrmSyncLog {
+  id                  String              @id @default(uuid())
+  integrationId       String
+  syncType            SyncType
+  direction           SyncDirection
+  status              SyncLogStatus
+  recordsProcessed    Int                 @default(0)
+  recordsSuccess      Int                 @default(0)
+  recordsFailed       Int                 @default(0)
+  recordsSkipped      Int                 @default(0)
+  startedAt           DateTime            @default(now())
+  completedAt         DateTime?
+  duration            Int?
+  errorMessage        String?
+  errorDetails        Json?
+  metadata            Json?
 
-  // Relations
-  post      CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    Agent          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  likes     CommunityLike[]
+  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
-  @@index([postId])
-  @@index([authorId])
-  @@index([createdAt])
-  @@map("community_comments")
-}
-
-model CommunityLike {
-  id        String   @id @default(uuid())
-  agentId   String
-  postId    String?
-  commentId String?
-  createdAt DateTime @default(now())
-
-  // Relations
-  agent     Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  post      CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment   CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-
-  @@unique([agentId, postId])
-  @@unique([agentId, commentId])
-  @@index([agentId])
-  @@index([postId])
-  @@index([commentId])
-  @@map("community_likes")
-}
-
-// ========================================
-// PHASE 12.5: ENHANCED COMMUNITY FEATURES
-// ========================================
-
-// Community Groups / Forums
-model CommunityGroup {
-  id          String   @id @default(uuid())
-  name        String
-  description String   @db.Text
-  category    String
-  isPrivate   Boolean  @default(false)
-  coverImage  String?
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  createdBy   Agent              @relation("GroupCreator", fields: [createdById], references: [id])
-  members     CommunityGroupMember[]
-  posts       CommunityPost[]
-
-  @@index([category])
-  @@index([isPrivate])
-  @@index([createdAt])
-  @@map("community_groups")
-}
-
-model CommunityGroupMember {
-  id        String               @id @default(uuid())
-  groupId   String
-  agentId   String
-  role      GroupMemberRole      @default(MEMBER)
-  joinedAt  DateTime             @default(now())
-
-  // Relations
-  group     CommunityGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  agent     Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@unique([groupId, agentId])
-  @@index([groupId])
-  @@index([agentId])
-  @@map("community_group_members")
-}
-
-enum GroupMemberRole {
-  MEMBER
-  MODERATOR
-  ADMIN
-}
-
-// Badges & Achievements
-model AgentBadge {
-  id          String   @id @default(uuid())
-  agentId     String
-  badgeType   BadgeType
-  earnedAt    DateTime @default(now())
-  metadata    Json?
-
-  // Relations
-  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@unique([agentId, badgeType])
-  @@index([agentId])
-  @@index([badgeType])
-  @@map("agent_badges")
-}
-
-enum BadgeType {
-  FIRST_POST
-  FIRST_COMMENT
-  TOP_CONTRIBUTOR
-  HELPFUL_ANSWER
-  EXPERT_ADVISOR
-  MENTOR
-  COMMUNITY_LEADER
-  EARLY_ADOPTER
-  PERFECT_ATTENDANCE
-  MILESTONE_10_LEADS
-  MILESTONE_50_LEADS
-  MILESTONE_100_LEADS
-  MILESTONE_500_LEADS
-  HIGH_CONVERSION_RATE
-}
-
-// Community Events
-model CommunityEvent {
-  id           String              @id @default(uuid())
-  title        String
-  description  String              @db.Text
-  eventType    CommunityEventType
-  startTime    DateTime
-  endTime      DateTime
-  location     String?
-  isVirtual    Boolean             @default(true)
-  meetingLink  String?
-  maxAttendees Int?
-  coverImage   String?
-  hostId       String
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-
-  // Relations
-  host         Agent               @relation("EventHost", fields: [hostId], references: [id])
-  attendees    CommunityEventAttendee[]
-
-  @@index([eventType])
-  @@index([startTime])
-  @@index([hostId])
-  @@map("community_events")
-}
-
-enum CommunityEventType {
-  WEBINAR
-  WORKSHOP
-  TRAINING
-  NETWORKING
-  Q_AND_A
-  MEETUP
-}
-
-model CommunityEventAttendee {
-  id        String               @id @default(uuid())
-  eventId   String
-  agentId   String
-  status    EventAttendeeStatus  @default(REGISTERED)
-  joinedAt  DateTime?
-  createdAt DateTime             @default(now())
-
-  // Relations
-  event     CommunityEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  agent     Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@unique([eventId, agentId])
-  @@index([eventId])
-  @@index([agentId])
-  @@map("community_event_attendees")
-}
-
-enum EventAttendeeStatus {
-  REGISTERED
-  ATTENDED
-  NO_SHOW
-  CANCELLED
-}
-
-// Mentorship Program
-model MentorshipRelationship {
-  id          String              @id @default(uuid())
-  mentorId    String
-  menteeId    String
-  status      MentorshipStatus    @default(PENDING)
-  startedAt   DateTime?
-  endedAt     DateTime?
-  notes       String?             @db.Text
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-
-  // Relations
-  mentor      Agent               @relation("Mentor", fields: [mentorId], references: [id])
-  mentee      Agent               @relation("Mentee", fields: [menteeId], references: [id])
-  sessions    MentorshipSession[]
-
-  @@unique([mentorId, menteeId])
-  @@index([mentorId])
-  @@index([menteeId])
+  @@index([integrationId])
+  @@index([syncType])
   @@index([status])
-  @@map("mentorship_relationships")
+  @@index([startedAt])
+  @@index([completedAt])
+  @@map("crm_sync_logs")
 }
 
-enum MentorshipStatus {
-  PENDING
-  ACTIVE
+model DataImportJob {
+  id                  String              @id @default(uuid())
+  integrationId       String?
+  name                String
+  importType          ImportType
+  status              ImportStatus
+  fileName            String?
+  fileUrl             String?
+  fileMimeType        String?
+  fileSize            Int?
+  totalRows           Int                 @default(0)
+  processedRows       Int                 @default(0)
+  successRows         Int                 @default(0)
+  failedRows          Int                 @default(0)
+  skippedRows         Int                 @default(0)
+  duplicateRows       Int                 @default(0)
+  validationErrors    Json?
+  fieldMapping        Json?
+  options             Json?
+  scheduledFor        DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  duration            Int?
+  errorMessage        String?
+  createdBy           String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  integration         CrmIntegration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  importRecords       DataImportRecord[]
+
+  @@index([integrationId])
+  @@index([importType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([startedAt])
+  @@index([completedAt])
+  @@map("data_import_jobs")
+}
+
+model DataImportRecord {
+  id                  String              @id @default(uuid())
+  importJobId         String
+  rowNumber           Int
+  status              ImportRecordStatus
+  leadId              String?
+  sourceData          Json
+  transformedData     Json?
+  validationErrors    Json?
+  errorMessage        String?
+  isDuplicate         Boolean             @default(false)
+  duplicateOfId       String?
+  createdAt           DateTime            @default(now())
+
+  importJob           DataImportJob       @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  lead                Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([importJobId])
+  @@index([status])
+  @@index([leadId])
+  @@index([isDuplicate])
+  @@map("data_import_records")
+}
+
+enum CrmProvider {
+  SALESFORCE
+  HUBSPOT
+  PIPEDRIVE
+  ZOHO
+  MICROSOFT_DYNAMICS
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  ERROR
+  PAUSED
+}
+
+enum SyncDirection {
+  INBOUND
+  OUTBOUND
+  BIDIRECTIONAL
+}
+
+enum SyncType {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum SyncLogStatus {
+  STARTED
+  IN_PROGRESS
   COMPLETED
+  FAILED
   CANCELLED
 }
 
-model MentorshipSession {
-  id             String                  @id @default(uuid())
-  relationshipId String
-  scheduledAt    DateTime
-  duration       Int                     // minutes
-  topic          String?
-  notes          String?                 @db.Text
-  status         MentorshipSessionStatus @default(SCHEDULED)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-
-  // Relations
-  relationship   MentorshipRelationship  @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
-
-  @@index([relationshipId])
-  @@index([scheduledAt])
-  @@map("mentorship_sessions")
+enum FieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  DATETIME
+  EMAIL
+  PHONE
+  URL
+  JSON
 }
 
-enum MentorshipSessionStatus {
-  SCHEDULED
-  COMPLETED
-  CANCELLED
-  NO_SHOW
+enum ImportType {
+  CSV
+  EXCEL
+  JSON
+  CRM_SYNC
+  API
 }
 
-// Agent Profile Extensions
-model AgentProfile {
-  id          String   @id @default(uuid())
-  agentId     String   @unique
-  bio         String?  @db.Text
-  avatar      String?
-  coverImage  String?
-  specialties String[]
-  interests   String[]
-  website     String?
-  linkedin    String?
-  twitter     String?
-  facebook    String?
-  isPublic    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@map("agent_profiles")
-}
-
-// Social Connections
-model AgentConnection {
-  id         String              @id @default(uuid())
-  followerId String
-  followingId String
-  status     ConnectionStatus    @default(PENDING)
-  createdAt  DateTime            @default(now())
-
-  // Relations
-  follower   Agent               @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
-  following  Agent               @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
-  @@map("agent_connections")
-}
-
-enum ConnectionStatus {
+enum ImportStatus {
   PENDING
-  ACCEPTED
-  BLOCKED
+  VALIDATING
+  VALIDATED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ImportRecordStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+  DUPLICATE
 }

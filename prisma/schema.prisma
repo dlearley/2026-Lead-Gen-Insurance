@@ -33,10 +33,7 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
-  enrichmentProfile LeadEnrichmentProfile?
-  personalizedOffers PersonalizedOffer[]
-  coachingSuggestions CoachingSuggestion[]
-  riskValidations RiskValidationResult[]
+  importRecords   DataImportRecord[]
 
   // Indexes for performance
   @@index([email])
@@ -243,244 +240,238 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// ========================================
-// LEAD ENRICHMENT & PERSONALIZATION MODELS (Phase 16.3.7)
-// ========================================
-
-// DataProvider - Third-party data enrichment providers
-model DataProvider {
-  id                  String   @id @default(uuid())
+// CRM Integration model - stores CRM connection configurations
+model CrmIntegration {
+  id                  String              @id @default(uuid())
   name                String
-  type                String   // zoominfo, apollo, clearbit, etc.
-  description         String?
-  apiEndpoint         String?
+  provider            CrmProvider
+  isActive            Boolean             @default(true)
+  isConnected         Boolean             @default(false)
+  accessToken         String?
+  refreshToken        String?
+  tokenExpiresAt      DateTime?
+  instanceUrl         String?
   apiKey              String?
   apiSecret           String?
-  rateLimitPerMinute  Int?
-  rateLimitPerDay     Int?
-  status              String   @default("active")
-  priority            Int      @default(0)
-  cacheTtlMinutes     Int      @default(1440) // 24 hours default
-  isEnabled           Boolean  @default(true)
-  lastSuccessfulAt    DateTime?
-  lastErrorAt         DateTime?
-  lastErrorMessage    String?
-  totalCalls          Int      @default(0)
-  failedCalls         Int      @default(0)
-  successRate         Float    @default(1.0)
-  config              Json?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  webhookSecret       String?
+  lastSyncAt          DateTime?
+  syncStatus          SyncStatus          @default(IDLE)
+  syncDirection       SyncDirection       @default(BIDIRECTIONAL)
+  syncFrequency       Int                 @default(3600) // seconds
+  autoSync            Boolean             @default(true)
+  errorCount          Int                 @default(0)
+  lastError           String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   // Relationships
-  enrichmentProfiles  LeadEnrichmentProfile[]
+  fieldMappings       CrmFieldMapping[]
+  syncLogs            CrmSyncLog[]
+  importJobs          DataImportJob[]
 
   // Indexes
-  @@index([type])
-  @@index([status])
-  @@index([isEnabled])
-  @@index([priority])
-}
-
-// LeadEnrichmentProfile - Cached enriched lead data
-model LeadEnrichmentProfile {
-  id                  String   @id @default(uuid())
-  leadId              String   @unique
-  enrichmentVersion   Int      @default(1)
-  demographics        Json?    // EnrichmentDemographics
-  firmographics       Json?    // EnrichmentFirmographics
-  behavioral          Json?    // EnrichmentBehavioral
-  risk                Json?    // EnrichmentRisk
-  propertyData        Json?    // EnrichmentProperty
-  vehicleData         Json?    // EnrichmentVehicle[]
-  confidenceScore     Float    @default(0.0)
-  dataSources         String[] // Provider IDs
-  dataFreshness       Json?    // Map of field -> {enrichedAt, providerId, expiresAt}
-  dataConflicts       Json?    // DataConflict[]
-  enrichmentMetadata  Json     // Total data points, duration, etc.
-  lastEnrichedAt      DateTime @default(now())
-  expiresAt           DateTime
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  // Relationships
-  lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  dataProviders       DataProvider[] @relation("EnrichmentProviders")
-  personalizedOffers  PersonalizedOffer[]
-  coachingSuggestions CoachingSuggestion[]
-  riskValidations     RiskValidationResult[]
-
-  // Indexes
-  @@index([leadId])
-  @@index([confidenceScore])
-  @@index([lastEnrichedAt])
-  @@index([expiresAt])
-}
-
-// PersonalizedOffer - Recommended offers for leads
-model PersonalizedOffer {
-  id                    String   @id @default(uuid())
-  leadId                String
-  callId                String?
-  tier                  String   // primary, secondary, tertiary
-  offerType             String   // auto, home, life, health, commercial, bundle
-  title                 String
-  description           String
-  coverageDetails       Json
-  premium               Json     // {amount, currency, frequency}
-  coverageLimits        Json
-  deductibles           Json
-  reasoning             Json[]   // OfferReasoning[]
-  fitScore              Float    @default(0.0)
-  confidence            Float    @default(0.0)
-  estimatedConversionProbability Float @default(0.0)
-  competitiveAdvantages String[]
-  abTestVariant         String?
-  validUntil            DateTime
-  status                String   @default("suggested")
-  metadata              Json?
-  presentedAt           DateTime?
-  acceptedAt            DateTime?
-  rejectedAt            DateTime?
-  rejectionReason       String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // Relationships
-  lead                  Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  enrichmentProfile     LeadEnrichmentProfile @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  acceptanceHistory     OfferAcceptanceHistory[]
-
-  // Indexes
-  @@index([leadId])
-  @@index([callId])
-  @@index([offerType])
-  @@index([tier])
-  @@index([status])
-  @@index([validUntil])
+  @@index([provider])
+  @@index([isActive])
+  @@index([isConnected])
+  @@index([syncStatus])
   @@index([createdAt])
 }
 
-// OfferAcceptanceHistory - Track offer conversion outcomes
-model OfferAcceptanceHistory {
-  id                  String   @id @default(uuid())
-  offerId             String
-  leadId              String
-  agentId             String?
-  callId              String?
-  status              String
-  presentedAt         DateTime
-  acceptedAt          DateTime?
-  rejectedAt          DateTime?
-  rejectionReason     String?
-  agentFeedback       String?
-  outcomeMetadata     Json?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+// CRM Field Mapping model - stores field mapping configurations
+model CrmFieldMapping {
+  id                  String              @id @default(uuid())
+  integrationId       String
+  sourceField         String
+  targetField         String
+  fieldType           FieldType
+  isRequired          Boolean             @default(false)
+  defaultValue        String?
+  transformFunction   String?
+  validationRules     Json?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   // Relationships
-  offer               PersonalizedOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   // Indexes
-  @@index([offerId])
-  @@index([leadId])
-  @@index([agentId])
-  @@index([callId])
-  @@index([status])
-  @@index([presentedAt])
+  @@index([integrationId])
+  @@index([sourceField])
+  @@index([targetField])
+  @@unique([integrationId, sourceField, targetField])
 }
 
-// CoachingSuggestion - Real-time coaching for agents
-model CoachingSuggestion {
-  id                    String   @id @default(uuid())
-  leadId                String
-  callId                String?
-  agentId               String?
-  type                  String   // sentiment_adjustment, objection_handling, etc.
-  title                 String
-  content               String
-  suggestedScript       String?
-  talkingPoints         String[]
-  confidence            String   // high, medium, low
-  priority              String   @default("medium")
-  triggeredBy           Json[]   // SuggestionTrigger[]
-  context               Json     // SuggestionContext
-  estimatedImpact       String
-  expiresAt             DateTime
-  status                String   @default("pending")
-  acknowledgedAt        DateTime?
-  usedAt                DateTime?
-  dismissedAt           DateTime?
-  feedback              Json?    // SuggestionFeedback
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+// CRM Sync Log model - tracks synchronization history
+model CrmSyncLog {
+  id                  String              @id @default(uuid())
+  integrationId       String
+  syncType            SyncType
+  direction           SyncDirection
+  status              SyncLogStatus
+  recordsProcessed    Int                 @default(0)
+  recordsSuccess      Int                 @default(0)
+  recordsFailed       Int                 @default(0)
+  recordsSkipped      Int                 @default(0)
+  startedAt           DateTime            @default(now())
+  completedAt         DateTime?
+  duration            Int?                // milliseconds
+  errorMessage        String?
+  errorDetails        Json?
+  metadata            Json?
 
   // Relationships
-  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  enrichmentProfile     LeadEnrichmentProfile @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   // Indexes
-  @@index([leadId])
-  @@index([callId])
-  @@index([agentId])
-  @@index([type])
+  @@index([integrationId])
+  @@index([syncType])
   @@index([status])
-  @@index([priority])
-  @@index([expiresAt])
+  @@index([startedAt])
+  @@index([completedAt])
+}
+
+// Data Import Job model - manages bulk data imports
+model DataImportJob {
+  id                  String              @id @default(uuid())
+  integrationId       String?
+  name                String
+  importType          ImportType
+  status              ImportStatus
+  fileName            String?
+  fileUrl             String?
+  fileMimeType        String?
+  fileSize            Int?
+  totalRows           Int                 @default(0)
+  processedRows       Int                 @default(0)
+  successRows         Int                 @default(0)
+  failedRows          Int                 @default(0)
+  skippedRows         Int                 @default(0)
+  duplicateRows       Int                 @default(0)
+  validationErrors    Json?
+  fieldMapping        Json?
+  options             Json?
+  scheduledFor        DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  duration            Int?                // milliseconds
+  errorMessage        String?
+  createdBy           String?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Relationships
+  integration         CrmIntegration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  importRecords       DataImportRecord[]
+
+  // Indexes
+  @@index([integrationId])
+  @@index([importType])
+  @@index([status])
   @@index([createdAt])
+  @@index([startedAt])
+  @@index([completedAt])
 }
 
-// RiskValidationResult - Fraud and compliance validation
-model RiskValidationResult {
-  id                    String   @id @default(uuid())
-  leadId                String
-  validationType        String   // fraud, compliance, quality
-  overallRiskScore      Float    @default(0.0)
-  severity              String   // low, medium, high, critical
-  isApproved            Boolean  @default(true)
-  requiresReview        Boolean  @default(false)
-  autoEscalate          Boolean  @default(false)
-  validationChecks      Json[]   // ValidationCheck[]
-  validationMetadata    Json     // checksPerformed, passed, failed, duration
-  validatedAt           DateTime @default(now())
-  expiresAt             DateTime
-  createdAt             DateTime @default(now())
+// Data Import Record model - stores individual import record details
+model DataImportRecord {
+  id                  String              @id @default(uuid())
+  importJobId         String
+  rowNumber           Int
+  status              ImportRecordStatus
+  leadId              String?
+  sourceData          Json
+  transformedData     Json?
+  validationErrors    Json?
+  errorMessage        String?
+  isDuplicate         Boolean             @default(false)
+  duplicateOfId       String?
+  createdAt           DateTime            @default(now())
 
   // Relationships
-  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  enrichmentProfile     LeadEnrichmentProfile @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  importJob           DataImportJob       @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  lead                Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   // Indexes
+  @@index([importJobId])
+  @@index([status])
   @@index([leadId])
-  @@index([validationType])
-  @@index([severity])
-  @@index([isApproved])
-  @@index([validatedAt])
+  @@index([isDuplicate])
 }
 
-// PersonalizationEffectivenessMetrics - Analytics tracking
-model PersonalizationEffectivenessMetrics {
-  id                    String   @id @default(uuid())
-  periodStart           DateTime
-  periodEnd             DateTime
-  leadsWithPersonalization      Int      @default(0)
-  leadsWithoutPersonalization   Int      @default(0)
-  conversionWithPersonalization Int      @default(0)
-  conversionWithoutPersonalization Int  @default(0)
-  conversionUplift      Float    @default(0.0)
-  conversionUpliftAbsolute Float  @default(0.0)
+// Enums for CRM Integration
+enum CrmProvider {
+  SALESFORCE
+  HUBSPOT
+  PIPEDRIVE
+  ZOHO
+  MICROSOFT_DYNAMICS
+}
 
-  offerMetrics          Json
-  suggestionMetrics     Json
-  sentimentMetrics      Json
-  costMetrics           Json
-  topPerformingCombinations Json[]
+enum SyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  ERROR
+  PAUSED
+}
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+enum SyncDirection {
+  INBOUND
+  OUTBOUND
+  BIDIRECTIONAL
+}
 
-  // Indexes
-  @@index([periodStart])
-  @@index([periodEnd])
-  @@unique([periodStart, periodEnd])
+enum SyncType {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum SyncLogStatus {
+  STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum FieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  DATETIME
+  EMAIL
+  PHONE
+  URL
+  JSON
+}
+
+enum ImportType {
+  CSV
+  EXCEL
+  JSON
+  CRM_SYNC
+  API
+}
+
+enum ImportStatus {
+  PENDING
+  VALIDATING
+  VALIDATED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ImportRecordStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+  DUPLICATE
 }
