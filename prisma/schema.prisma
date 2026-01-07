@@ -1,9 +1,5 @@
 // Prisma schema for Insurance Lead Generation AI Platform
 // This schema defines the relational data model for PostgreSQL
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
 
 generator client {
   provider = "prisma-client-js"
@@ -218,9 +214,9 @@ model Lead {
   // Relationships
   assignments     LeadAssignment[]
   events          Event[]
-  
-  // Organization relationship
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  routingHistory  LeadRoutingHistory[]
+  assignmentQueue AssignmentQueue?
+  routingEvents   RoutingEvent[]
 
   // Indexes for performance
   @@index([email])
@@ -262,8 +258,10 @@ model Agent {
 
   // Relationships
   assignments         LeadAssignment[]
-  user                User? @relation(fields: [userId], references: [id])
-  organization        Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  specializationsDetail AgentSpecialization[]
+  availability        AgentAvailability?
+  routingHistory      LeadRoutingHistory[]
+  performanceMetrics  AgentPerformanceMetrics[]
 
   // Indexes
   @@index([email])
@@ -1139,37 +1137,214 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// New Enums for Organization Management
-enum OrganizationStatus {
-  PENDING       // Just created, not yet activated
-  ACTIVE        // Fully active
-  SUSPENDED     // Temporarily disabled
-  CANCELLED     // Permanently closed
+// ========================================
+// AGENT SPECIALIZATION (Phase 27.2)
+// ========================================
+
+model AgentSpecialization {
+  id                   String   @id @default(uuid())
+  agentId              String
+  insuranceLine        String   // Auto, Home, Life, Health, Commercial
+  customerSegment      String   // Individual, SMB, Enterprise
+  proficiencyLevel     Int      @default(1) // 1-5 (Novice to Expert)
+  maxConcurrentLeads   Int      @default(5)
+  languages            Json     // ['English', 'Spanish']
+  territories          Json     // ['CA', 'NY', 'TX']
+  isEliteAgent         Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  agent                Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, insuranceLine, customerSegment])
+  @@index([agentId])
+  @@index([insuranceLine])
+  @@index([customerSegment])
 }
 
-enum SubscriptionStatus {
-  PENDING       // Subscription not started
-  ACTIVE        // Active subscription
-  PAST_DUE      // Payment failed
-  CANCELLED     // Cancelled
-  EXPIRED       // Trial/period ended
+// ========================================
+// AGENT AVAILABILITY (Phase 27.2)
+// ========================================
+
+model AgentAvailability {
+  id              String   @id @default(uuid())
+  agentId         String   @unique
+  status          String   @default("Available") // Available, In_Call, Break, Training, Offline
+  currentLoad     Int      @default(0)
+  maxCapacity     Int
+  lastUpdated     DateTime @updatedAt
+  updatedAt       DateTime @updatedAt
+
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([status, currentLoad])
 }
 
-// Enhanced User Role system
-enum UserRole {
-  USER          // Basic user
-  AGENT         // Insurance agent (can view/leads)
-  MANAGER       // Team manager (can manage agents)
-  ADMIN         // Organization admin
-  SUPER_ADMIN   // Platform admin
-  VIEWER        // Read-only access
+// ========================================
+// LEAD ROUTING HISTORY (Phase 27.2)
+// ========================================
+
+model LeadRoutingHistory {
+  id                     String   @id @default(uuid())
+  leadId                 String
+  assignedAgentId        String
+  routingStrategy        String   @default("greedy") // greedy, optimal, reinforcement, manual
+  leadScore              Float
+  assignmentReason       Json
+  routingTimestamp       DateTime @default(now())
+  assignmentDurationHours Float?
+  conversionOutcome      Boolean?
+  assignmentQualityScore Float?
+  feedback               String?
+  createdAt              DateTime @default(now())
+
+  lead                   Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent                  Agent    @relation(fields: [assignedAgentId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([assignedAgentId])
+  @@index([routingTimestamp])
 }
 
-// Team Invitation Status
-enum InvitationStatus {
-  PENDING       // Sent but not accepted
-  ACCEPTED      // Accepted and processed
-  DECLINED      // Explicitly declined
-  EXPIRED       // Token expired
-  REVOKED       // Revoked by admin
+// ========================================
+// AGENT PERFORMANCE METRICS (Phase 27.2)
+// ========================================
+
+model AgentPerformanceMetrics {
+  id                       String   @id @default(uuid())
+  agentId                  String
+  periodDate               DateTime @db.Date
+  leadsAssigned            Int      @default(0)
+  leadsConverted           Int      @default(0)
+  conversionRate           Float    @default(0.0)
+  avgHandlingTimeMinutes   Float    @default(0.0)
+  customerSatisfactionRating Float @default(0.0)
+  crossSellRate           Float    @default(0.0)
+  upsellRate              Float    @default(0.0)
+  repeatCustomerRate      Float    @default(0.0)
+  avgLeadScore            Float    @default(0.0)
+  tier1ConversionRate     Float    @default(0.0)
+  tier2ConversionRate     Float    @default(0.0)
+  tier3ConversionRate     Float    @default(0.0)
+  updatedAt               DateTime @updatedAt
+
+  agent                   Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, periodDate])
+  @@index([agentId, periodDate(sort: Desc)])
+}
+
+// ========================================
+// ROUTING EXPERIMENTS (Phase 27.2)
+// ========================================
+
+model RoutingExperiment {
+  id                String   @id @default(uuid())
+  name              String
+  strategyType      String   // greedy, optimal, reinforcement, hybrid
+  description       String?
+  status            String   @default("active") // active, paused, completed, archived
+  trafficPercentage Float    @default(50.0)
+  startDate         DateTime
+  endDate           DateTime?
+  controlStrategyId String?
+  successMetric     String   @default("conversion_rate")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  controlStrategy   RoutingExperiment? @relation("ControlStrategy", fields: [controlStrategyId], references: [id], onDelete: SetNull)
+  variants          RoutingExperimentVariant[]
+  leadAssignments   LeadExperimentAssignment[]
+
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model RoutingExperimentVariant {
+  id                String   @id @default(uuid())
+  experimentId      String
+  name              String
+  strategy          String
+  parameters        Json
+  trafficAllocation Float    @default(50.0)
+  createdAt         DateTime @default(now())
+
+  experiment        RoutingExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  assignments       LeadExperimentAssignment[]
+
+  @@index([experimentId])
+}
+
+model LeadExperimentAssignment {
+  id           String   @id @default(uuid())
+  leadId       String
+  experimentId String
+  variantId    String
+  assignedAt   DateTime @default(now())
+
+  experiment   RoutingExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variant      RoutingExperimentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([experimentId, variantId])
+}
+
+// ========================================
+// ASSIGNMENT QUEUES (Phase 27.2)
+// ========================================
+
+model AssignmentQueue {
+  id                  String   @id @default(uuid())
+  queueType           String   @default("active") // hot, active, nurture, waiting, reassignment
+  leadId              String   @unique
+  leadScore           Float
+  timeInQueue         Interval @default("0 seconds")
+  assignmentAttempts  Int      @default(0)
+  lastAttempted       DateTime?
+  estimatedWaitMinutes Int
+  slaExpiry           DateTime?
+  queuePosition       Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  lead                Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([queueType, leadScore(sort: Desc)])
+  @@index([slaExpiry])
+}
+
+// ========================================
+// ROUTING RULES (Phase 27.2)
+// ========================================
+
+model RoutingRule {
+  id          String   @id @default(uuid())
+  ruleName    String
+  ruleType    String   // matching, capacity, geographic, business_logic, temporal
+  condition   Json
+  action      String
+  priority    Int      @default(50)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([priority(sort: Desc), isActive])
+}
+
+// ========================================
+// ROUTING EVENTS (Phase 27.2)
+// ========================================
+
+model RoutingEvent {
+  id         String   @id @default(uuid())
+  leadId     String
+  eventType  String   // assigned, reassigned, escalated, failed_assignment, sla_warning
+  agentId    String?
+  eventData  Json
+  timestamp  DateTime @default(now())
+
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, timestamp(sort: Desc)])
+  @@index([eventType])
 }

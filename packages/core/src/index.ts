@@ -13,6 +13,5 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// Copilot services
-export { CopilotService } from './services/copilot.service.js';
-export { CopilotSessionService } from './services/copilot-session.service.js';
+// Phase 27.2: Lead Prioritization & Routing Services
+export * from './services/index.js';

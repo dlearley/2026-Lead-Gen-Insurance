@@ -1,11 +1,9 @@
-// ========================================
-// UNDERWRITING & RECOMMENDATION SERVICES
-// ========================================
+// Phase 27.2: Intelligent Lead Prioritization & Real-Time Routing Services
 
-export { UnderwritingEngineService } from './underwriting-engine.service.js';
-export { CoverageGapService } from './coverage-gap.service.js';
-export { RecommendationEngineService } from './recommendation-engine.service.js';
-export { CrossSellUpsellService } from './cross-sell-upsell.service.js';
-export { RiskAssessmentService } from './risk-assessment.service.js';
-export { UnderwritingAnalyticsService } from './underwriting-analytics.service.js';
-export { RecommendationOptimizationService } from './recommendation-optimization.service.js';
+export { LeadPrioritizationService } from './lead-prioritization.service.js';
+export { AgentMatchingService } from './agent-matching.service.js';
+export { CapacityManagementService } from './capacity-management.service.js';
+export { RoutingEngineService } from './routing-engine.service.js';
+export { QueueManagementService } from './queue-management.service.js';
+export { RoutingAnalyticsService } from './routing-analytics.service.js';
+export { ABTestingService } from './ab-testing.service.js';

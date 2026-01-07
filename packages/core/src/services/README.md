@@ -1,238 +1,385 @@
-# NLP and Document Processing Services
+# Lead Prioritization & Routing Services
 
-This directory contains the Natural Language Intelligence and Document Processing services for the insurance lead generation platform.
+Phase 27.2: Intelligent Lead Prioritization & Real-Time Routing
+
+## Overview
+
+This package provides comprehensive services for intelligent lead routing, agent matching, capacity management, and A/B testing of routing strategies.
 
 ## Services
 
-### 1. Document Classification Service
-- **Location**: `document-classification.service.ts`
-- **Purpose**: Classify document types and extract text using OCR
-- **Key Features**: BERT-based classification, OCR text extraction, quality assessment
-- **Target Accuracy**: 95%+
+### 1. LeadPrioritizationService
 
-### 2. Entity Extraction Service
-- **Location**: `entity-extraction.service.ts`
-- **Purpose**: Extract insurance-specific entities from documents
-- **Key Features**: 15+ entity types, entity linking, confidence scoring
-- **Target F1 Score**: 90%+
-
-### 3. Conversation Analysis Service
-- **Location**: `conversation-analysis.service.ts`
-- **Purpose**: Analyze customer interactions for sentiment, intent, and emotions
-- **Key Features**: Speech-to-text, intent detection, sentiment analysis, emotion detection
-- **Target Accuracy**: 85%+
-
-### 4. Automated Note Generation Service
-- **Location**: `automated-note-generation.service.ts`
-- **Purpose**: Generate AI-powered notes from conversations and documents
-- **Key Features**: Summarization, action item extraction, quality scoring
-- **Target Quality**: 90%+
-
-### 5. Policy Summarization Service
-- **Location**: `policy-summarization.service.ts`
-- **Purpose**: Generate customer-friendly policy summaries
-- **Key Features**: Executive summary, coverage breakdown, plain English translation
-- **Target Coverage**: 90%+
-
-### 6. Document Validation Service
-- **Location**: `document-validation.service.ts`
-- **Purpose**: Validate document quality, completeness, and consistency
-- **Key Features**: Completeness check, readability assessment, validation rules
-- **Target Accuracy**: 95%+
-
-### 7. Semantic Document Search Service
-- **Location**: `semantic-document-search.service.ts`
-- **Purpose**: Provide semantic search across documents using embeddings
-- **Key Features**: Vector embeddings, similarity search, entity resolution
-- **Target Response Time**: <2 seconds
-
-### 8. Multi-Language Processing Service
-- **Location**: `multi-language-processing.service.ts`
-- **Purpose**: Support multi-language document and conversation processing
-- **Key Features**: Language detection, translation, multi-language NLP
-- **Supported Languages**: English, Spanish, Chinese, Vietnamese, Korean
-
-## Usage
+Handles lead scoring, tier assignment, and SLA tracking.
 
 ```typescript
-// Import services
+const leadPrioritization = new LeadPrioritizationService(prisma);
+
+// Calculate lead score (0-100)
+const score = await leadPrioritization.calculateLeadScore(leadId);
+
+// Get full scoring details
+const leadScore = await leadPrioritization.getLeadScore(leadId);
+
+// Assign tier based on score
+const tier = leadPrioritization.assignLeadTier(score); // Tier1, Tier2, Tier3, Tier4
+
+// Get SLA status
+const slaStatus = await leadPrioritization.getSLAStatus(leadId);
+```
+
+### 2. AgentMatchingService
+
+Finds and scores agents based on lead requirements.
+
+```typescript
+const agentMatching = new AgentMatchingService(prisma);
+
+// Find matching agents for a lead
+const matches = await agentMatching.findMatchingAgents(leadId);
+
+// Get agent capability profile
+const capability = await agentMatching.getAgentCapability(agentId);
+
+// Update agent specializations
+await agentMatching.updateAgentSpecializations(agentId, [
+  {
+    insuranceLine: 'Auto',
+    customerSegment: 'Individual',
+    proficiencyLevel: 4,
+    languages: ['English'],
+    territories: ['CA', 'NY'],
+  },
+]);
+```
+
+### 3. CapacityManagementService
+
+Manages real-time agent capacity and load balancing.
+
+```typescript
+const capacityManagement = new CapacityManagementService(prisma);
+
+// Get agent available capacity
+const available = await capacityManagement.getAvailableCapacity(agentId);
+
+// Update agent status
+await capacityManagement.updateAgentStatus(agentId, 'Available', 5);
+
+// Get capacity heatmap
+const heatmap = await capacityManagement.getCapacityHeatmap();
+
+// Get capacity forecast
+const forecast = await capacityManagement.getCapacityForecast(8); // 8 hours
+```
+
+### 4. RoutingEngineService
+
+Main routing engine with multiple strategies.
+
+```typescript
+const routingEngine = new RoutingEngineService(
+  prisma,
+  leadPrioritization,
+  agentMatching,
+  capacityManagement
+);
+
+// Route lead using greedy strategy
+const result = await routingEngine.routeLead(leadId, 'greedy');
+
+// Route lead using optimal batch strategy
+const results = await routingEngine.batchRouteLeads(leadIds, 'optimal');
+
+// Reassign lead to new agent
+const rerouteResult = await routingEngine.rerouteLead(leadId, 'Agent unavailable');
+
+// Get routing explanation
+const explanation = await routingEngine.getRoutingExplanation(leadId);
+```
+
+### 5. QueueManagementService
+
+Manages lead queues and automatic processing.
+
+```typescript
+const queueManagement = new QueueManagementService(
+  prisma,
+  leadPrioritization,
+  routingEngine
+);
+
+// Add lead to queue
+await queueManagement.enqueueLeadForAssignment(leadId, 'hot');
+
+// Process queue
+const assignedCount = await queueManagement.processQueue('hot', 10);
+
+// Get queue metrics
+const metrics = await queueManagement.getQueueMetrics('hot');
+
+// Get leads approaching SLA breach
+const atRiskLeads = await queueManagement.getApproachingSLALeads(60);
+
+// Escalate stale leads
+const escalatedCount = await queueManagement.escalateStaleLeads(24);
+```
+
+### 6. RoutingAnalyticsService
+
+Provides analytics and performance metrics.
+
+```typescript
+const routingAnalytics = new RoutingAnalyticsService(prisma);
+
+// Get overall routing metrics
+const metrics = await routingAnalytics.getRoutingMetrics({
+  start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+  end: new Date(),
+});
+
+// Get agent assignment quality
+const quality = await routingAnalytics.getAssignmentQuality(agentId, {
+  start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+  end: new Date(),
+});
+
+// Compare routing strategies
+const comparison = await routingAnalytics.compareRoutingStrategies({
+  start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+  end: new Date(),
+});
+
+// Identify improvements
+const improvements = await routingAnalytics.identifyImprovements();
+```
+
+### 7. ABTestingService
+
+A/B testing framework for routing strategies.
+
+```typescript
+const abTesting = new ABTestingService(prisma);
+
+// Create experiment
+const experiment = await abTesting.createExperiment(
+  {
+    name: 'Greedy vs Optimal Routing',
+    strategyType: 'hybrid',
+    trafficPercentage: 100,
+    startDate: new Date(),
+    successMetric: 'conversion_rate',
+  },
+  [
+    {
+      name: 'Greedy',
+      strategy: 'greedy',
+      trafficAllocation: 50,
+      parameters: {},
+    },
+    {
+      name: 'Optimal',
+      strategy: 'optimal',
+      trafficAllocation: 50,
+      parameters: {},
+    },
+  ]
+);
+
+// Assign lead to variant
+const variantId = await abTesting.assignLeadToVariant(leadId, experiment.id);
+
+// Get experiment metrics
+const metrics = await abTesting.getExperimentMetrics(experiment.id);
+
+// Determine winner
+const winner = await abTesting.determineWinner(experiment.id);
+
+// Promote winner to production
+await abTesting.promoteWinner(experiment.id);
+```
+
+## Quick Start
+
+### 1. Initialize Services
+
+```typescript
+import { PrismaClient } from '@prisma/client';
 import {
-  DocumentClassificationService,
-  EntityExtractionService,
-  ConversationAnalysisService,
-  AutomatedNoteGenerationService,
-  PolicySummarizationService,
-  DocumentValidationService,
-  SemanticDocumentSearchService,
-  MultiLanguageProcessingService
+  LeadPrioritizationService,
+  AgentMatchingService,
+  CapacityManagementService,
+  RoutingEngineService,
+  QueueManagementService,
+  RoutingAnalyticsService,
+  ABTestingService,
 } from '@insurance-lead-gen/core';
 
-// Initialize services
-const classificationService = new DocumentClassificationService();
-const entityService = new EntityExtractionService();
-const conversationService = new ConversationAnalysisService();
-const noteService = new AutomatedNoteGenerationService();
-const policyService = new PolicySummarizationService();
-const validationService = new DocumentValidationService();
-const searchService = new SemanticDocumentSearchService();
-const multiLangService = new MultiLanguageProcessingService();
+const prisma = new PrismaClient();
 
-// Use services
-const classification = await classificationService.classifyDocument('/path/to/doc.pdf');
-const entities = await entityService.extractEntities('doc-id', 'text');
-const analysis = await conversationService.analyzeConversation('conv-id', 'text');
-const note = await noteService.generateNoteFromConversation('conv-id', 'text', 'customer-id');
-const summary = await policyService.summarizePolicy('policy-id', 'policy-text');
-const quality = await validationService.assessDocumentQuality(document);
-const results = await searchService.semanticSearch('query');
-const language = await multiLangService.detectLanguage('text');
+// Initialize services
+const leadPrioritization = new LeadPrioritizationService(prisma);
+const agentMatching = new AgentMatchingService(prisma);
+const capacityManagement = new CapacityManagementService(prisma);
+const routingEngine = new RoutingEngineService(
+  prisma,
+  leadPrioritization,
+  agentMatching,
+  capacityManagement
+);
+const queueManagement = new QueueManagementService(
+  prisma,
+  leadPrioritization,
+  routingEngine
+);
+const routingAnalytics = new RoutingAnalyticsService(prisma);
+const abTesting = new ABTestingService(prisma);
+```
+
+### 2. Route a Lead
+
+```typescript
+// Route lead to best agent
+const result = await routingEngine.routeLead(leadId, 'greedy');
+
+if (result.success) {
+  console.log(`Lead assigned to agent: ${result.assignedAgentId}`);
+  console.log(`SLA met: ${result.slaMet}`);
+  console.log(`Score: ${result.score}`);
+} else {
+  console.log(`Lead added to queue: ${result.queueType}`);
+}
+```
+
+### 3. Process Queues
+
+```typescript
+// Process hot queue (assign up to 10 leads)
+const assignedCount = await queueManagement.processQueue('hot', 10);
+
+console.log(`Assigned ${assignedCount} leads from hot queue`);
+```
+
+### 4. Monitor Performance
+
+```typescript
+// Get routing metrics for last 30 days
+const metrics = await routingAnalytics.getRoutingMetrics({
+  start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+  end: new Date(),
+});
+
+console.log(`Total assignments: ${metrics.totalAssignments}`);
+console.log(`First attempt success rate: ${metrics.firstAttemptSuccessRate}%`);
+console.log(`Routing efficiency score: ${metrics.routingEfficiencyScore}`);
 ```
 
 ## Configuration
 
-Services can be configured with optional parameters:
+### Lead Scoring Weights
+
+Default weights can be customized:
 
 ```typescript
-// Document Classification Service
-const classificationService = new DocumentClassificationService({
-  ocrEngine: 'tesseract', // or 'aws-textract', 'google-vision'
-  classificationModel: 'bert-insurance-classifier'
-});
-
-// Entity Extraction Service
-const entityService = new EntityExtractionService({
-  nerModel: 'bert-insurance-ner'
-});
-
-// Conversation Analysis Service
-const conversationService = new ConversationAnalysisService({
-  transcriptionService: 'google-speech-to-text', // or 'aws-transcribe', 'deepgram'
-  intentModel: 'intent-classifier',
-  sentimentModel: 'sentiment-analyzer',
-  emotionModel: 'emotion-detector'
-});
-
-// Automated Note Generation Service
-const noteService = new AutomatedNoteGenerationService({
-  summarizationModel: 'bart-summarizer',
-  conversationAnalysisService: customConversationService
-});
-
-// Policy Summarization Service
-const policyService = new PolicySummarizationService({
-  summarizationModel: 't5-policy-summarizer',
-  entityExtractionService: customEntityService
-});
-
-// Semantic Document Search Service
-const searchService = new SemanticDocumentSearchService({
-  embeddingModel: 'openai-text-embedding-ada-002', // or 'huggingface-embeddings'
-  vectorDimension: 1536
-});
-
-// Multi-Language Processing Service
-const multiLangService = new MultiLanguageProcessingService({
-  translationService: 'google-translate', // or 'aws-translate', 'deepl'
-  languageDetectionModel: 'language-detector'
-});
+const scoringWeights = {
+  contactCompleteness: 0.15,
+  engagementLevel: 0.25,
+  budgetAlignment: 0.20,
+  timelineUrgency: 0.20,
+  insuranceKnowledge: 0.10,
+  competitivePosition: 0.10,
+};
 ```
 
-## Production Integration
+### Agent Matching Weights
 
-### ML Models
+Default fitness score weights:
 
-To integrate with real ML models:
+```typescript
+const matchingWeights = {
+  specializationMatch: 0.35,
+  performanceScore: 0.35,
+  availabilityBonus: 0.10,
+  capacityUtilization: 0.20,
+};
+```
 
-1. **Document Classification**:
-   - Deploy BERT-based model (HuggingFace)
-   - Use HuggingFace Inference API
-   - Fine-tune on insurance documents
+### Tier Thresholds
 
-2. **Entity Extraction**:
-   - Use spaCy with custom NER model
-   - Use HuggingFace token classification
-   - Fine-tune on insurance entity data
+Lead tiers based on score (0-100):
 
-3. **Intent/Sentiment Analysis**:
-   - Use HuggingFace models
-   - Use OpenAI API
-   - Fine-tune on conversation data
+- Tier 1 (Premium): 85-100 - SLA: 2 hours
+- Tier 2 (High): 70-85 - SLA: 24 hours
+- Tier 3 (Medium): 50-70 - SLA: 48 hours
+- Tier 4 (Nurture): 0-50 - SLA: 168 hours
 
-4. **Summarization**:
-   - Use BART or T5 models
-   - Use OpenAI API
-   - Fine-tune for insurance domain
+### Capacity Settings
 
-5. **OCR**:
-   - Install Tesseract: `npm install tesseract.js`
-   - Use AWS Textract or Google Vision API
+Default capacity limits:
 
-6. **Speech-to-Text**:
-   - Use Google Speech-to-Text API
-   - Use AWS Transcribe
-   - Use Deepgram
+- Elite agents: 8 concurrent leads
+- Standard agents: 5 concurrent leads
+- Target utilization: 75-85%
 
-7. **Embeddings**:
-   - Use OpenAI embeddings API
-   - Use HuggingFace sentence-transformers
-   - Store in vector database (Qdrant, Pinecone)
+## Error Handling
 
-### Dependencies
+All services throw errors for invalid operations:
 
-Add these dependencies for production use:
+```typescript
+try {
+  await routingEngine.routeLead(leadId, 'greedy');
+} catch (error) {
+  if (error.message.includes('Lead not found')) {
+    // Handle lead not found
+  } else if (error.message.includes('Agent not found')) {
+    // Handle agent not found
+  } else {
+    // Handle other errors
+  }
+}
+```
 
-```bash
-# OCR
-pnpm add tesseract.js
+## API Integration
 
-# OpenAI API
-pnpm add openai
+Services are integrated into the API via `apps/api/src/routes/routing-enhanced.ts`.
 
-# HuggingFace
-pnpm add @huggingface/inference
+Register routes:
 
-# Vector Database
-pnpm add qdrant-js-client
-# or
-pnpm add @pinecone-database/pinecone
+```typescript
+import routingEnhanced from './routes/routing-enhanced.js';
 
-# Translation
-pnpm add @google-cloud/translate
-# or
-pnpm add @aws-sdk/client-translate
+app.use('/api/v1/routing', routingEnhanced);
 ```
 
 ## Testing
 
-Each service includes comprehensive error handling and logging. Test using:
+Run tests:
 
-```typescript
-// Test document classification
-const classification = await classificationService.classifyDocument('test.pdf');
-console.log('Document type:', classification.documentType);
-console.log('Confidence:', classification.confidence);
+```bash
+# Unit tests
+npm test -- packages/core/src/services
 
-// Test entity extraction
-const entities = await entityService.extractEntities('doc-id', sampleText);
-console.log('Entities:', entities);
+# Integration tests
+npm test -- apps/api/src/routes/routing-enhanced
+```
 
-// Test conversation analysis
-const analysis = await conversationService.analyzeConversation('conv-id', sampleText);
-console.log('Intent:', analysis.primaryIntent);
-console.log('Sentiment:', analysis.overallSentiment);
+## Migration
+
+Run database migration:
+
+```bash
+# Apply migration
+psql -U postgres -d insurance_db \
+  -f prisma/migrations/20240101000000_add_routing_phase_27_2/migration.sql
 ```
 
 ## Documentation
 
-For complete documentation, see:
-- [Phase 27.5 Documentation](../../docs/PHASE_27.5.md)
-- [API Documentation](../../docs/API.md)
-- [Database Schema](../../prisma/schema.prisma)
+Full documentation available in `docs/PHASE_27.2.md`.
 
-## Notes
+## Support
 
-- Current implementation uses simulated ML models for development
-- Services are designed to integrate with actual ML models in production
-- All services include comprehensive logging for debugging and monitoring
-- Error handling follows project standards using BaseError class
-- Services are designed to be independent but can be composed for workflows
+For issues or questions:
+- Check `docs/PHASE_27.2.md` for detailed documentation
+- Review `PHASE_27.2_IMPLEMENTATION_SUMMARY.md` for implementation details
+- Check logs for detailed error messages
