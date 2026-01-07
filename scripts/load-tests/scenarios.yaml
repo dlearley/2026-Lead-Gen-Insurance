@@ -1,0 +1,51 @@
+scenarios:
+  baseline:
+    name: "Scenario 1: Baseline Load"
+    description: "Typical user behavior under normal conditions"
+    vus: 50
+    duration: "10m"
+    ramp_up: "1m"
+    slo:
+      p99_latency: 500
+      error_rate: 0.001
+
+  peak:
+    name: "Scenario 2: Peak Load"
+    description: "Peak traffic during busiest hours"
+    vus: 500
+    duration: "20m"
+    ramp_up: "5m"
+    slo:
+      p99_latency: 1000
+      error_rate: 0.005
+
+  spike:
+    name: "Scenario 3: Spike Test"
+    description: "Sudden traffic spike to test scalability"
+    vus: 1000
+    ramp_up: "2m"
+    duration: "5m"
+    ramp_down: "2m"
+    slo:
+      p99_latency: 2000
+      error_rate: 0.01
+
+  soak:
+    name: "Scenario 4: Soak Test"
+    description: "Extended duration to detect leaks and degradation"
+    vus: 200
+    duration: "4h"
+    ramp_up: "5m"
+    slo:
+      p99_latency: 700
+      error_rate: 0.002
+
+  stress:
+    name: "Scenario 5: Stress Test"
+    description: "Push beyond limits to find breaking point"
+    vus: 2000
+    duration: "15m"
+    ramp_up: "10m"
+    slo:
+      p99_latency: 5000
+      error_rate: 0.05

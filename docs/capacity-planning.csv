@@ -1,0 +1,5 @@
+Scenario,Concurrent Users,Daily Lead Volume,API Replicas,DS Replicas,DB Instance,Redis Nodes,Estimated Cost ($)
+Current Baseline,500,50000,2,2,db.r6i.xlarge,6,2500
+3 Months (4x),2000,200000,10,5,db.r6i.2xlarge,9,7500
+6 Months (10x),5000,500000,25,12,db.r6i.4xlarge,12,15000
+12 Months (20x),10000,1000000,50,25,db.r6i.8xlarge,18,30000
