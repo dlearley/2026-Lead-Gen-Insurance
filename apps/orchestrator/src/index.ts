@@ -10,7 +10,7 @@ import { NatsEventBus } from './nats/nats-event-bus.js';
 import { RankingService } from './services/ranking.service.js';
 import { RoutingService } from './services/routing.service.js';
 import { LeadRoutingWorkflow } from './services/lead-routing-workflow.js';
-import { OrchestrationService } from './services/orchestration.service.js';
+import knowledgeBaseRoutes from './routes/knowledge-base.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.orchestrator;
@@ -45,31 +45,8 @@ const start = async (): Promise<void> => {
     });
   });
 
-  // Orchestration endpoints
-  const orchestrationService = new OrchestrationService();
-
-  app.post('/api/orchestration/execute', async (req, res) => {
-    try {
-      const result = await orchestrationService.executeOrchestration(req.body);
-      res.json(result);
-    } catch (error) {
-      logger.error('Orchestration execution failed', { error });
-      res.status(500).json({ error: 'Orchestration execution failed' });
-    }
-  });
-
-  app.get('/api/orchestration/active', (req, res) => {
-    const active = orchestrationService.getAllActiveOrchestrations();
-    res.json({ active });
-  });
-
-  app.get('/api/orchestration/active/:requestId', (req, res) => {
-    const result = orchestrationService.getActiveOrchestration(req.params.requestId);
-    if (!result) {
-      return res.status(404).json({ error: 'Orchestration not found' });
-    }
-    res.json(result);
-  });
+  // Knowledge base routes
+  app.use('/api/v1/knowledge-base', knowledgeBaseRoutes);
 
   // Start Express server
   const server = app.listen(PORT, () => {

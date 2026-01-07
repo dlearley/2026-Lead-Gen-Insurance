@@ -28,7 +28,7 @@ import communityRouter from './routes/community.js';
 import communityNetworkRouter from './routes/community-network.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import orchestrationRouter from './routes/orchestration.js';
+import knowledgeBaseRouter from './routes/knowledge-base.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -82,7 +82,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/community-network', communityNetworkRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/orchestration', orchestrationRouter);
+  app.use('/api/v1/knowledge-base', knowledgeBaseRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
