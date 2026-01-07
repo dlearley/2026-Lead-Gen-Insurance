@@ -1,0 +1,566 @@
+name: Build Docker Images
+
+on:
+  workflow_run:
+    workflows: ["Enhanced CI"]
+    types:
+      - completed
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to build images for'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: insurance-lead-gen
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  # Pre-build validation
+  pre-build-validation:
+    name: Pre-build Validation
+    runs-on: ubuntu-latest
+    outputs:
+      should-continue: ${{ steps.validation.outputs.should-continue }}
+      image-tag: ${{ steps.tag.outputs.image-tag }}
+      image-tags: ${{ steps.tag.outputs.image-tags }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate workflow run status
+        id: validation
+        run: |
+          if [[ "${{ github.event.workflow_run.conclusion }}" == "success" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-continue=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate image tags
+        id: tag
+        run: |
+          # Base image tag from Git SHA
+          IMAGE_TAG="${{ github.sha }}"
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          
+          # Create comma-separated list of all tags
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          BRANCH_TAG="${{ github.ref_name }}"
+          if [[ "$BRANCH_TAG" == "main" ]]; then
+            BRANCH_TAG="latest"
+          elif [[ "$BRANCH_TAG" == "develop" ]]; then
+            BRANCH_TAG="staging"
+          fi
+          
+          # All tags for this image
+          TAGS="$IMAGE_TAG,$BRANCH_TAG,$TIMESTAMP"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            MANUAL_ENV="${{ github.event.inputs.environment }}"
+            TAGS="$TAGS,$MANUAL_ENV"
+          fi
+          
+          echo "image-tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "Generated tags: $TAGS"
+
+      - name: Verify Dockerfiles exist
+        run: |
+          SERVICES=("api" "backend" "data-service" "orchestrator" "frontend")
+          for service in "${SERVICES[@]}"; do
+            if [[ ! -f "apps/$service/Dockerfile" ]]; then
+              echo "::error::Dockerfile not found for service: $service"
+              exit 1
+            fi
+          done
+          echo "All Dockerfiles found"
+
+  # Security scanning for images
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-build-validation
+    if: needs.pre-build-validation.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Build API service image
+  build-api:
+    name: Build API Service Image
+    runs-on: ubuntu-latest
+    needs: [pre-build-validation, security-scan]
+    if: needs.pre-build-validation.outputs.should-continue == 'true'
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/api
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.ref_name }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Build and push API image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/api
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Scan API image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image }}
+          format: 'sarif'
+          output: 'api-trivy-results.sarif'
+
+      - name: Upload API image scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'api-trivy-results.sarif'
+
+  # Build Backend service image
+  build-backend:
+    name: Build Backend Service Image
+    runs-on: ubuntu-latest
+    needs: [pre-build-validation, security-scan]
+    if: needs.pre-build-validation.outputs.should-continue == 'true'
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.ref_name }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Build and push Backend image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Scan Backend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image }}
+          format: 'sarif'
+          output: 'backend-trivy-results.sarif'
+
+      - name: Upload Backend image scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'backend-trivy-results.sarif'
+
+  # Build Data Service image
+  build-data-service:
+    name: Build Data Service Image
+    runs-on: ubuntu-latest
+    needs: [pre-build-validation, security-scan]
+    if: needs.pre-build-validation.outputs.should-continue == 'true'
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/data-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.ref_name }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Build and push Data Service image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/data-service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Scan Data Service image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image }}
+          format: 'sarif'
+          output: 'data-service-trivy-results.sarif'
+
+      - name: Upload Data Service image scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'data-service-trivy-results.sarif'
+
+  # Build Orchestrator service image
+  build-orchestrator:
+    name: Build Orchestrator Service Image
+    runs-on: ubuntu-latest
+    needs: [pre-build-validation, security-scan]
+    if: needs.pre-build-validation.outputs.should-continue == 'true'
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/orchestrator
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.ref_name }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Build and push Orchestrator image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/orchestrator
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Scan Orchestrator image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image }}
+          format: 'sarif'
+          output: 'orchestrator-trivy-results.sarif'
+
+      - name: Upload Orchestrator image scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'orchestrator-trivy-results.sarif'
+
+  # Build Frontend image
+  build-frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    needs: [pre-build-validation, security-scan]
+    if: needs.pre-build-validation.outputs.should-continue == 'true'
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.ref_name }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Build and push Frontend image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/frontend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ needs.pre-build-validation.outputs.image-tag }}
+
+      - name: Scan Frontend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image }}
+          format: 'sarif'
+          output: 'frontend-trivy-results.sarif'
+
+      - name: Upload Frontend image scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'frontend-trivy-results.sarif'
+
+  # Build summary and notifications
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-api, build-backend, build-data-service, build-orchestrator, build-frontend]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Create build summary
+        run: |
+          echo "## Docker Image Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ needs.build-api.outputs.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status | Image | Digest |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.build-api.result }} | ${{ needs.build-api.outputs.image }} | ${needs.build-api.outputs.digest#sha256:} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | ${{ needs.build-backend.result }} | ${{ needs.build-backend.outputs.image }} | ${needs.build-backend.outputs.digest#sha256:} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Data Service | ${{ needs.build-data-service.result }} | ${{ needs.build-data-service.outputs.image }} | ${needs.build-data-service.outputs.digest#sha256:} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Orchestrator | ${{ needs.build-orchestrator.result }} | ${{ needs.build-orchestrator.outputs.image }} | ${needs.build-orchestrator.outputs.digest#sha256:} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.build-frontend.result }} | ${{ needs.build-frontend.outputs.image }} | ${needs.build-frontend.outputs.digest#sha256:} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Determine overall status
+          if [[ "${{ needs.build-api.result }}" == "success" && \
+                "${{ needs.build-backend.result }}" == "success" && \
+                "${{ needs.build-data-service.result }}" == "success" && \
+                "${{ needs.build-orchestrator.result }}" == "success" && \
+                "${{ needs.build-frontend.result }}" == "success" ]]; then
+            echo "✅ All images built and pushed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some images failed to build. Please check the logs." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send Slack notification on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "🚀 Docker Images Built Successfully",
+              attachments: [{
+                color: "good",
+                fields: [{
+                  title: "Branch",
+                  value: "${{ github.ref_name }}",
+                  short: true
+                }, {
+                  title: "Commit",
+                  value: "${{ github.sha }}",
+                  short: true
+                }, {
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }]
+              }]
+            }
+          channel: '#ci-cd'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send Slack notification on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "❌ Docker Image Build Failed",
+              attachments: [{
+                color: "danger",
+                fields: [{
+                  title: "Branch",
+                  value: "${{ github.ref_name }}",
+                  short: true
+                }, {
+                  title: "Commit",
+                  value: "${{ github.sha }}",
+                  short: true
+                }, {
+                  title: "Repository",
+                  value: "${{ github.repository }}",
+                  short: true
+                }]
+              }]
+            }
+          channel: '#ci-cd'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

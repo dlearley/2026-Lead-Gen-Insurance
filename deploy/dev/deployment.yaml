@@ -1,0 +1,136 @@
+# Development Environment Deployment Configuration
+
+namespace: dev
+replicas: 1
+
+# Resource limits for development environment
+resource_limits:
+  cpu: "500m"
+  memory: "1Gi"
+
+# Health check configuration
+health_checks:
+  liveness_probe:
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 5
+    failure_threshold: 3
+  readiness_probe:
+    initial_delay_seconds: 5
+    period_seconds: 5
+    timeout_seconds: 3
+    failure_threshold: 3
+
+# Service configuration
+services:
+  api:
+    port: 3000
+    target_port: 3000
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    
+  backend:
+    port: 3001
+    target_port: 3001
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    
+  data-service:
+    port: 3002
+    target_port: 3002
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+    
+  orchestrator:
+    port: 3003
+    target_port: 3003
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    
+  frontend:
+    port: 80
+    target_port: 3000
+    replicas: 1
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+
+# Environment variables
+environment_variables:
+  NODE_ENV: development
+  LOG_LEVEL: debug
+  ENABLE_CORS: true
+  ENABLE_RATE_LIMITING: false
+  DATABASE_POOL_SIZE: 5
+  REDIS_TTL: 3600
+
+# Security configuration
+security:
+  security_context:
+    run_as_non_root: true
+    run_as_user: 1000
+    read_only_root_filesystem: false
+    allow_privilege_escalation: false
+    capabilities:
+      drop:
+        - ALL
+
+# Ingress configuration
+ingress:
+  enabled: true
+  class_name: nginx
+  hosts:
+    - host: dev.insurance-lead-gen.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: dev-tls
+      hosts:
+        - dev.insurance-lead-gen.com
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  service_monitor:
+    enabled: true
+    interval: 30s
+  prometheus_rule:
+    enabled: true
+
+# Persistence configuration
+persistence:
+  enabled: false
+  # Development environment doesn't require persistent storage
+
+# Auto-scaling configuration (disabled for development)
+autoscaling:
+  enabled: false

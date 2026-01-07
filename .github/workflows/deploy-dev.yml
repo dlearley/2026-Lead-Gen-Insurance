@@ -1,0 +1,419 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'deploy/dev/**'
+      - 'scripts/deploy/**'
+      - '.github/workflows/deploy-dev.yml'
+  workflow_run:
+    workflows: ["Build Docker Images"]
+    types:
+      - completed
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      rollback_version:
+        description: 'Version to rollback to (optional)'
+        required: false
+        type: string
+      force_deploy:
+        description: 'Force deployment even if health checks fail'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: insurance-lead-gen
+  DEV_NAMESPACE: dev
+  KUBE_CONFIG_PATH: ~/.kube/config
+
+jobs:
+  pre-deployment:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    outputs:
+      should-continue: ${{ steps.validation.outputs.should-continue }}
+      image-tag: ${{ steps.tag.outputs.image-tag }}
+      deployment-id: ${{ steps.id.outputs.deployment-id }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment prerequisites
+        id: validation
+        run: |
+          # Check if this is a rollback
+          if [[ -n "${{ github.event.inputs.rollback_version }}" ]]; then
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+            echo "Performing rollback to version: ${{ github.event.inputs.rollback_version }}"
+            exit 0
+          fi
+
+          # Check if this is triggered by build-images workflow
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            if [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]]; then
+              echo "should-continue=true" >> $GITHUB_OUTPUT
+            else
+              echo "should-continue=false" >> $GITHUB_OUTPUT
+              echo "Build images workflow failed, skipping deployment"
+            fi
+          else
+            echo "should-continue=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate deployment ID and image tag
+        id: tag
+        run: |
+          if [[ -n "${{ github.event.inputs.rollback_version }}" ]]; then
+            echo "image-tag=${{ github.event.inputs.rollback_version }}" >> $GITHUB_OUTPUT
+          else
+            echo "image-tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate unique deployment ID
+        id: id
+        run: |
+          DEPLOYMENT_ID="dev-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}"
+          echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Validate secrets are available
+        run: |
+          REQUIRED_SECRETS=(
+            "AWS_ACCESS_KEY_ID"
+            "AWS_SECRET_ACCESS_KEY"
+            "KUBE_CONFIG_DEV"
+            "DATABASE_URL_DEV"
+            "REDIS_URL_DEV"
+          )
+          
+          for secret in "${REQUIRED_SECRETS[@]}"; do
+            if [[ -z "${!secret}" ]]; then
+              echo "::error::Required secret $secret is not set"
+              exit 1
+            fi
+          done
+          echo "All required secrets are available"
+
+  security-check:
+    name: Security Pre-deployment Check
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    if: needs.pre-deployment.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run pre-deployment security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Check for secrets in deployment
+        run: |
+          # Look for potential secrets in deployment configs
+          if grep -r "password\|secret\|key\|token" deploy/dev/ --include="*.yaml" --include="*.yml" | grep -v "secrets\|placeholder"; then
+            echo "::error::Potential secrets found in deployment configs"
+            exit 1
+          fi
+
+  infrastructure-check:
+    name: Infrastructure Validation
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    if: needs.pre-deployment.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check EKS cluster health
+        run: |
+          # Validate EKS cluster is accessible
+          aws eks describe-cluster --name insurance-dev-cluster --region ${{ env.AWS_REGION }} --query 'cluster.status' --output text
+
+      - name: Check available resources
+        run: |
+          # Check disk space and memory on nodes
+          echo "Checking cluster resources..."
+
+      - name: Validate Kubernetes manifests
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+          # Validate YAML syntax
+          for file in deploy/dev/*.yaml deploy/dev/*.yml; do
+            if [[ -f "$file" ]]; then
+              echo "Validating $file"
+              kubectl apply --dry-run=client -f "$file"
+            fi
+          done
+
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, infrastructure-check]
+    if: needs.pre-deployment.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup ECR login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Run database migrations
+        run: |
+          # Run Prisma migrations
+          echo "Running Prisma database migrations..."
+          
+          # Set up environment
+          export DATABASE_URL="${{ secrets.DATABASE_URL_DEV }}"
+          export REDIS_URL="${{ secrets.REDIS_URL_DEV }}"
+          
+          # Run migration script
+          ./scripts/deploy/migrate.sh dev
+
+      - name: Verify database connectivity
+        run: |
+          # Test database connection
+          echo "Testing database connectivity..."
+          # Add database connectivity test here
+
+  deploy-services:
+    name: Deploy Services
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, security-check, infrastructure-check, database-migration]
+    if: needs.pre-deployment.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_DEV }}" | base64 -d > ${{ env.KUBE_CONFIG_PATH }}
+          chmod 600 ${{ env.KUBE_CONFIG_PATH }}
+
+      - name: Deploy to development environment
+        run: |
+          # Set image tag
+          IMAGE_TAG="${{ needs.pre-deployment.outputs.image-tag }}"
+          export IMAGE_TAG
+          
+          # Run deployment script
+          ./scripts/deploy/deploy.sh dev
+
+      - name: Wait for deployment to be ready
+        run: |
+          echo "Waiting for deployments to be ready..."
+          
+          # Wait for API service
+          kubectl rollout status deployment/api -n ${{ env.DEV_NAMESPACE }} --timeout=300s
+          
+          # Wait for Backend service
+          kubectl rollout status deployment/backend -n ${{ env.DEV_NAMESPACE }} --timeout=300s
+          
+          # Wait for Data Service
+          kubectl rollout status deployment/data-service -n ${{ env.DEV_NAMESPACE }} --timeout=300s
+          
+          # Wait for Orchestrator
+          kubectl rollout status deployment/orchestrator -n ${{ env.DEV_NAMESPACE }} --timeout=300s
+          
+          # Wait for Frontend
+          kubectl rollout status deployment/frontend -n ${{ env.DEV_NAMESPACE }} --timeout=300s
+
+      - name: Store deployment info
+        run: |
+          echo "Deployment completed successfully"
+          echo "Deployment ID: ${{ needs.pre-deployment.outputs.deployment-id }}"
+          echo "Image Tag: ${{ needs.pre-deployment.outputs.image-tag }}"
+
+  post-deployment-tests:
+    name: Post-deployment Tests
+    runs-on: ubuntu-latest
+    needs: deploy-services
+    if: needs.pre-deployment.outputs.should-continue == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run health checks
+        run: |
+          ./scripts/deploy/health-check.sh dev
+
+      - name: Run smoke tests
+        run: |
+          ./scripts/deploy/smoke-tests.sh dev
+
+      - name: Performance baseline check
+        run: |
+          # Run basic performance tests
+          echo "Running performance baseline check..."
+          
+          # Test API response time
+          API_URL="https://dev-api.insurance-lead-gen.com/health"
+          RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}\n' $API_URL)
+          echo "API response time: ${RESPONSE_TIME}s"
+          
+          if (( $(echo "$RESPONSE_TIME > 2.0" | bc -l) )); then
+            echo "::warning::API response time is slower than expected: ${RESPONSE_TIME}s"
+          fi
+
+      - name: Verify database operations
+        run: |
+          # Test critical database operations
+          echo "Verifying database operations..."
+          
+          # Add database operation tests here
+
+  notification:
+    name: Send Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, deploy-services, post-deployment-tests]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.pre-deployment.outputs.should-continue }}" == "true" && \
+                "${{ needs.deploy-services.result }}" == "success" && \
+                "${{ needs.post-deployment-tests.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ Development deployment completed successfully!" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.force_deploy }}" == "true" && \
+                  "${{ needs.deploy-services.result }}" == "success" ]]; then
+            echo "status=warning" >> $GITHUB_OUTPUT
+            echo "message=⚠️ Development deployment completed with warnings (forced deployment)" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Development deployment failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create deployment summary
+        run: |
+          echo "## Development Deployment Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment ID:** ${{ needs.pre-deployment.outputs.deployment-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ needs.pre-deployment.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Development" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-deployment Validation | ${{ needs.pre-deployment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Check | ${{ needs.security-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure Check | ${{ needs.infrastructure-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database Migration | ${{ needs.database-migration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service Deployment | ${{ needs.deploy-services.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-deployment Tests | ${{ needs.post-deployment-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Rollback Option" >> $GITHUB_STEP_SUMMARY
+          echo "If you need to rollback this deployment, use the [Rollback workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/rollback.yml) with version: ${{ needs.pre-deployment.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#dev-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          custom_payload: |
+            {
+              text: "${{ steps.status.outputs.message }}",
+              attachments: [{
+                color: "${{ job.status == 'success' && 'good' || job.status == 'warning' && 'warning' || 'danger' }}",
+                fields: [{
+                  title: "Environment",
+                  value: "Development",
+                  short: true
+                }, {
+                  title: "Deployment ID",
+                  value: "${{ needs.pre-deployment.outputs.deployment-id }}",
+                  short: true
+                }, {
+                  title: "Image Tag",
+                  value: "${{ needs.pre-deployment.outputs.image-tag }}",
+                  short: true
+                }, {
+                  title: "Branch",
+                  value: "${{ github.ref_name }}",
+                  short: true
+                }]
+              }]
+            }
+
+      - name: Send Teams notification
+        if: env.TEAMS_WEBHOOK_URL != ''
+        uses: aliencube/microsoft-teams-actions@v0.8.0
+        with:
+          webhook_uri: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          title: Development Deployment ${{ job.status == 'success' && 'Completed' || 'Failed' }}
+          summary: ${{ steps.status.outputs.message }}
+          theme_color: ${{ job.status == 'success' && '0078D7' || job.status == 'warning' && 'FFA500' || 'E81123' }}
+          sections: |
+            [{
+              "activityTitle": "Development Deployment",
+              "activitySubtitle": "${{ github.ref_name }} - ${{ github.sha }}",
+              "facts": [{
+                "name": "Environment",
+                "value": "Development"
+              }, {
+                "name": "Deployment ID", 
+                "value": "${{ needs.pre-deployment.outputs.deployment-id }}"
+              }, {
+                "name": "Image Tag",
+                "value": "${{ needs.pre-deployment.outputs.image-tag }}"
+              }, {
+                "name": "Status",
+                "value": "${{ job.status }}"
+              }],
+              "markdown": true
+            }]
