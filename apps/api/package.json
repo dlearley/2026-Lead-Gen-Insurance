@@ -29,20 +29,8 @@
     "@opentelemetry/api": "^1.7.0",
     "@opentelemetry/auto-instrumentations-node": "^0.40.0",
     "@opentelemetry/exporter-jaeger": "^1.19.0",
-    "@opentelemetry/sdk-node": "^0.46.0",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.0",
-    "compression": "^1.7.4",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "helmet": "^7.1.0",
     "http-proxy-middleware": "^2.0.6",
-    "js-yaml": "^4.1.1",
-    "prom-client": "^15.1.0",
-    "rate-limiter-flexible": "^3.0.6",
-    "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1",
-    "zod": "^3.22.0"
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.3.0",

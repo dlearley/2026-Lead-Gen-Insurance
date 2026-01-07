@@ -21,6 +21,7 @@ import alertsRouter from './routes/alerts.js';
 import scoringRouter from './routes/scoring.js';
 import carriersRouter from './routes/carriers.js';
 import brokersRouter from './routes/brokers.js';
+import brokerAuthRouter from './routes/broker-auth.js';
 import integrationsRouter from './routes/integrations.js';
 import biRouter from './routes/bi.js';
 import vipRouter from './routes/vip.js';
@@ -76,6 +77,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/scoring', scoringRouter);
   app.use('/api/v1/carriers', carriersRouter);
   app.use('/api/v1/brokers', brokersRouter);
+  app.use('/api/brokers', brokerAuthRouter);
   app.use('/api/v1/integrations', integrationsRouter);
   app.use('/api/v1/bi', biRouter);
   app.use('/api/v1/vip', vipRouter);
