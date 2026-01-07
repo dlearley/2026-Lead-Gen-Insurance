@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Voice/Video Core Communication
-export * from './voice-video.js';
+// Broker Benchmarking (Phase 12.2)
+export * from './benchmark.js';

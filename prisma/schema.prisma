@@ -393,102 +393,139 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// Voice/Video Enums
-enum MediaSessionType {
-  VOICE
-  VIDEO
-  SCREEN_SHARE
-  BROADCAST
+// Performance Goal model - tracks broker performance goals
+model PerformanceGoal {
+  id            String            @id @default(uuid())
+  brokerId      String
+  category      PerformanceGoalCategory
+  targetValue   Float
+  currentValue  Float             @default(0)
+  progress      Float             @default(0)
+  deadline      DateTime
+  status        PerformanceGoalStatus @default(ON_TRACK)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([brokerId])
+  @@index([category])
+  @@index([status])
 }
 
-enum SessionStatus {
-  SCHEDULED
-  IN_PROGRESS
-  ENDED
-  FAILED
-  CANCELLED
+enum PerformanceGoalCategory {
+  CONVERSION
+  RESPONSE_TIME
+  REVENUE
+  RETENTION
+  CUSTOMER_SATISFACTION
 }
 
-enum ParticipantRole {
-  HOST
-  CO_HOST
-  PARTICIPANT
-  VIEWER
-  MODERATOR
+enum PerformanceGoalStatus {
+  ON_TRACK
+  AT_RISK
+  BEHIND
+  ACHIEVED
 }
 
-enum ParticipantStatus {
-  INVITED
-  JOINING
-  CONNECTED
-  DISCONNECTED
-  REMOVED
-  ERROR
+// Broker Network model - tracks broker network relationships
+model BrokerNetwork {
+  id                String   @id @default(uuid())
+  brokerId          String   @unique
+  networkTier       NetworkTier @default(BRONZE)
+  totalConnections  Int      @default(0)
+  activeConnections Int      @default(0)
+  networkValue      Float    @default(0.0)
+  networkScore      Float    @default(0.0)
+  referralMultiplier Float   @default(1.0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
-enum RecordingFormat {
-  MP4
-  WEBM
-  MP3
-  WAV
-  M4A
+enum NetworkTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
 }
 
-enum RecordingStatus {
-  STARTED
-  IN_PROGRESS
-  STOPPED
-  COMPLETED
-  FAILED
-  PROCESSING
-  READY
-  DELETED
+// Broker Connection model - tracks connections between brokers
+model BrokerConnection {
+  id                 String    @id @default(uuid())
+  brokerId           String
+  connectedBrokerId  String
+  relationshipType   BrokerRelationshipType @default(DIRECT_REFERRAL)
+  strength           Float     @default(0.5)
+  isActive           Boolean   @default(true)
+  referralCount      Int       @default(0)
+  revenueGenerated   Float     @default(0.0)
+  lastReferralAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([brokerId, connectedBrokerId])
+  @@index([brokerId])
+  @@index([connectedBrokerId])
+  @@index([isActive])
 }
 
-enum RecordingQuality {
-  LOW
-  MEDIUM
-  HIGH
-  HD
-  FULL_HD
-  _4K
+enum BrokerRelationshipType {
+  DIRECT_REFERRAL
+  CROSS_REFERRAL
+  MENTORSHIP
+  PARTNERSHIP
+  TEAM_MEMBER
+  TEAM_LEADER
+  NETWORK_MEMBER
 }
 
-enum CallEventType {
-  SESSION_STARTED
-  SESSION_ENDED
-  PARTICIPANT_JOINED
-  PARTICIPANT_LEFT
-  AUDIO_ENABLED
-  AUDIO_DISABLED
-  VIDEO_ENABLED
-  VIDEO_DISABLED
-  SCREEN_SHARE_STARTED
-  SCREEN_SHARE_STOPPED
-  RECORDING_STARTED
-  RECORDING_STOPPED
-  HAND_RAISED
-  HAND_LOWERED
-  CONNECTION_ESTABLISHED
-  CONNECTION_LOST
-  QUALITY_DEGRADED
-  QUALITY_IMPROVED
-  ERROR
+// Broker Referral model - tracks referrals between brokers
+model BrokerReferral {
+  id                  String    @id @default(uuid())
+  leadId              String
+  referringBrokerId   String
+  receivingBrokerId   String
+  status              BrokerReferralStatus @default(PENDING)
+  commissionRate      Float     @default(0.15)
+  commissionAmount    Float?
+  referralReason      String?
+  notes               String?
+  expiresAt           DateTime?
+  convertedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([referringBrokerId])
+  @@index([receivingBrokerId])
+  @@index([status])
 }
 
-enum SignalType {
-  OFFER
-  ANSWER
-  ICE_CANDIDATE
-  JOIN
-  LEAVE
-  MUTE
-  UNMUTE
-  START_SCREEN_SHARE
-  STOP_SCREEN_SHARE
-  HAND_RAISE
-  MESSAGE
-  CONNECTION_STATE
-  ROOM_UPDATE
-  ERROR
+enum BrokerReferralStatus {
+  PENDING
+  ACCEPTED
+  CONVERTED
+  DECLINED
+  EXPIRED
+}
+
+// Network Effect model - tracks network effects on broker performance
+model NetworkEffect {
+  id               String    @id @default(uuid())
+  sourceBrokerId   String
+  affectedBrokerId String
+  effectType       NetworkEffectType
+  value            Float
+  description      String
+  timestamp        DateTime  @default(now())
+  metadata         Json?
+
+  @@index([sourceBrokerId])
+  @@index([affectedBrokerId])
+  @@index([effectType])
+}
+
+enum NetworkEffectType {
+  REFERRAL_BOOST
+  KNOWLEDGE_SHARING
+  RESOURCE_SHARING
+  MARKET_EXPANSION
 }
