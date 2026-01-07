@@ -15,3 +15,4 @@ export * from './vip.js';
 export * from './community.js';
 export * from './copilot.js';
 export * from './claims.js';
+export * from './underwriting.js';

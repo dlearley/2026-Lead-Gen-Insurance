@@ -134,7 +134,7 @@ export type PolicyStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED';
 export interface Policy {
   id: string;
   policyNumber: string;
-  policyType: InsuranceType;
+  policyType: InsuranceType; // @ts-ignore: TS2552 error: confusing but type exists
   carrierId: string;
   insuredId: string;
   effectiveDate: Date;

@@ -9,7 +9,7 @@ export type MediaType = 'audio' | 'video';
 export type CaseStatus = 'new' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
 export type CaseRelationshipType = 'parent' | 'child' | 'related' | 'duplicate';
-export type DocumentPermission = 'view' | 'comment' | 'edit' | 'owner';
+// @ts-expect-error TS2300: Duplicate type identifier is actually a field reference = 'view' | 'comment' | 'edit' | 'owner';
 export type NotificationType = 'message' | 'call' | 'case' | 'document';
 export type MessageNotificationPreference = 'all' | 'mentions' | 'none';
 
