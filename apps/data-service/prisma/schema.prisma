@@ -1084,230 +1084,446 @@ enum Direction {
 }
 
 // ========================================
-// CRM INTEGRATION (Phase 15.1.2)
+// PHASE 12.5: COMMUNITY NETWORK EFFECTS
 // ========================================
 
-model CrmIntegration {
-  id                  String              @id @default(uuid())
-  name                String
-  provider            CrmProvider
-  isActive            Boolean             @default(true)
-  isConnected         Boolean             @default(false)
-  accessToken         String?
-  refreshToken        String?
-  tokenExpiresAt      DateTime?
-  instanceUrl         String?
-  apiKey              String?
-  apiSecret           String?
-  webhookSecret       String?
-  lastSyncAt          DateTime?
-  syncStatus          SyncStatus          @default(IDLE)
-  syncDirection       SyncDirection       @default(BIDIRECTIONAL)
-  syncFrequency       Int                 @default(3600)
-  autoSync            Boolean             @default(true)
-  errorCount          Int                 @default(0)
-  lastError           String?
-  metadata            Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+// Connection & Following
+model Connection {
+  id           String           @id @default(uuid())
+  requesterId  String
+  addresseeId  String
+  status       ConnectionStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
-  fieldMappings       CrmFieldMapping[]
-  syncLogs            CrmSyncLog[]
-  importJobs          DataImportJob[]
-
-  @@index([provider])
-  @@index([isActive])
-  @@index([isConnected])
-  @@index([syncStatus])
-  @@index([createdAt])
-  @@map("crm_integrations")
-}
-
-model CrmFieldMapping {
-  id                  String              @id @default(uuid())
-  integrationId       String
-  sourceField         String
-  targetField         String
-  fieldType           FieldType
-  isRequired          Boolean             @default(false)
-  defaultValue        String?
-  transformFunction   String?
-  validationRules     Json?
-  metadata            Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-
-  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@index([integrationId])
-  @@index([sourceField])
-  @@index([targetField])
-  @@unique([integrationId, sourceField, targetField])
-  @@map("crm_field_mappings")
-}
-
-model CrmSyncLog {
-  id                  String              @id @default(uuid())
-  integrationId       String
-  syncType            SyncType
-  direction           SyncDirection
-  status              SyncLogStatus
-  recordsProcessed    Int                 @default(0)
-  recordsSuccess      Int                 @default(0)
-  recordsFailed       Int                 @default(0)
-  recordsSkipped      Int                 @default(0)
-  startedAt           DateTime            @default(now())
-  completedAt         DateTime?
-  duration            Int?
-  errorMessage        String?
-  errorDetails        Json?
-  metadata            Json?
-
-  integration         CrmIntegration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@index([integrationId])
-  @@index([syncType])
+  @@index([requesterId])
+  @@index([addresseeId])
   @@index([status])
-  @@index([startedAt])
-  @@index([completedAt])
-  @@map("crm_sync_logs")
+  @@unique([requesterId, addresseeId])
+  @@map("connections")
 }
 
-model DataImportJob {
-  id                  String              @id @default(uuid())
-  integrationId       String?
-  name                String
-  importType          ImportType
-  status              ImportStatus
-  fileName            String?
-  fileUrl             String?
-  fileMimeType        String?
-  fileSize            Int?
-  totalRows           Int                 @default(0)
-  processedRows       Int                 @default(0)
-  successRows         Int                 @default(0)
-  failedRows          Int                 @default(0)
-  skippedRows         Int                 @default(0)
-  duplicateRows       Int                 @default(0)
-  validationErrors    Json?
-  fieldMapping        Json?
-  options             Json?
-  scheduledFor        DateTime?
-  startedAt           DateTime?
-  completedAt         DateTime?
-  duration            Int?
-  errorMessage        String?
-  createdBy           String?
-  metadata            Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+model AgentFollow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
 
-  integration         CrmIntegration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
-  importRecords       DataImportRecord[]
-
-  @@index([integrationId])
-  @@index([importType])
-  @@index([status])
-  @@index([createdAt])
-  @@index([startedAt])
-  @@index([completedAt])
-  @@map("data_import_jobs")
+  @@index([followerId])
+  @@index([followingId])
+  @@unique([followerId, followingId])
+  @@map("agent_follows")
 }
 
-model DataImportRecord {
-  id                  String              @id @default(uuid())
-  importJobId         String
-  rowNumber           Int
-  status              ImportRecordStatus
-  leadId              String?
-  sourceData          Json
-  transformedData     Json?
-  validationErrors    Json?
-  errorMessage        String?
-  isDuplicate         Boolean             @default(false)
-  duplicateOfId       String?
-  createdAt           DateTime            @default(now())
+// Mentorship
+model Mentor {
+  id                  String         @id @default(uuid())
+  agentId             String         @unique
+  specialties         String[]
+  bio                 String
+  yearsOfExperience   Int
+  maxMentees          Int            @default(5)
+  currentMentees      Int            @default(0)
+  status              MentorStatus   @default(AVAILABLE)
+  rating              Float          @default(0.0)
+  totalSessions       Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-  importJob           DataImportJob       @relation(fields: [importJobId], references: [id], onDelete: Cascade)
-  lead                Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  mentorshipRequests  MentorshipRequest[]
 
-  @@index([importJobId])
+  @@index([agentId])
   @@index([status])
+  @@map("mentors")
+}
+
+model MentorshipRequest {
+  id        String                    @id @default(uuid())
+  mentorId  String
+  menteeId  String
+  message   String
+  status    MentorshipRequestStatus   @default(PENDING)
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  mentor    Mentor                    @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  sessions  MentorshipSession[]
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([status])
+  @@map("mentorship_requests")
+}
+
+model MentorshipSession {
+  id                    String         @id @default(uuid())
+  mentorshipRequestId   String
+  scheduledAt           DateTime
+  durationMinutes       Int
+  status                SessionStatus  @default(SCHEDULED)
+  notes                 String?
+  rating                Int?
+  feedback              String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  mentorshipRequest     MentorshipRequest @relation(fields: [mentorshipRequestId], references: [id], onDelete: Cascade)
+
+  @@index([mentorshipRequestId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("mentorship_sessions")
+}
+
+// Community Groups
+model CommunityGroup {
+  id          String      @id @default(uuid())
+  name        String
+  description String
+  type        GroupType   @default(PUBLIC)
+  category    String?
+  region      String?
+  specialty   String?
+  coverImage  String?
+  createdBy   String
+  memberCount Int         @default(0)
+  postCount   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  memberships GroupMembership[]
+
+  @@index([createdBy])
+  @@index([type])
+  @@index([category])
+  @@index([region])
+  @@index([specialty])
+  @@map("community_groups")
+}
+
+model GroupMembership {
+  id        String           @id @default(uuid())
+  groupId   String
+  agentId   String
+  role      GroupMemberRole  @default(MEMBER)
+  status    MembershipStatus @default(ACTIVE)
+  joinedAt  DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  group     CommunityGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([agentId])
+  @@index([status])
+  @@unique([groupId, agentId])
+  @@map("group_memberships")
+}
+
+// Referral Network
+model AgentReferral {
+  id                   String         @id @default(uuid())
+  referrerId           String
+  refereeId            String
+  leadId               String
+  reason               String
+  status               ReferralStatus @default(PENDING)
+  commissionPercentage Float          @default(10.0)
+  commissionAmount     Float?
+  paidAt               DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([referrerId])
+  @@index([refereeId])
   @@index([leadId])
-  @@index([isDuplicate])
-  @@map("data_import_records")
+  @@index([status])
+  @@map("agent_referrals")
 }
 
-enum CrmProvider {
-  SALESFORCE
-  HUBSPOT
-  PIPEDRIVE
-  ZOHO
-  MICROSOFT_DYNAMICS
+// Events & Webinars
+model CommunityEvent {
+  id               String       @id @default(uuid())
+  title            String
+  description      String
+  type             EventType
+  status           EventStatus  @default(DRAFT)
+  hostId           String
+  startTime        DateTime
+  endTime          DateTime
+  timezone         String       @default("UTC")
+  maxAttendees     Int?
+  currentAttendees Int          @default(0)
+  meetingUrl       String?
+  recordingUrl     String?
+  materials        String[]
+  tags             String[]
+  coverImage       String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  registrations    EventRegistration[]
+
+  @@index([hostId])
+  @@index([type])
+  @@index([status])
+  @@index([startTime])
+  @@map("community_events")
 }
 
-enum SyncStatus {
-  IDLE
-  SYNCING
-  SUCCESS
-  ERROR
-  PAUSED
+model EventRegistration {
+  id           String             @id @default(uuid())
+  eventId      String
+  agentId      String
+  status       RegistrationStatus @default(REGISTERED)
+  registeredAt DateTime           @default(now())
+  attendedAt   DateTime?
+  rating       Int?
+  feedback     String?
+
+  event        CommunityEvent     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([agentId])
+  @@index([status])
+  @@unique([eventId, agentId])
+  @@map("event_registrations")
 }
 
-enum SyncDirection {
-  INBOUND
-  OUTBOUND
-  BIDIRECTIONAL
+// Reputation & Recognition
+model Badge {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  type        BadgeType
+  icon        String
+  criteria    Json
+  points      Int       @default(0)
+  rarity      Int       @default(1)
+  createdAt   DateTime  @default(now())
+
+  agentBadges AgentBadge[]
+
+  @@index([type])
+  @@map("badges")
 }
 
-enum SyncType {
-  FULL
-  INCREMENTAL
-  MANUAL
+model AgentBadge {
+  id        String   @id @default(uuid())
+  agentId   String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([badgeId])
+  @@unique([agentId, badgeId])
+  @@map("agent_badges")
 }
 
-enum SyncLogStatus {
-  STARTED
-  IN_PROGRESS
+model Endorsement {
+  id         String   @id @default(uuid())
+  agentId    String
+  endorserId String
+  skill      String
+  message    String?
+  createdAt  DateTime @default(now())
+
+  @@index([agentId])
+  @@index([endorserId])
+  @@index([skill])
+  @@unique([agentId, endorserId, skill])
+  @@map("endorsements")
+}
+
+model ExpertTopic {
+  id                String    @id @default(uuid())
+  agentId           String
+  topic             String
+  endorsementCount  Int       @default(0)
+  articlesWritten   Int       @default(0)
+  questionsAnswered Int       @default(0)
+  score             Float     @default(0.0)
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([agentId])
+  @@index([topic])
+  @@index([score])
+  @@unique([agentId, topic])
+  @@map("expert_topics")
+}
+
+model ActivityStreak {
+  id             String   @id @default(uuid())
+  agentId        String
+  streakType     String
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  lastActivityAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([streakType])
+  @@unique([agentId, streakType])
+  @@map("activity_streaks")
+}
+
+// Collaboration
+model Collaboration {
+  id              String               @id @default(uuid())
+  leadId          String
+  initiatorId     String
+  title           String
+  description     String
+  status          CollaborationStatus  @default(PROPOSED)
+  estimatedValue  Float
+  splitPercentage Json
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  completedAt     DateTime?
+
+  participants    CollaborationParticipant[]
+
+  @@index([leadId])
+  @@index([initiatorId])
+  @@index([status])
+  @@map("collaborations")
+}
+
+model CollaborationParticipant {
+  id               String        @id @default(uuid())
+  collaborationId  String
+  agentId          String
+  role             String
+  splitPercentage  Float
+  invitedAt        DateTime      @default(now())
+  acceptedAt       DateTime?
+  status           String        @default("INVITED")
+
+  collaboration    Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+
+  @@index([collaborationId])
+  @@index([agentId])
+  @@unique([collaborationId, agentId])
+  @@map("collaboration_participants")
+}
+
+model KnowledgeArticle {
+  id          String   @id @default(uuid())
+  authorId    String
+  title       String
+  content     String
+  category    String
+  tags        String[]
+  views       Int      @default(0)
+  upvotes     Int      @default(0)
+  downvotes   Int      @default(0)
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([category])
+  @@index([isPublished])
+  @@index([publishedAt])
+  @@map("knowledge_articles")
+}
+
+// Enums for Phase 12.5
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum MentorStatus {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
+enum MentorshipRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
   COMPLETED
-  FAILED
   CANCELLED
 }
 
-enum FieldType {
-  STRING
-  NUMBER
-  BOOLEAN
-  DATE
-  DATETIME
-  EMAIL
-  PHONE
-  URL
-  JSON
-}
-
-enum ImportType {
-  CSV
-  EXCEL
-  JSON
-  CRM_SYNC
-  API
-}
-
-enum ImportStatus {
-  PENDING
-  VALIDATING
-  VALIDATED
-  PROCESSING
+enum SessionStatus {
+  SCHEDULED
   COMPLETED
-  FAILED
+  CANCELLED
+  NO_SHOW
+}
+
+enum GroupType {
+  PUBLIC
+  PRIVATE
+  SECRET
+}
+
+enum GroupMemberRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CONVERTED
+  EXPIRED
+}
+
+enum EventType {
+  WEBINAR
+  WORKSHOP
+  TRAINING
+  NETWORKING
+  CONFERENCE
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ONGOING
+  COMPLETED
   CANCELLED
 }
 
-enum ImportRecordStatus {
-  PENDING
-  SUCCESS
-  FAILED
-  SKIPPED
-  DUPLICATE
+enum RegistrationStatus {
+  REGISTERED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+}
+
+enum BadgeType {
+  MILESTONE
+  ACHIEVEMENT
+  SKILL
+  PARTICIPATION
+  LEADERSHIP
+}
+
+enum CollaborationStatus {
+  PROPOSED
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }

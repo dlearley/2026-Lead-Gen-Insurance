@@ -25,7 +25,7 @@ import integrationsRouter from './routes/integrations.js';
 import biRouter from './routes/bi.js';
 import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
-import communityPhase125Router from './routes/community-phase-12-5.js';
+import communityNetworkRouter from './routes/community-network.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
 import partnersRouter from './routes/partners.js';
@@ -77,7 +77,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/bi', biRouter);
   app.use('/api/v1/vip', vipRouter);
   app.use('/api/v1/community', communityRouter);
-  app.use('/api/v1/community', communityPhase125Router);
+  app.use('/api/v1/community-network', communityNetworkRouter);
   app.use('/api/v1/claims', claimsRouter);
   app.use('/api/v1/partners', partnersRouter);
 
@@ -100,7 +100,7 @@ export function createApp(): express.Express {
   app.use('/api/bi', biRouter);
   app.use('/api/vip', vipRouter);
   app.use('/api/community', communityRouter);
-  app.use('/api/community', communityPhase125Router);
+  app.use('/api/community-network', communityNetworkRouter);
   app.use('/api/claims', claimsRouter);
   app.use('/api/partners', partnersRouter);
 

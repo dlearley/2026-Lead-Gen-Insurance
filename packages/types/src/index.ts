@@ -843,6 +843,4 @@ export * from './predictive-maintenance.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
-
-// NLP & Document Processing Types
-export * from './nlp.js';
+export * from './community-network.js';

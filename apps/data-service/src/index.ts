@@ -32,6 +32,7 @@ import { createRetentionRoutes } from './routes/retention.routes.js';
 import { createCampaignsRoutes } from './routes/campaigns.routes.js';
 import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
+import { createCommunityNetworkRoutes } from './routes/community-network.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import predictiveMaintenanceRoutes from './routes/predictive-maintenance.routes.js';
@@ -88,6 +89,7 @@ const start = async (): Promise<void> => {
   // Setup VIP and community routes
   app.use('/api/v1/vip', createVIPRoutes());
   app.use('/api/v1/community', createCommunityRoutes());
+  app.use('/api/v1/community-network', createCommunityNetworkRoutes());
 
   // Phase 12.5: enhanced community routes
   app.use('/api/v1/community/groups', createCommunityGroupsRoutes());
