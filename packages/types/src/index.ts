@@ -843,4 +843,6 @@ export * from './predictive-maintenance.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
-export * from './community-network.js';
+
+// Marketplace (Phase 12.6)
+export * from './marketplace.js';

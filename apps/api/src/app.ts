@@ -28,7 +28,7 @@ import communityRouter from './routes/community.js';
 import communityNetworkRouter from './routes/community-network.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import partnersRouter from './routes/partners.js';
+import marketplaceRouter from './routes/marketplace.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -79,7 +79,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/community-network', communityNetworkRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/partners', partnersRouter);
+  app.use('/api/v1/marketplace', marketplaceRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -102,7 +102,7 @@ export function createApp(): express.Express {
   app.use('/api/community', communityRouter);
   app.use('/api/community-network', communityNetworkRouter);
   app.use('/api/claims', claimsRouter);
-  app.use('/api/partners', partnersRouter);
+  app.use('/api/marketplace', marketplaceRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
