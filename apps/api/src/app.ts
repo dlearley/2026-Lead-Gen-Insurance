@@ -4,20 +4,8 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { 
-  logger, 
-  createInputSanitizer, 
-  createSecurityHeaders, 
-  createSecurityRateLimiter, 
-  rateLimitPresets, 
-  securityHeaderPresets 
-} from '@insurance-lead-gen/core';
-import { authMiddleware } from './middleware/auth.js';
-import { csrfProtection, getCsrfToken } from './middleware/csrf.js';
-import { enforceHttps } from './middleware/https.js';
-import { userRateLimiter } from './middleware/user-rate-limit.js';
-import { requestIdMiddleware } from './middleware/request-id.js';
-import authRouter from './routes/auth.js';
+import { register } from 'prom-client';
+import { logger, MetricsCollector, OnboardingMetrics } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -43,7 +31,8 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import attributionRouter from './routes/attribution.js';
+import onboardingRouter from './routes/onboarding.js';
+import { onboardingTracker } from './telemetry/onboarding-tracker.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -52,30 +41,13 @@ import rtcSignalingRouter from './routes/rtc-signaling.js';
 export function createApp(): express.Express {
   const app = express();
 
-  // Request ID
-  app.use(requestIdMiddleware);
+  const serviceName = 'api';
+  const metricsCollector = new MetricsCollector(serviceName);
+  const onboardingMetrics = new OnboardingMetrics(register, serviceName);
+  onboardingTracker.initialize(onboardingMetrics, serviceName);
 
-  // HTTPS Enforcement
-  app.use(enforceHttps);
-
-  // Security Headers (replaces app.use(helmet()))
-  app.use(createSecurityHeaders(securityHeaderPresets.moderate));
-  
-  // Basic Helmet for remaining headers
-  app.use(helmet({
-    contentSecurityPolicy: false, // Handled by createSecurityHeaders
-  }));
-
-  // CORS Hardening
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
-  app.use(cors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-    credentials: true,
-    maxAge: 86400, // 24 hours
-  }));
-
+  app.use(helmet());
+  app.use(cors());
   app.use(compression());
   app.use(cookieParser());
   app.use(express.json({ limit: '10mb' }));
@@ -103,6 +75,8 @@ export function createApp(): express.Express {
   // Input Sanitization
   app.use(createInputSanitizer());
 
+  app.use(metricsCollector.middleware());
+
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
   const openApiSpec = generateOpenApiSpec();
@@ -120,21 +94,9 @@ export function createApp(): express.Express {
     });
   });
 
-  // CSRF Token Endpoint (public)
-  app.get('/api/csrf-token', getCsrfToken);
-
-  // Public Auth Routes
-  app.use('/api/auth', authRouter);
-
-  // Auth & CSRF protection for all API routes
-  app.use('/api', authMiddleware);
-  app.use('/api', userRateLimiter);
-  app.use('/api', (req, res, next) => {
-    // Only apply CSRF to state-changing requests
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-      return csrfProtection(req, res, next);
-    }
-    next();
+  app.get('/metrics', async (req, res) => {
+    res.setHeader('Content-Type', metricsCollector.getContentType());
+    res.end(await metricsCollector.getMetrics());
   });
 
   app.use('/api/v1/leads', leadsRouter);
@@ -163,7 +125,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/attribution', attributionRouter);
+  app.use('/api/v1/onboarding', onboardingRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -190,7 +152,7 @@ export function createApp(): express.Express {
   app.use('/api/community', communityRouter);
   app.use('/api/broker-education', brokerEducationRouter);
   app.use('/api/claims', claimsRouter);
-  app.use('/api/attribution', attributionRouter);
+  app.use('/api/onboarding', onboardingRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

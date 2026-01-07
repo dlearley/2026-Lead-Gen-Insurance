@@ -626,6 +626,9 @@ export type NotificationType =
   | 'email_received'
   | 'lead_assigned'
   | 'lead_updated'
+  | 'onboarding_milestone'
+  | 'onboarding_completed'
+  | 'onboarding_at_risk'
   | 'system_alert';
 
 export interface Notification {
@@ -1680,15 +1683,11 @@ export interface ClaimLifecycleConfig {
   }>;
 }
 
-// Assignment Algorithm Types
-export interface AssignmentCriteria {
-  expertiseMatch: number; // 0-100
-  caseloadUtilization: number; // 0-100
-  availability: boolean;
-  geographicProximity?: number; // 0-100
-  historicalPerformance: number; // 0-100
-  estimatedComplexity: 'simple' | 'moderate' | 'complex';
-}
+// Onboarding & Success Metrics
+export * from './onboarding.js';
+
+// Report Types
+export * from './reports.js';
 
 export interface AdjusterScore {
   adjusterId: string;
