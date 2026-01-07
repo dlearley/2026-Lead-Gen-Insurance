@@ -29,7 +29,10 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import attributionRouter from './routes/attribution.js';
+import privacyRouter from './routes/privacy.js';
+import auditLogsRouter from './routes/audit-logs.js';
+import { createAuditMiddleware } from './middleware/audit.middleware.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -44,6 +47,13 @@ export function createApp(): express.Express {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(apiAnalyticsMiddleware);
+
+  app.use(requestIdMiddleware);
+  app.use(
+    createAuditMiddleware({
+      excludePaths: ['/health', '/metrics', '/uploads'],
+    })
+  );
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
@@ -65,6 +75,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/leads', leadsRouter);
   app.use('/api/v1/leads/:leadId/notes', notesRouter);
   app.use('/api/v1/leads/:leadId/activity', activityRouter);
+  app.use('/api/v1/privacy', privacyRouter);
+  app.use('/api/v1/audit-logs', auditLogsRouter);
   app.use('/api/v1/leads/:leadId/emails', emailsRouter);
   app.use('/api/v1/leads/:leadId/tasks', tasksRouter);
   app.use('/api/v1/leads/:leadId/policies', policiesRouter);
@@ -89,6 +101,8 @@ export function createApp(): express.Express {
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
   app.use('/api/leads/:leadId/activity', activityRouter);
+  app.use('/api/privacy', privacyRouter);
+  app.use('/api/audit-logs', auditLogsRouter);
   app.use('/api/leads/:leadId/emails', emailsRouter);
   app.use('/api/leads/:leadId/tasks', tasksRouter);
   app.use('/api/leads/:leadId/policies', policiesRouter);

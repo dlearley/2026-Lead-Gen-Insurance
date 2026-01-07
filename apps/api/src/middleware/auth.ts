@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { auditLogService, buildAuditContext } from '../services/audit.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -28,7 +29,18 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized - No token provided' });
+    void auditLogService
+      .logCritical({
+        ...buildAuditContext(req),
+        action: 'auth_missing_token',
+        resourceType: 'auth',
+        status: 'failure',
+        errorMessage: 'No token provided',
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        res.status(401).json({ error: 'Unauthorized - No token provided' });
+      });
     return;
   }
 
@@ -45,21 +57,66 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    res.status(401).json({ error: 'Unauthorized - Invalid token' });
+    void auditLogService
+      .logCritical({
+        ...buildAuditContext(req),
+        action: 'auth_invalid_token',
+        resourceType: 'auth',
+        status: 'failure',
+        errorMessage: 'Invalid token',
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        res.status(401).json({ error: 'Unauthorized - Invalid token' });
+      });
   } catch {
-    res.status(401).json({ error: 'Unauthorized - Invalid token' });
+    void auditLogService
+      .logCritical({
+        ...buildAuditContext(req),
+        action: 'auth_invalid_token',
+        resourceType: 'auth',
+        status: 'failure',
+        errorMessage: 'Invalid token',
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        res.status(401).json({ error: 'Unauthorized - Invalid token' });
+      });
   }
 }
 
 export function requireRole(allowedRoles: AuthenticatedUser['role'][]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
+      void auditLogService
+        .logCritical({
+          ...buildAuditContext(req),
+          action: 'authorization_missing_user',
+          resourceType: 'authorization',
+          status: 'failure',
+          errorMessage: 'No authenticated user in request',
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          res.status(401).json({ error: 'Unauthorized' });
+        });
       return;
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      res.status(403).json({ error: 'Forbidden - Insufficient permissions' });
+      void auditLogService
+        .logCritical({
+          ...buildAuditContext(req),
+          action: 'authorization_denied',
+          resourceType: 'authorization',
+          status: 'failure',
+          errorMessage: 'Insufficient permissions',
+          newValues: { requiredRoles: allowedRoles, userRole: req.user.role },
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          res.status(403).json({ error: 'Forbidden - Insufficient permissions' });
+        });
       return;
     }
 

@@ -33,7 +33,11 @@ export interface SecurityConfig {
   };
   audit: {
     enabled: boolean;
+    dbEnabled: boolean;
     retentionDays: number;
+    archiveAfterDays: number;
+    batchDelayMs: number;
+    batchSize: number;
     excludePaths: string[];
   };
 }
@@ -130,7 +134,11 @@ export function loadSecurityConfig(): SecurityConfig {
     },
     audit: {
       enabled: process.env.ENABLE_AUDIT_LOGGING !== 'false',
-      retentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '90'),
+      dbEnabled: process.env.AUDIT_LOG_DB_ENABLED !== 'false',
+      retentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '2555'), // 7 years
+      archiveAfterDays: parseInt(process.env.AUDIT_LOG_ARCHIVE_AFTER_DAYS || '365'), // 1 year
+      batchDelayMs: parseInt(process.env.AUDIT_LOG_BATCH_DELAY_MS || '100'),
+      batchSize: parseInt(process.env.AUDIT_LOG_BATCH_SIZE || '100'),
       excludePaths: ['/health', '/metrics', '/favicon.ico'],
     },
   };
