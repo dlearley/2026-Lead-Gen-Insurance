@@ -1,0 +1,376 @@
+# PostgreSQL Operator Installation (CloudNativePG)
+# Managed PostgreSQL clusters on Kubernetes
+
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgresql-operator
+  labels:
+    name: postgresql-operator
+
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgresql-operator
+  namespace: postgresql-operator
+
+---
+# RBAC: Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: postgresql-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - scheduledbackups
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - poolers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+
+---
+# RBAC: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: postgresql-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: postgresql-operator
+subjects:
+- kind: ServiceAccount
+  name: postgresql-operator
+  namespace: postgresql-operator
+
+---
+# PostgreSQL Cluster Definition
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-cluster
+  namespace: postgresql-operator
+spec:
+  # Cluster configuration
+  description: "PostgreSQL Cluster for Insurance Lead Generation Platform"
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.1
+  instances: 3
+
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      shared_buffers: "8GB"
+      effective_cache_size: "24GB"
+      work_mem: "64MB"
+      maintenance_work_mem: "2GB"
+      max_connections: "500"
+      wal_buffers: "16MB"
+      random_page_cost: "1.0"
+      checkpoint_completion_target: "0.9"
+      max_wal_size: "4GB"
+      min_wal_size: "1GB"
+      bgwriter_delay: "200ms"
+      bgwriter_lru_maxpages: "100"
+      log_min_duration_statement: "5000"
+      log_connections: "on"
+      log_disconnections: "on"
+      log_lock_waits: "on"
+      track_io_timing: "on"
+      track_functions: "all"
+      statement_timeout: "300000"
+    pg_hba:
+      - host all all 0.0.0.0/0 md5
+      - hostssl all all 0.0.0.0/0 md5
+
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: insurance_lead_gen
+      owner: postgres
+      secret:
+        name: postgres-superuser-password
+
+  # Storage configuration
+  storage:
+    size: 500Gi
+    storageClass: gp3-encrypted
+
+  # Replica configuration
+  replicas:
+    - name: replica1
+      parameters:
+        hot_standby_feedback: "on"
+    - name: replica2
+      parameters:
+        hot_standby_feedback: "on"
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    metadata:
+      labels:
+        app: postgresql
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+  # Backup configuration
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://insurance-lead-gen-postgres-backups
+      endpointURL: https://s3.${AWS_REGION}.amazonaws.com
+      s3Credentials:
+        accessKeyId:
+          name: postgres-backup-credentials
+          key: accessKeyId
+        secretAccessKey:
+          name: postgres-backup-credentials
+          key: secretAccessKey
+      wal:
+        maxParallel: 8
+      data:
+        compression: gzip
+        jobs: 4
+      retentionPolicy: "30d"
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: true
+
+  # Resources
+  resources:
+    requests:
+      memory: "16Gi"
+      cpu: "4"
+    limits:
+      memory: "32Gi"
+      cpu: "8"
+
+---
+# PgBouncer Configuration
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pgbouncer-pooler
+  namespace: postgresql-operator
+spec:
+  cluster:
+    name: postgres-cluster
+  type: rw
+  instances: 3
+  template:
+    metadata:
+      labels:
+        app: pgbouncer
+    spec:
+      containers:
+      - name: pgbouncer
+        image: ghcr.io/cloudnative-pg/pgbouncer:1.21.0
+        env:
+        - name: PGBOUNCER_DEFAULT_POOL_SIZE
+          value: "100"
+        - name: PGBOUNCER_MAX_CLIENT_CONN
+          value: "10000"
+        - name: PGBOUNCER_IDLE_TIMEOUT
+          value: "900"
+        - name: PGBOUNCER_QUERY_TIMEOUT
+          value: "30"
+        - name: PGBOUNCER_POOL_MODE
+          value: "transaction"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        ports:
+        - containerPort: 6432
+          name: pgbouncer
+          protocol: TCP
+
+---
+# Scheduled Backup
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: daily-backup
+  namespace: postgresql-operator
+spec:
+  cluster:
+    name: postgres-cluster
+  schedule: "0 2 * * *"
+  immediate: false
+  backupOwnerReference: none
+  method: barmanObjectStore

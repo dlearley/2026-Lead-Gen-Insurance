@@ -1,0 +1,135 @@
+groups:
+  - name: postgres_alerts
+    interval: 30s
+    rules:
+      # Database Down
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          database: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute."
+
+      # High Replication Lag
+      - alert: PostgresReplicationLag
+        expr: pg_replication_lag_bytes > 104857600
+        for: 3m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "High PostgreSQL replication lag"
+          description: "PostgreSQL replication lag is {{ $value | humanize }} (threshold: 100MB)."
+
+      # High Database Connections
+      - alert: PostgresHighConnections
+        expr: sum(pg_stat_activity_count) > 400
+        for: 5m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "High number of database connections"
+          description: "PostgreSQL has {{ $value }} active connections (threshold: 400)."
+
+      # Low Cache Hit Ratio
+      - alert: PostgresLowCacheHitRatio
+        expr: (pg_stat_database_blks_hit / (pg_stat_database_blks_hit + pg_stat_database_blks_read)) < 0.99
+        for: 10m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "Low PostgreSQL cache hit ratio"
+          description: "PostgreSQL cache hit ratio is {{ $value | humanizePercentage }} (threshold: 99%)."
+
+      # Slow Queries
+      - alert: PostgresSlowQueries
+        expr: rate(pg_stat_statements_mean_exec_time_ms[5m]) > 5000
+        for: 5m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "PostgreSQL mean query time is {{ $value }}ms (threshold: 5000ms)."
+
+      # Transaction Wraparound Risk
+      - alert: PostgresTransactionWraparound
+        expr: pg_postmaster_start_time < (pg_current_wal_lsn() - 1000000)
+        for: 10m
+        labels:
+          severity: critical
+          database: postgresql
+        annotations:
+          summary: "PostgreSQL transaction wraparound risk"
+          description: "PostgreSQL is approaching transaction ID wraparound."
+
+      # High Disk Usage
+      - alert: PostgresHighDiskUsage
+        expr: (node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"} - node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql"}) / node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"} > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "High PostgreSQL disk usage"
+          description: "PostgreSQL disk usage is {{ $value | humanizePercentage }} (threshold: 80%)."
+
+      # Critical Disk Usage
+      - alert: PostgresCriticalDiskUsage
+        expr: (node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"} - node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql"}) / node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"} > 0.90
+        for: 2m
+        labels:
+          severity: critical
+          database: postgresql
+        annotations:
+          summary: "Critical PostgreSQL disk usage"
+          description: "PostgreSQL disk usage is {{ $value | humanizePercentage }} (threshold: 90%)."
+
+      # High CPU Usage
+      - alert: PostgresHighCPU
+        expr: rate(process_cpu_seconds_total{job="postgres"}[5m]) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "High PostgreSQL CPU usage"
+          description: "PostgreSQL CPU usage is {{ $value | humanizePercentage }} (threshold: 80%)."
+
+      # Lock Wait Timeout
+      - alert: PostgresLockWaits
+        expr: pg_locks_count{mode="AccessExclusiveLock"} > 10
+        for: 2m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "PostgreSQL lock waits detected"
+          description: "PostgreSQL has {{ $value }} AccessExclusiveLocks held."
+
+      # Backup Failure
+      - alert: PostgresBackupFailed
+        expr: pg_backup_last_success_time < (now() - 24h)
+        for: 1m
+        labels:
+          severity: critical
+          database: postgresql
+        annotations:
+          summary: "PostgreSQL backup failed"
+          description: "PostgreSQL last successful backup was more than 24 hours ago."
+
+      # Connection Pool Exhaustion
+      - alert: PostgresConnectionPoolExhausted
+        expr: pgbouncer_pool_stats_pool_size{mode="session"} - pgbouncer_pool_stats_num_wait_clients < 10
+        for: 5m
+        labels:
+          severity: warning
+          database: postgresql
+        annotations:
+          summary: "PgBouncer connection pool exhaustion"
+          description: "PgBouncer has less than 10 available connections."

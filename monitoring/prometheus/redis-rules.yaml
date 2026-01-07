@@ -1,0 +1,190 @@
+groups:
+  - name: redis_alerts
+    interval: 30s
+    rules:
+      # Redis Down
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute."
+
+      # High Memory Usage
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} (threshold: 90%)."
+
+      # Critical Memory Usage
+      - alert: RedisCriticalMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "Critical Redis memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} (threshold: 95%)."
+
+      # Memory Evictions
+      - alert: RedisEvictions
+        expr: rate(redis_evicted_keys_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "Redis evictions detected"
+          description: "Redis is evicting {{ $value }} keys/sec due to memory pressure."
+
+      # High Eviction Rate
+      - alert: RedisHighEvictionRate
+        expr: rate(redis_evicted_keys_total[5m]) > 100
+        for: 2m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "High Redis eviction rate"
+          description: "Redis is evicting {{ $value }} keys/sec (threshold: 100 keys/sec)."
+
+      # Low Hit Rate
+      - alert: RedisLowHitRate
+        expr: (redis_keyspace_hits / (redis_keyspace_hits + redis_keyspace_misses)) < 0.95
+        for: 10m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "Low Redis hit rate"
+          description: "Redis hit rate is {{ $value | humanizePercentage }} (threshold: 95%)."
+
+      # Critical Hit Rate
+      - alert: RedisCriticalHitRate
+        expr: (redis_keyspace_hits / (redis_keyspace_hits + redis_keyspace_misses)) < 0.90
+        for: 5m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "Critical Redis hit rate"
+          description: "Redis hit rate is {{ $value | humanizePercentage }} (threshold: 90%)."
+
+      # High Connection Count
+      - alert: RedisHighConnections
+        expr: redis_connected_clients > 500
+        for: 5m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "High Redis connection count"
+          description: "Redis has {{ $value }} connected clients (threshold: 500)."
+
+      # Critical Connection Count
+      - alert: RedisCriticalConnections
+        expr: redis_connected_clients > 800
+        for: 2m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "Critical Redis connection count"
+          description: "Redis has {{ $value }} connected clients (threshold: 800)."
+
+      # Replication Lag
+      - alert: RedisReplicationLag
+        expr: redis_replication_lag_seconds > 1
+        for: 3m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "Redis replication lag detected"
+          description: "Redis replication lag is {{ $value }}s (threshold: 1s)."
+
+      # High Replication Lag
+      - alert: RedisHighReplicationLag
+        expr: redis_replication_lag_seconds > 5
+        for: 1m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "High Redis replication lag"
+          description: "Redis replication lag is {{ $value }}s (threshold: 5s)."
+
+      # Slow Log Entries
+      - alert: RedisSlowLog
+        expr: rate(redis_slowlog_length[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "Redis slow log entries detected"
+          description: "Redis slow log has {{ $value }} new entries per second."
+
+      # Expired Keys Not Cleaned
+      - alert: RedisExpiredKeys
+        expr: rate(redis_expired_keys_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "High rate of expired keys in Redis"
+          description: "Redis is expiring {{ $value }} keys/sec."
+
+      # Blocked Clients
+      - alert: RedisBlockedClients
+        expr: redis_blocked_clients > 10
+        for: 2m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "Redis blocked clients detected"
+          description: "Redis has {{ $value }} blocked clients."
+
+      # Backup Failure
+      - alert: RedisBackupFailed
+        expr: redis_last_save_time < (now() - 24h)
+        for: 1m
+        labels:
+          severity: critical
+          database: redis
+        annotations:
+          summary: "Redis backup failed"
+          description: "Redis last successful save was more than 24 hours ago."
+
+      # High CPU Usage
+      - alert: RedisHighCPU
+        expr: rate(process_cpu_seconds_total{job="redis"}[5m]) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "High Redis CPU usage"
+          description: "Redis CPU usage is {{ $value | humanizePercentage }} (threshold: 80%)."
+
+      # Rejected Connections
+      - alert: RedisRejectedConnections
+        expr: rate(redis_rejected_connections_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          database: redis
+        annotations:
+          summary: "Redis rejected connections detected"
+          description: "Redis is rejecting {{ $value }} connections/sec."
