@@ -5,7 +5,7 @@
 export * from './margin-analysis-service.js';
 export * from './competitive-analysis-service.js';
 export * from './pricing-optimization-service.js';
-export * from './marketplace.service.js';
+export * from './compliance-service.js';
 
 // Export service instances for convenience
 import { MarginAnalysisService } from './margin-analysis-service.js';

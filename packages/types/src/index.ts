@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Document Management Types
-export * from './document-management.js';
+// Compliance & Regulatory
+export * from './compliance.js';

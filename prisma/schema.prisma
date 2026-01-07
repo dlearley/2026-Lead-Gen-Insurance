@@ -205,358 +205,216 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
-// Document Management Models
+// DataConsent model - tracks user consent for data processing (GDPR/CCPA)
+model DataConsent {
+  id              String           @id @default(uuid())
+  leadId          String?
+  email           String?
+  consentType     ConsentType
+  consentGiven     Boolean          @default(false)
+  consentText      String
+  ipAddress       String?
+  userAgent       String?
+  version         Int              @default(1)
+  withdrawnAt     DateTime?
+  expiresAt       DateTime?
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-// Document Registry model
-model Document {
-  id                String      @id @default(cuid())
-  documentId        String      @unique // External identifier for audit
-  leadId            String?     // Associated lead
-  agentId           String?     // Associated agent
-  documentType      String      // "Quote", "Policy", "Claim", "ID", "ProofOfAddress", "IncomeVerification", "ConsentForm", "Disclosure", "Other"
-  category          String      // "Financial", "Identity", "Medical", "Legal", "Regulatory", "Operational"
-  filename          String      // Original filename
-  fileSize          Int         // Size in bytes
-  mimeType          String      // Content type
-  storageLocation   String      // Path in S3/MinIO
-  storageProvider   String      // "S3", "MinIO", "LocalStorage"
-  encryptionKey     String?     // Reference to encryption key
-  checksum          String      // SHA-256 hash for integrity
-  description       String?     // Human description
-  tags              String[]    // Array of tags for organization
-  jurisdiction      String?     // Relevant jurisdiction/state
-  status            String      @default("Active") // "Active", "Archived", "Deleted", "PendingDeletion"
-  
-  // Lifecycle Management
-  uploadedDate      DateTime    @default(now())
-  uploadedBy        String      // User/system that uploaded
-  lastAccessedDate  DateTime?
-  archivedDate      DateTime?
-  deletionScheduledDate DateTime?
-  deletionDate      DateTime?
-  
-  // Retention
-  retentionCategory String      // Reference to retention policy
-  retentionPeriodDays Int?      // Override global retention if set
-  expiryDate        DateTime?   // Auto-calculated from retention policy
-  legalHoldApplied  Boolean     @default(false)
-  legalHoldReason   String?
-  
-  // Metadata
-  version           Int         @default(1) // Document version
-  parentDocumentId  String?     // For versioned documents
-  relatedDocuments  String[]    // Array of related document IDs
-  
-  // Classification
-  sensitivity       String      // "Public", "Internal", "Confidential", "Secret"
-  piiDetected       Boolean     @default(false) // PII detected by scanning
-  piiFields        String[]    // Array of detected PII fields
-  requiresRedaction Boolean     @default(false)
-  redacted          Boolean     @default(false)
-  
-  // Compliance
-  complianceRelevant Boolean    @default(false) // Subject to specific regulation
-  regulations       String[]    // Array of applicable regulations
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-
-  // Relations
-  versions          DocumentVersion[]
-  accessLogs        DocumentAccessLog[]
-  shares            DocumentShare[]
-  integrityChecks   DocumentIntegrityCheck[]
-  retentionPolicy   DocumentRetentionPolicy? @relation(fields: [retentionCategory], references: [policyName])
-  deletionRequests  DocumentDeletionRequest[]
-  expirationEvents  DocumentExpirationEvent[]
-
+  // Indexes
   @@index([leadId])
-  @@index([agentId])
-  @@index([documentType])
-  @@index([status])
-  @@index([expiryDate])
-  @@index([legalHoldApplied])
-  @@index([retentionCategory])
+  @@index([email])
+  @@index([consentType])
+  @@index([consentGiven])
+  @@index([createdAt])
+  @@index([withdrawnAt])
 }
 
-// Document Access Audit Trail
-model DocumentAccessLog {
-  id                String      @id @default(cuid())
-  documentId        String
-  userId            String
-  action            String      // "View", "Download", "Print", "Share", "Delete", "Restore"
+// DataDeletionRequest model - handles right to be forgotten requests (GDPR Article 17)
+model DataDeletionRequest {
+  id                String               @id @default(uuid())
+  leadId            String?
+  email             String?
+  requestType       DeletionRequestType
+  status            DeletionRequestStatus @default(PENDING)
+  requestedBy       String
+  requestedByEmail  String?
+  ipAddress         String?
+  reason            String?
+  verifiedAt        DateTime?
+  processedAt       DateTime?
+  completedAt       DateTime?
+  rejectedReason    String?
+  retentionExpiry   DateTime?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relationships
+  auditLogs         ComplianceAuditLog[]
+
+  // Indexes
+  @@index([leadId])
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@index([requestedBy])
+}
+
+// ComplianceAuditLog model - comprehensive audit trail for compliance
+model ComplianceAuditLog {
+  id                String               @id @default(uuid())
+  entityType        EntityType
+  entityId          String
+  actionType        ActionType
+  performedBy       String?
+  performedByRole   String?
   ipAddress         String?
   userAgent         String?
-  accessReason      String?     // Why they accessed
-  timestamp         DateTime    @default(now())
-  success           Boolean     @default(true)
-  failureReason     String?     // If access denied
+  oldValue          Json?
+  newValue          Json?
+  sensitiveFields   String[]
+  requestId         String?
+  sessionId         String?
+  deletionRequestId String?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
 
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  // Relationships
+  deletionRequest    DataDeletionRequest? @relation(fields: [deletionRequestId], references: [id], onDelete: SetNull)
 
-  @@index([documentId])
-  @@index([userId])
-  @@index([timestamp])
+  // Indexes
+  @@index([entityType])
+  @@index([entityId])
+  @@index([actionType])
+  @@index([performedBy])
+  @@index([createdAt])
+  @@index([deletionRequestId])
+  @@index([requestId])
 }
 
-// Document Versions
-model DocumentVersion {
-  id                String      @id @default(cuid())
-  documentId        String
-  versionNumber     Int
-  storageLocation   String      // Where this version is stored
-  checksum          String      // SHA-256 of this version
-  uploadedDate      DateTime    @default(now())
-  uploadedBy        String
-  changeDescription String?
-  changes           String?     // JSON of what changed
-  fileSize          Int
+// ComplianceReport model - generated regulatory reports
+model ComplianceReport {
+  id                  String              @id @default(uuid())
+  reportType          ReportType
+  reportFormat        ReportFormat
+  status              ReportStatus        @default(PENDING)
+  title               String
+  description         String?
+  generatedBy         String
+  periodStart         DateTime?
+  periodEnd           DateTime?
+  filters             Json?
+  metrics             Json?
+  fileUrl             String?
+  fileSize            Int?
+  recordCount         Int?
+  encryptionKey       String?
+  checksum            String?
+  retentionExpiresAt  DateTime?
+  publishedAt         DateTime?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, versionNumber])
-  @@index([documentId])
-}
-
-// Document Classification Rules
-model DocumentClassificationRule {
-  id                String      @id @default(cuid())
-  name              String      @unique
-  description       String?
-  pattern           String      // Regex pattern to match filenames
-  documentType      String?     // Associated document type
-  category          String      // Document category
-  sensitivity       String      // "P", "I", "C", "S" for Public, Internal, Confidential, Secret
-  requiresRedaction Boolean     @default(false)
-  retentionCategory String?     // Reference to retention policy
-  jurisdiction      String[]    // Applicable jurisdictions
-  status            String      @default("Active")
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-
-  // Relations
-  retentionPolicy   DocumentRetentionPolicy? @relation(fields: [retentionCategory], references: [policyName])
-
+  // Indexes
+  @@index([reportType])
   @@index([status])
-  @@index([category])
+  @@index([generatedBy])
+  @@index([periodStart])
+  @@index([periodEnd])
+  @@index([createdAt])
+  @@index([publishedAt])
 }
 
-// PII (Personally Identifiable Information) Detection Rules
-model PIIDetectionRule {
-  id                String      @id @default(cuid())
-  fieldName         String      @unique // e.g., "SSN", "CreditCard", "BankAccount", "DriversLicense"
-  pattern           String      // Regex pattern to detect
-  dataType          String      // "Number", "Email", "Phone", "Address", "Name"
-  severity          String      // "Critical", "High", "Medium"
-  redactionMethod   String      // "Mask", "Hash", "Remove", "Encrypt"
-  redactionFormat   String?     // e.g., "XXX-XX-1234" for SSN
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+// DataRetentionPolicy model - define and enforce retention policies
+model DataRetentionPolicy {
+  id              String                @id @default(uuid())
+  entityType      EntityType
+  retentionPeriod Int                   // retention period in days
+  action          RetentionAction       @default(DELETE)
+  condition       String?
+  isActive        Boolean               @default(true)
+  priority        Int                   @default(0)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  recordsProcessed Int                  @default(0)
+  recordsDeleted Int                   @default(0)
+  createdBy       String?
+  metadata        Json?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  // Indexes
+  @@index([entityType])
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@index([priority])
 }
 
-// Document Retention Policies (Enhanced)
-model DocumentRetentionPolicy {
-  id                String      @id @default(cuid())
-  policyName        String      @unique
-  documentTypes     String[]    // Document types covered
-  retentionDays     Int         // Days to retain
-  archiveDays       Int?        // Days before archiving
-  jurisdiction      String      // State code or "Federal"
-  reason            String      // Why retention required
-  regulations       String[]    // Applicable regulations
-  legalHolds        String[]    // Legal hold reasons
-  deletionMethod    String      // "SecureDelete", "Shred", "Anonymize"
-  notificationDays  Int         // Days before expiry to notify
-  status            String      @default("Active")
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+// ComplianceViolation model - track violations and remediation
+model ComplianceViolation {
+  id                  String              @id @default(uuid())
+  violationType       ViolationType
+  severity            ViolationSeverity
+  status              ViolationStatus     @default(OPEN)
+  description         String
+  entityId            String?
+  entityType          EntityType?
+  detectedBy          String?
+  detectionMethod     String?
+  affectedRecords     Int?
+  riskScore           Float?
+  remediationAction   String?
+  remediationStatus   RemediationStatus  @default(NOT_STARTED)
+  remediatedAt        DateTime?
+  remediatedBy        String?
+  notes               String?
+  reportedTo          String?
+  reportDate          DateTime?
+  metadata            Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
-  // Relations
-  documents         Document[]
-  classificationRules DocumentClassificationRule[]
-
+  // Indexes
+  @@index([violationType])
+  @@index([severity])
   @@index([status])
+  @@index([entityType])
+  @@index([detectedBy])
+  @@index([createdAt])
+  @@index([riskScore])
 }
 
-// Encryption Keys Management
-model EncryptionKey {
-  id                String      @id @default(cuid())
-  keyId             String      @unique
-  keyType           String      // "AES256", "RSA2048", "RSA4096"
-  algorithm         String      // "AES-GCM", "RSA-OAEP"
-  creationDate      DateTime    @default(now())
-  expiryDate        DateTime?
-  status            String      @default("Active") // "Active", "Rotated", "Disabled"
-  rotationDate      DateTime?
-  lastUsedDate      DateTime?
-  keySource         String      // "AWS-KMS", "HashiCorp-Vault", "Local"
-  metadata          String?     // JSON with additional key info
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-}
-
-// Document Sharing/Access Control
-model DocumentShare {
-  id                String      @id @default(cuid())
-  documentId        String
-  grantedToUserId   String
-  grantedBy         String      // Who gave access
-  permission        String      // "View", "Download", "Edit", "Share"
-  shareType         String      // "Direct", "Role", "Team", "Public"
-  expiryDate        DateTime?   // Access expires
-  requiresPassword  Boolean     @default(false)
-  password          String?     // Hashed password
-  accessCount       Int         @default(0) // Number of times accessed
-  status            String      @default("Active")
-  
-  grantedDate       DateTime    @default(now())
-  revokedDate       DateTime?
-  revokedReason     String?
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, grantedToUserId])
-  @@index([documentId])
-  @@index([grantedToUserId])
-}
-
-// Document Search Index (for fast search)
-model DocumentIndex {
-  id                String      @id @default(cuid())
-  documentId        String      @unique
-  content           String      // Full text for search
-  extractedText     String?     // OCR'd text
-  keywords          String[]    // Extracted keywords
-  entities          String[]    // Named entities
-  lastIndexedDate   DateTime    @default(now())
-  
-  createdAt         DateTime    @default(now())
-  
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@fulltext([content])
-}
-
-// Document Deletion Request & Audit
-model DocumentDeletionRequest {
-  id                String      @id @default(cuid())
-  documentId        String
-  documentType      String
+// DataSubjectRequest model - general data subject rights requests
+model DataSubjectRequest {
+  id                String                @id @default(uuid())
+  leadId            String?
+  email             String
+  requestType       DataSubjectRequestType
+  status            DataSubjectRequestStatus @default(PENDING)
+  verificationData  Json?
+  identityVerified  Boolean               @default(false)
+  verifiedAt        DateTime?
+  processedAt       DateTime?
+  completedAt       DateTime?
+  requestData       Json?
+  responseData      Json?
+  rejectionReason   String?
+  ipAddress         String?
   requestedBy       String
-  requestReason     String
-  status            String      @default("Pending") // "Pending", "Approved", "InProgress", "Completed", "Failed"
-  requestDate       DateTime    @default(now())
-  approvedDate      DateTime?
-  approvedBy        String?
-  executionDate     DateTime?
-  completionDetails String?     // JSON with deletion proof
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  metadata          Json?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
-  @@index([documentId])
+  // Indexes
+  @@index([leadId])
+  @@index([email])
+  @@index([requestType])
   @@index([status])
-  @@index([requestDate])
-}
-
-// Document Archival
-model ArchivedDocument {
-  id                String      @id @default(cuid())
-  documentId        String      // Reference to original
-  originalStorageLocation String
-  archiveLocation   String      // Where archived
-  archiveFormat     String      // "TAR.GZ", "ZIP", "BAG"
-  archiveDate       DateTime    @default(now())
-  archivedBy        String
-  checksum          String      // Integrity check
-  retrievalInstructions String? // How to retrieve
-  expiryDate        DateTime?   // When archive can be deleted
-  
-  createdAt         DateTime    @default(now())
-
-  // Relations
-  document          Document?   @relation(fields: [documentId], references: [id], onDelete: SetNull)
-
-  @@index([documentId])
-  @@index([archiveDate])
-  @@index([expiryDate])
-}
-
-// Legal Hold / Litigation Hold
-model LitigationHold {
-  id                String      @id @default(cuid())
-  holdId            String      @unique
-  caseNumber        String?     // Related case/matter number
-  description       String
-  reason            String      // Why hold was placed
-  appliedDate       DateTime    @default(now())
-  appliedBy         String
-  targetDocuments   String[]    // Array of document types or IDs
-  jurisdiction      String?     // Jurisdiction of hold
-  status            String      @default("Active") // "Active", "Lifted", "Expired"
-  liftedDate        DateTime?
-  liftedBy          String?
-  liftReason        String?
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-
-  @@index([holdId])
-  @@index([status])
-  @@index([appliedDate])
-}
-
-// Document Integrity Verification
-model DocumentIntegrityCheck {
-  id                String      @id @default(cuid())
-  documentId        String
-  checkDate         DateTime    @default(now())
-  storedChecksum    String      // Original checksum
-  currentChecksum   String      // Current computed checksum
-  isIntact          Boolean     // Checksums match
-  encryptionValid   Boolean     // Encryption still valid
-  accessible        Boolean     // Can still be retrieved
-  issues            String[]    // Any issues found
-  
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId])
-  @@index([checkDate])
-}
-
-// Document Expiration Events
-model DocumentExpirationEvent {
-  id                String      @id @default(cuid())
-  documentId        String
-  eventType         String      // "WillExpireIn30Days", "WillExpireIn7Days", "Expired", "DeletedAfterExpiration"
-  scheduledDate     DateTime
-  executedDate      DateTime?
-  status            String      @default("Scheduled") // "Scheduled", "Executed", "Cancelled"
-  notificationSent  Boolean     @default(false)
-  
-  createdAt         DateTime    @default(now())
-  
-  // Relations
-  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId])
-  @@index([scheduledDate])
-  @@index([status])
+  @@index([createdAt])
+  @@index([identityVerified])
 }
 
 // Enums for type safety
@@ -600,139 +458,141 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// Performance Goal model - tracks broker performance goals
-model PerformanceGoal {
-  id            String            @id @default(uuid())
-  brokerId      String
-  category      PerformanceGoalCategory
-  targetValue   Float
-  currentValue  Float             @default(0)
-  progress      Float             @default(0)
-  deadline      DateTime
-  status        PerformanceGoalStatus @default(ON_TRACK)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-
-  @@index([brokerId])
-  @@index([category])
-  @@index([status])
+// Compliance Enums
+enum ConsentType {
+  MARKETING_COMMUNICATIONS
+  DATA_PROCESSING
+  DATA_SHARING
+  ANALYTICS
+  PERSONALIZED_ADS
+  LOCATION_TRACKING
+  THIRD_PARTY_SHARING
 }
 
-enum PerformanceGoalCategory {
-  CONVERSION
-  RESPONSE_TIME
-  REVENUE
-  RETENTION
-  CUSTOMER_SATISFACTION
+enum DeletionRequestType {
+  RIGHT_TO_BE_FORGOTTEN
+  DATA_PORTABILITY
+  ACCOUNT_DELETION
+  CONSENT_WITHDRAWAL
 }
 
-enum PerformanceGoalStatus {
-  ON_TRACK
-  AT_RISK
-  BEHIND
-  ACHIEVED
-}
-
-// Broker Network model - tracks broker network relationships
-model BrokerNetwork {
-  id                String   @id @default(uuid())
-  brokerId          String   @unique
-  networkTier       NetworkTier @default(BRONZE)
-  totalConnections  Int      @default(0)
-  activeConnections Int      @default(0)
-  networkValue      Float    @default(0.0)
-  networkScore      Float    @default(0.0)
-  referralMultiplier Float   @default(1.0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
-
-enum NetworkTier {
-  BRONZE
-  SILVER
-  GOLD
-  PLATINUM
-  DIAMOND
-}
-
-// Broker Connection model - tracks connections between brokers
-model BrokerConnection {
-  id                 String    @id @default(uuid())
-  brokerId           String
-  connectedBrokerId  String
-  relationshipType   BrokerRelationshipType @default(DIRECT_REFERRAL)
-  strength           Float     @default(0.5)
-  isActive           Boolean   @default(true)
-  referralCount      Int       @default(0)
-  revenueGenerated   Float     @default(0.0)
-  lastReferralAt     DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  @@unique([brokerId, connectedBrokerId])
-  @@index([brokerId])
-  @@index([connectedBrokerId])
-  @@index([isActive])
-}
-
-enum BrokerRelationshipType {
-  DIRECT_REFERRAL
-  CROSS_REFERRAL
-  MENTORSHIP
-  PARTNERSHIP
-  TEAM_MEMBER
-  TEAM_LEADER
-  NETWORK_MEMBER
-}
-
-// Broker Referral model - tracks referrals between brokers
-model BrokerReferral {
-  id                  String    @id @default(uuid())
-  leadId              String
-  referringBrokerId   String
-  receivingBrokerId   String
-  status              BrokerReferralStatus @default(PENDING)
-  commissionRate      Float     @default(0.15)
-  commissionAmount    Float?
-  referralReason      String?
-  notes               String?
-  expiresAt           DateTime?
-  convertedAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  @@index([referringBrokerId])
-  @@index([receivingBrokerId])
-  @@index([status])
-}
-
-enum BrokerReferralStatus {
+enum DeletionRequestStatus {
   PENDING
-  ACCEPTED
-  CONVERTED
-  DECLINED
+  VERIFIED
+  PROCESSING
+  COMPLETED
+  REJECTED
   EXPIRED
 }
 
-// Network Effect model - tracks network effects on broker performance
-model NetworkEffect {
-  id               String    @id @default(uuid())
-  sourceBrokerId   String
-  affectedBrokerId String
-  effectType       NetworkEffectType
-  value            Float
-  description      String
-  timestamp        DateTime  @default(now())
-  metadata         Json?
-
-  @@index([sourceBrokerId])
-  @@index([affectedBrokerId])
-  @@index([effectType])
+enum EntityType {
+  LEAD
+  AGENT
+  CARRIER
+  ASSIGNMENT
+  CONSENT
+  AUDIT_LOG
+  REPORT
+  POLICY
+  VIOLATION
+  DATA_SUBJECT_REQUEST
 }
 
-enum NetworkEffectType {
-  REFERRAL_BOOST
-  KNOWLEDGE_SHARING
-  RESOURCE_SHARING
-  MARKET_EXPANSION
+enum ActionType {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  EXPORT
+  ACCESS
+  SHARE
+  ANONYMIZE
+  ARCHIVE
+  RESTORE
+}
+
+enum ReportType {
+  DATA_PROCESSING_REGISTRY
+  DATA_SUBJECT_REQUESTS
+  DATA_BREACH_REPORT
+  CONSENT_REGISTRY
+  RETENTION_REPORT
+  AUDIT_LOG_REPORT
+  PRIVACY_IMPACT_ASSESSMENT
+  SECURITY_INCIDENT_REPORT
+}
+
+enum ReportFormat {
+  PDF
+  CSV
+  JSON
+  XML
+  HTML
+}
+
+enum ReportStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum RetentionAction {
+  DELETE
+  ANONYMIZE
+  ARCHIVE
+  TRANSFER
+}
+
+enum ViolationType {
+  UNAUTHORIZED_ACCESS
+  DATA_BREACH
+  CONSENT_VIOLATION
+  RETENTION_VIOLATION
+  DATA_LEAK
+  SECURITY_INCIDENT
+  POLICY_VIOLATION
+  COMPLIANCE_BREACH
+}
+
+enum ViolationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ViolationStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum RemediationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+enum DataSubjectRequestType {
+  ACCESS_REQUEST
+  DELETION_REQUEST
+  PORTABILITY_REQUEST
+  RECTIFICATION_REQUEST
+  OBJECTION_REQUEST
+  RESTRICTION_REQUEST
+}
+
+enum DataSubjectRequestStatus {
+  PENDING
+  VERIFIED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  EXPIRED
 }

@@ -270,10 +270,4 @@ setInterval(() => {
 
 // Re-export for package consumers
 export { prisma, disconnectPrisma } from './database/prisma.client.js';
-
-// Export personalization services
-export { LeadEnrichmentService } from './services/lead-enrichment-service.js';
-export { OfferRecommendationEngine } from './services/offer-recommendation-engine.js';
-export { CoachingSuggestionService } from './services/coaching-suggestion-service.js';
-export { RiskValidationService } from './services/risk-validation-service.js';
-export { PersonalizationAnalyticsService } from './services/personalization-analytics-service.js';
+export { ComplianceService } from './services/compliance-service.js';
