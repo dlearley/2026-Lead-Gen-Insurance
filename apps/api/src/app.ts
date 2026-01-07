@@ -28,7 +28,7 @@ import communityRouter from './routes/community.js';
 import communityNetworkRouter from './routes/community-network.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import knowledgeBaseRouter from './routes/knowledge-base.js';
+import copilotRouter from './routes/copilot.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -82,7 +82,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/community-network', communityNetworkRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/knowledge-base', knowledgeBaseRouter);
+  app.use('/api/v1/copilot', copilotRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -105,13 +105,7 @@ export function createApp(): express.Express {
   app.use('/api/community', communityRouter);
   app.use('/api/community-network', communityNetworkRouter);
   app.use('/api/claims', claimsRouter);
-  
-  // Phase 30: Partner Ecosystem Routes (without v1 prefix)
-  app.use('/api/partners', partnersRouter);
-  app.use('/api/applications', applicationsRouter);
-  app.use('/api/keys', apiKeysRouter);
-  app.use('/api/webhooks', webhooksRouter);
-  app.use('/api/marketplace', marketplaceRouter);
+  app.use('/api/copilot', copilotRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

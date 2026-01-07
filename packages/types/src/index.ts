@@ -1,8 +1,8 @@
 // ========================================
-// BEHAVIOR & PERSONALIZATION TYPES
+// COPILOT TYPES
 // ========================================
 
-export * from './behavior';
+export * from './copilot.js';
 
 // ========================================
 // USER TYPES

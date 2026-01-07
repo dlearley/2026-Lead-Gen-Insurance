@@ -13,5 +13,6 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// Features exports
-export * from './features/index.js';
+// Copilot services
+export { CopilotService } from './services/copilot.service.js';
+export { CopilotSessionService } from './services/copilot-session.service.js';
