@@ -835,5 +835,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Performance Optimization
-export * from './performance.js';
+// Compliance Framework
+export * from './compliance.js';

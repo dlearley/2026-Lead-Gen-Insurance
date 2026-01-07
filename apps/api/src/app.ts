@@ -26,8 +26,7 @@ import biRouter from './routes/bi.js';
 import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
-import brokerToolsRouter from './routes/broker-tools.js';
-import complianceRouter from './routes/insurance-compliance.routes.js';
+import complianceRouter from './routes/compliance.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
