@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Compliance Types (Phase 19.9)
-export * from './compliance.js';
+// Document Management Types
+export * from './document-management.js';
