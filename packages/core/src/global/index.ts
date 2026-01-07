@@ -1,0 +1,6 @@
+export {
+  DEFAULT_GLOBAL_CONFIG,
+  LOCALE_METADATA,
+  CURRENCY_METADATA,
+  REGIONAL_MAPPING
+} from './config.js';

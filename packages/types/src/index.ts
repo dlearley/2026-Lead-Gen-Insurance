@@ -828,3 +828,7 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// Global Expansion Types
+export * from './global.js';
+export * from './i18n.js';
