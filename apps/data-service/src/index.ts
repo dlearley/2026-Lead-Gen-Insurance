@@ -36,8 +36,7 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { PolicyRepository } from './services/policy-repository.js';
-import { createPoliciesRoutes } from './routes/policies.routes.js';
+import educationRoutes from './routes/education.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -114,8 +113,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup policy routes
-  app.use('/api/v1/policies', createPoliciesRoutes(policyRepository));
+  // Setup education routes (Phase 29)
+  app.use('/api/v1/education', educationRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {

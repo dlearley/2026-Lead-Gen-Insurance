@@ -1,100 +1,117 @@
 // ========================================
-// EDUCATION & TRAINING TYPES
-// Phase 12.3: Education System for Agents & Brokers
+// EDUCATION & TRAINING TYPES (Phase 29)
 // ========================================
 
 export type CourseCategory = 
-  | 'product_training'
-  | 'compliance'
-  | 'sales_techniques'
-  | 'customer_service'
-  | 'technology'
-  | 'lead_generation'
-  | 'closing_skills'
-  | 'market_knowledge';
+  | 'ONBOARDING'
+  | 'COMPLIANCE'
+  | 'PRODUCTS'
+  | 'SALES_TECHNIQUES'
+  | 'CUSTOMER_SERVICE'
+  | 'REGULATORY'
+  | 'TECHNOLOGY'
+  | 'LEADERSHIP'
+  | 'SPECIALIZATIONS'
+  | 'CONTINUING_EDUCATION';
 
-export type CourseDifficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+export type CourseLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
 
-export type CourseStatus = 'draft' | 'published' | 'archived';
+export type ContentType = 'VIDEO' | 'DOCUMENT' | 'INTERACTIVE' | 'WEBINAR' | 'SIMULATION' | 'QUIZ';
 
-export type EnrollmentStatus = 'not_enrolled' | 'enrolled' | 'in_progress' | 'completed' | 'certified';
+export type ProgressStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
 
-export type ModuleType = 'video' | 'reading' | 'quiz' | 'assignment' | 'live_session';
+export type EnrollmentStatus = 'ENROLLED' | 'IN_PROGRESS' | 'COMPLETED' | 'DROPPED' | 'FAILED';
 
-export type AssessmentType = 'quiz' | 'practical' | 'peer_review' | 'final_exam';
+export type EducationLevel = 'NONE' | 'HIGH_SCHOOL' | 'ASSOCIATE' | 'BACHELOR' | 'MASTER' | 'DOCTORATE';
 
-export type CertificateStatus = 'pending' | 'earned' | 'expired' | 'revoked';
+export type LearningStyle = 'VIDEO' | 'TEXT' | 'INTERACTIVE' | 'HANDS_ON' | 'GROUP';
 
 export interface Course {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   category: CourseCategory;
-  difficulty: CourseDifficulty;
-  status: CourseStatus;
-  duration: number; // in minutes
+  level: CourseLevel;
+  duration: number; // Duration in minutes
+  estimatedHours?: number;
   thumbnailUrl?: string;
+  contentType: ContentType;
+  isMandatory: boolean;
+  isActive: boolean;
   objectives: string[];
   prerequisites: string[];
   tags: string[];
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-  modules: CourseModule[];
-  assessment?: CourseAssessment;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  modules?: CourseModule[];
+  enrollments?: CourseEnrollment[];
+  certifications?: CourseCertification[];
 }
 
 export interface CourseModule {
   id: string;
   courseId: string;
   title: string;
-  description: string;
-  type: ModuleType;
+  description?: string;
   orderIndex: number;
-  duration: number;
-  content: ModuleContent;
+  content: Record<string, unknown>; // Flexible content structure
+  duration?: number;
   isRequired: boolean;
+  hasQuiz: boolean;
+  passingScore?: number;
+  createdAt: Date;
+  updatedAt: Date;
+  quizzes?: ModuleQuiz[];
+  progresses?: ModuleProgress[];
 }
 
-export interface ModuleContent {
-  videoUrl?: string;
-  videoDuration?: number;
-  textContent?: string;
-  readingTime?: number;
-  quizQuestions?: QuizQuestion[];
-  assignmentInstructions?: string;
-  liveSessionUrl?: string;
-  liveSessionDate?: string;
-  resources?: Resource[];
-}
-
-export interface QuizQuestion {
+export interface ModuleQuiz {
   id: string;
-  question: string;
-  type: 'multiple_choice' | 'true_false' | 'short_answer';
-  options?: string[];
-  correctAnswer: string | string[];
-  explanation?: string;
-  points: number;
-}
-
-export interface CourseAssessment {
-  id: string;
-  courseId: string;
-  type: AssessmentType;
-  passingScore: number; // percentage
+  moduleId: string;
+  title: string;
+  description?: string;
+  questions: Record<string, unknown>; // Quiz questions structure
+  timeLimit?: number;
   maxAttempts: number;
-  timeLimit?: number; // in minutes
-  questions: AssessmentQuestion[];
+  passingScore: number;
+  shuffleQuestions: boolean;
+  shuffleAnswers: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  attempts?: QuizAttempt[];
 }
 
-export interface AssessmentQuestion {
+export interface LearningPath {
   id: string;
-  question: string;
-  type: 'multiple_choice' | 'true_false' | 'scenario';
-  options?: string[];
-  correctAnswer: string | string[];
-  points: number;
+  title: string;
+  description?: string;
+  category: CourseCategory;
+  level: CourseLevel;
+  estimatedHours?: number;
+  isMandatory: boolean;
+  isActive: boolean;
+  prerequisites: string[];
+  targetRoles: string[];
+  specialization: InsuranceType[];
+  tags: string[];
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  courses?: PathCourse[];
+  enrollments?: PathEnrollment[];
+}
+
+export interface PathCourse {
+  id: string;
+  learningPathId: string;
+  courseId: string;
+  orderIndex: number;
+  isRequired: boolean;
+  passingScore?: number;
+  createdAt: Date;
+  learningPath?: LearningPath;
+  course?: Course;
 }
 
 export interface CourseEnrollment {
@@ -102,82 +119,284 @@ export interface CourseEnrollment {
   courseId: string;
   agentId: string;
   status: EnrollmentStatus;
-  enrolledAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  progress: CourseProgress;
-  assessmentScore?: number;
-  assessmentAttempts: number;
+  progress: number; // 0-100
+  completedAt?: Date;
+  finalScore?: number;
+  passingScore?: number;
+  enrolledAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  course?: Course;
+  agent?: Agent;
+  moduleProgresses?: ModuleProgress[];
 }
 
-export interface CourseProgress {
-  completedModules: string[];
-  currentModuleId?: string;
-  overallProgress: number; // percentage
-  timeSpent: number; // in minutes
-  lastAccessedAt?: string;
-  quizScores: Record<string, number>;
+export interface ModuleProgress {
+  id: string;
+  enrollmentId: string;
+  moduleId: string;
+  status: ProgressStatus;
+  progress: number; // 0-100
+  timeSpent: number; // Time spent in minutes
+  startedAt?: Date;
+  completedAt?: Date;
+  enrollment?: CourseEnrollment;
+  module?: CourseModule;
+  quizAttempts?: QuizAttempt[];
 }
 
-export interface Certificate {
+export interface PathEnrollment {
+  id: string;
+  learningPathId: string;
+  agentId: string;
+  status: EnrollmentStatus;
+  progress: number; // 0-100
+  completedAt?: Date;
+  enrolledAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  learningPath?: LearningPath;
+  agent?: Agent;
+}
+
+export interface QuizAttempt {
+  id: string;
+  quizId: string;
+  moduleProgressId: string;
+  attemptNumber: number;
+  score: number; // Score achieved (0-100)
+  passed: boolean;
+  timeSpent?: number;
+  answers: Record<string, unknown>; // User's answers
+  correctAnswers?: Record<string, unknown>; // Correct answers (for review)
+  startedAt: Date;
+  completedAt?: Date;
+  quiz?: ModuleQuiz;
+  moduleProgress?: ModuleProgress;
+}
+
+export interface CourseCertification {
   id: string;
   courseId: string;
   agentId: string;
   certificateNumber: string;
-  status: CertificateStatus;
-  issuedAt?: string;
-  expiresAt?: string;
-  score?: number;
-  verificationUrl: string;
+  score: number;
+  issuedAt: Date;
+  expiresAt?: Date;
+  version: string;
+  isActive: boolean;
+  course?: Course;
+  agent?: Agent;
 }
 
-export interface LearningPath {
+// Enhanced Agent interface for education
+export interface Agent {
   id: string;
-  title: string;
-  description: string;
-  courses: string[]; // course IDs
-  estimatedDuration: number;
-  certification: boolean;
-  certificateName?: string;
-  createdAt: string;
-  updatedAt: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  licenseNumber: string;
+  specializations: InsuranceType[];
+  city: string;
+  state: string;
+  country: string;
+  zipCode?: string;
+  rating: number;
+  averageResponseTime: number;
+  conversionRate: number;
+  totalLeadsAssigned: number;
+  totalLeadsConverted: number;
+  maxLeadCapacity: number;
+  currentLeadCount: number;
+  status: AgentStatus;
+  isActive: boolean;
+  passwordHash?: string;
+  lastLoginAt?: Date;
+  // Education fields
+  educationLevel: EducationLevel;
+  totalTrainingHours: number;
+  certificationsCount: number;
+  lastTrainingDate?: Date;
+  expertiseAreas: string[];
+  skillAssessments?: Record<string, unknown>;
+  learningGoals: string[];
+  preferredLearningStyle: LearningStyle;
+  educationMetadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface AgentLearning {
-  agentId: string;
-  enrollments: CourseEnrollment[];
-  certificates: Certificate[];
-  completedCourses: string[];
-  inProgressCourses: string[];
-  totalTimeSpent: number;
-  skillsAcquired: string[];
-  learningStreak: number;
-  lastActivityAt?: string;
-}
+export type AgentStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION';
 
-export interface Resource {
-  id: string;
+// Import InsuranceType from the main index
+export type InsuranceType = 'auto' | 'home' | 'life' | 'health' | 'commercial';
+
+// DTOs for API requests
+export interface CreateCourseDto {
   title: string;
-  type: 'document' | 'video' | 'link' | 'template' | 'checklist';
-  url: string;
   description?: string;
-  fileSize?: number;
-  downloadCount: number;
+  category: CourseCategory;
+  level: CourseLevel;
+  duration: number;
+  estimatedHours?: number;
+  thumbnailUrl?: string;
+  contentType: ContentType;
+  isMandatory?: boolean;
+  objectives?: string[];
+  prerequisites?: string[];
+  tags?: string[];
 }
 
-export interface TrainingRecommendation {
+export interface UpdateCourseDto {
+  title?: string;
+  description?: string;
+  category?: CourseCategory;
+  level?: CourseLevel;
+  duration?: number;
+  estimatedHours?: number;
+  thumbnailUrl?: string;
+  contentType?: ContentType;
+  isMandatory?: boolean;
+  isActive?: boolean;
+  objectives?: string[];
+  prerequisites?: string[];
+  tags?: string[];
+}
+
+export interface CreateLearningPathDto {
+  title: string;
+  description?: string;
+  category: CourseCategory;
+  level: CourseLevel;
+  estimatedHours?: number;
+  isMandatory?: boolean;
+  prerequisites?: string[];
+  targetRoles?: string[];
+  specialization: InsuranceType[];
+  tags?: string[];
+}
+
+export interface UpdateLearningPathDto {
+  title?: string;
+  description?: string;
+  category?: CourseCategory;
+  level?: CourseLevel;
+  estimatedHours?: number;
+  isMandatory?: boolean;
+  isActive?: boolean;
+  prerequisites?: string[];
+  targetRoles?: string[];
+  specialization?: InsuranceType[];
+  tags?: string[];
+}
+
+export interface EnrollCourseDto {
   agentId: string;
-  recommendedCourses: string[];
-  reason: string;
-  priority: 'low' | 'medium' | 'high';
-  basedOnPerformance: boolean;
 }
 
-export interface TrainingAnalytics {
+export interface EnrollLearningPathDto {
+  agentId: string;
+}
+
+export interface UpdateProgressDto {
+  progress?: number;
+  timeSpent?: number;
+  status?: ProgressStatus;
+}
+
+export interface SubmitQuizDto {
+  moduleProgressId: string;
+  answers: Record<string, unknown>;
+  timeSpent?: number;
+}
+
+export interface UpdateAgentEducationDto {
+  educationLevel?: EducationLevel;
+  expertiseAreas?: string[];
+  skillAssessments?: Record<string, unknown>;
+  learningGoals?: string[];
+  preferredLearningStyle?: LearningStyle;
+  educationMetadata?: Record<string, unknown>;
+}
+
+// Query parameters for filtering
+export interface CourseFilterParams {
+  category?: CourseCategory;
+  level?: CourseLevel;
+  contentType?: ContentType;
+  isMandatory?: boolean;
+  isActive?: boolean;
+  tags?: string[];
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface LearningPathFilterParams {
+  category?: CourseCategory;
+  level?: CourseLevel;
+  isMandatory?: boolean;
+  isActive?: boolean;
+  tags?: string[];
+  specialization?: InsuranceType;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface EnrollmentFilterParams {
+  agentId?: string;
+  courseId?: string;
+  status?: EnrollmentStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page?: number;
+  limit?: number;
+}
+
+// Statistics and Analytics
+export interface EducationStats {
   totalCourses: number;
   totalEnrollments: number;
-  completionRate: number;
-  averageScore: number;
-  popularCourses: { courseId: string; title: string; enrollments: number }[];
-  categoryDistribution: Record<CourseCategory, number>;
+  totalCompletions: number;
+  averageCompletionTime: number;
+  certificationRate: number;
+  totalTrainingHours: number;
+  topPerformingCourses: Array<{
+    courseId: string;
+    title: string;
+    completionRate: number;
+    averageScore: number;
+  }>;
+  agentProgressStats: {
+    topPerformers: Array<{
+      agentId: string;
+      agentName: string;
+      coursesCompleted: number;
+      totalHours: number;
+    }>;
+    completionRates: Record<CourseCategory, number>;
+    averageScores: Record<CourseCategory, number>;
+  };
+}
+
+export interface AgentEducationProfile {
+  agent: Agent;
+  enrolledCourses: CourseEnrollment[];
+  completedCourses: CourseEnrollment[];
+  certifications: CourseCertification[];
+  learningPaths: PathEnrollment[];
+  skillAssessments: Record<string, {
+    skill: string;
+    level: number;
+    lastAssessment: Date;
+  }>;
+  progressStats: {
+    totalCoursesEnrolled: number;
+    totalCoursesCompleted: number;
+    totalTrainingHours: number;
+    averageScore: number;
+    certificationsEarned: number;
+  };
 }

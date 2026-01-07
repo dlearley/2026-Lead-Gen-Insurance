@@ -1466,12 +1466,13 @@ export interface ClaimApiResponse {
   message?: string;
 }
 
-export interface ClaimsListApiResponse {
-  success: boolean;
-  data?: ClaimsSearchResult;
-  error?: string;
-  message?: string;
-}
+// ========================================
+// EDUCATION & TRAINING TYPES (Phase 29)
+// ========================================
+export * from './education.js';
+
+// Claims Management (Phase 10.1)
+export * from './claims.js';
 
 // Claims State Machine Types
 export interface ClaimStateTransition {

@@ -1,589 +1,681 @@
-import { logger } from '@insurance-lead-gen/core';
-import type { PrismaClient } from '@prisma/client';
-import type {
+import { PrismaClient } from '@prisma/client';
+import { EducationRepository } from '../repositories/education.repository';
+import {
   Course,
-  CourseModule,
-  CourseEnrollment,
-  CourseProgress,
-  Certificate,
   LearningPath,
-  TrainingAnalytics,
-  TrainingRecommendation,
+  CourseEnrollment,
+  ModuleProgress,
+  QuizAttempt,
+  CourseCertification,
+  Agent,
+  CreateCourseDto,
+  UpdateCourseDto,
+  CreateLearningPathDto,
+  UpdateLearningPathDto,
+  CourseFilterParams,
+  LearningPathFilterParams,
+  EnrollmentFilterParams,
+  EducationStats,
+  AgentEducationProfile,
+  EnrollCourseDto,
+  EnrollLearningPathDto,
+  UpdateProgressDto,
+  SubmitQuizDto,
+  UpdateAgentEducationDto,
+  InsuranceType,
   CourseCategory,
-  CourseDifficulty,
-  CourseStatus,
-  EnrollmentStatus,
-  CertificateStatus,
-  ModuleType,
-  AssessmentType,
-} from '@insurance-lead-gen/types';
-
-// In-memory storage for education entities (simulating database)
-// In production, these would be Prisma models
-const courses: Map<string, Course> = new Map();
-const enrollments: Map<string, CourseEnrollment> = new Map();
-const certificates: Map<string, Certificate> = new Map();
-const learningPaths: Map<string, LearningPath> = new Map();
-
-// Helper to generate unique IDs
-const generateId = (): string => crypto.randomUUID();
-
-// Helper to generate certificate number
-const generateCertificateNumber = (courseId: string, agentId: string): string => {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `CERT-${courseId.slice(0, 4).toUpperCase()}-${agentId.slice(0, 4).toUpperCase()}-${date}-${random}`;
-};
+  CourseLevel,
+  ProgressStatus,
+  EnrollmentStatus
+} from '@insurance/types';
 
 export class EducationService {
-  private prisma: PrismaClient;
+  constructor(private educationRepository: EducationRepository, private prisma: PrismaClient) {}
 
-  constructor(prisma: PrismaClient) {
-    this.prisma = prisma;
-    logger.info('EducationService initialized');
-  }
+  // Course Management
+  async createCourse(data: CreateCourseDto, createdBy?: string): Promise<Course> {
+    // Validate prerequisites
+    if (data.prerequisites && data.prerequisites.length > 0) {
+      await this.validateCoursePrerequisites(data.prerequisites);
+    }
 
-  // ========================================
-  // COURSE MANAGEMENT
-  // ========================================
-
-  /**
-   * Create a new course
-   */
-  async createCourse(params: {
-    title: string;
-    description: string;
-    category: CourseCategory;
-    difficulty: CourseDifficulty;
-    duration: number;
-    objectives: string[];
-    prerequisites: string[];
-    tags: string[];
-    createdBy: string;
-    modules?: CourseModule[];
-  }): Promise<Course> {
-    const course: Course = {
-      id: generateId(),
-      title: params.title,
-      description: params.description,
-      category: params.category,
-      difficulty: params.difficulty,
-      status: 'draft',
-      duration: params.duration,
-      objectives: params.objectives,
-      prerequisites: params.prerequisites,
-      tags: params.tags,
-      createdBy: params.createdBy,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      modules: params.modules || [],
+    const courseData = {
+      ...data,
+      createdBy
     };
 
-    courses.set(course.id, course);
-    logger.info('Course created', { courseId: course.id, title: course.title });
-    return course;
+    return this.educationRepository.createCourse(courseData);
   }
 
-  /**
-   * Get course by ID
-   */
-  async getCourseById(courseId: string): Promise<Course | null> {
-    return courses.get(courseId) || null;
+  async updateCourse(id: string, data: UpdateCourseDto): Promise<Course> {
+    // Check if course exists
+    const existingCourse = await this.educationRepository.getCourse(id);
+    if (!existingCourse) {
+      throw new Error('Course not found');
+    }
+
+    // Validate prerequisites if being updated
+    if (data.prerequisites && data.prerequisites.length > 0) {
+      await this.validateCoursePrerequisites(data.prerequisites);
+    }
+
+    return this.educationRepository.updateCourse(id, data);
   }
 
-  /**
-   * List all courses with optional filters
-   */
-  async listCourses(params?: {
-    category?: CourseCategory;
-    difficulty?: CourseDifficulty;
-    status?: CourseStatus;
-    search?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ courses: Course[]; total: number }> {
-    let filteredCourses = Array.from(courses.values());
-
-    if (params?.category) {
-      filteredCourses = filteredCourses.filter(c => c.category === params.category);
+  private async validateCoursePrerequisites(prerequisiteIds: string[]): Promise<void> {
+    for (const prerequisiteId of prerequisiteIds) {
+      const prerequisite = await this.educationRepository.getCourse(prerequisiteId);
+      if (!prerequisite) {
+        throw new Error(`Prerequisite course not found: ${prerequisiteId}`);
+      }
     }
-    if (params?.difficulty) {
-      filteredCourses = filteredCourses.filter(c => c.difficulty === params.difficulty);
-    }
-    if (params?.status) {
-      filteredCourses = filteredCourses.filter(c => c.status === params.status);
-    }
-    if (params?.search) {
-      const searchLower = params.search.toLowerCase();
-      filteredCourses = filteredCourses.filter(c =>
-        c.title.toLowerCase().includes(searchLower) ||
-        c.description.toLowerCase().includes(searchLower)
-      );
-    }
-
-    const total = filteredCourses.length;
-    const offset = params?.offset || 0;
-    const limit = params?.limit || 20;
-    filteredCourses = filteredCourses.slice(offset, offset + limit);
-
-    return { courses: filteredCourses, total };
   }
 
-  /**
-   * Update course
-   */
-  async updateCourse(courseId: string, updates: Partial<Course>): Promise<Course | null> {
-    const course = courses.get(courseId);
-    if (!course) return null;
-
-    const updatedCourse: Course = {
+  async getCoursesWithAvailability(filter?: CourseFilterParams): Promise<{ courses: Course[]; total: number }> {
+    const result = await this.educationRepository.getCourses(filter);
+    
+    // Add availability information to each course
+    const coursesWithAvailability = result.courses.map(course => ({
       ...course,
-      ...updates,
-      updatedAt: new Date().toISOString(),
+      isAvailable: this.isCourseAvailable(course)
+    }));
+
+    return {
+      courses: coursesWithAvailability,
+      total: result.total
     };
-    courses.set(courseId, updatedCourse);
-    return updatedCourse;
   }
 
-  /**
-   * Publish course
-   */
-  async publishCourse(courseId: string): Promise<Course | null> {
-    return this.updateCourse(courseId, { status: 'published' });
+  private isCourseAvailable(course: Course): boolean {
+    // Check if course is active
+    if (!course.isActive) return false;
+
+    // Check if prerequisites are met (for course prerequisites)
+    // This would need to be checked against individual agent profiles
+    return true; // For now, assume available if active
   }
 
-  /**
-   * Archive course
-   */
-  async archiveCourse(courseId: string): Promise<Course | null> {
-    return this.updateCourse(courseId, { status: 'archived' });
-  }
-
-  /**
-   * Add module to course
-   */
-  async addModuleToCourse(courseId: string, module: Omit<CourseModule, 'id' | 'courseId' | 'orderIndex'>): Promise<Course | null> {
-    const course = courses.get(courseId);
-    if (!course) return null;
-
-    const newModule: CourseModule = {
-      ...module,
-      id: generateId(),
-      courseId,
-      orderIndex: course.modules.length,
-    };
-
-    course.modules.push(newModule);
-    course.updatedAt = new Date().toISOString();
-    courses.set(courseId, course);
-    return course;
-  }
-
-  // ========================================
-  // ENROLLMENT MANAGEMENT
-  // ========================================
-
-  /**
-   * Enroll agent in course
-   */
-  async enrollAgent(params: {
-    courseId: string;
-    agentId: string;
-  }): Promise<CourseEnrollment> {
-    const existingEnrollment = Array.from(enrollments.values()).find(
-      e => e.courseId === params.courseId && e.agentId === params.agentId
+  // Learning Path Management
+  async createLearningPath(data: CreateLearningPathDto, createdBy?: string): Promise<LearningPath> {
+    // Validate courses in path
+    const courses = await Promise.all(
+      data.specialization.map(spec => this.getCoursesBySpecialization(spec))
     );
 
-    if (existingEnrollment) {
-      return existingEnrollment;
+    if (courses.flat().length === 0) {
+      throw new Error('No courses found for the specified specializations');
     }
 
-    const enrollment: CourseEnrollment = {
-      id: generateId(),
-      courseId: params.courseId,
-      agentId: params.agentId,
-      status: 'enrolled',
-      enrolledAt: new Date().toISOString(),
-      progress: {
-        completedModules: [],
-        overallProgress: 0,
-        timeSpent: 0,
-        quizScores: {},
-      },
-      assessmentAttempts: 0,
+    const pathData = {
+      ...data,
+      createdBy
     };
 
-    enrollments.set(enrollment.id, enrollment);
-    logger.info('Agent enrolled in course', { enrollmentId: enrollment.id, agentId: params.agentId, courseId: params.courseId });
+    return this.educationRepository.createLearningPath(pathData);
+  }
+
+  async addCourseToPath(learningPathId: string, courseId: string, orderIndex: number, isRequired = true, passingScore?: number): Promise<void> {
+    // Verify both learning path and course exist
+    const [path, course] = await Promise.all([
+      this.educationRepository.getLearningPath(learningPathId),
+      this.educationRepository.getCourse(courseId)
+    ]);
+
+    if (!path) {
+      throw new Error('Learning path not found');
+    }
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    // Add course to path (would need to implement this method in repository)
+    // await this.educationRepository.addCourseToPath(learningPathId, courseId, orderIndex, isRequired, passingScore);
+  }
+
+  // Enrollment Management
+  async enrollInCourse(courseId: string, data: EnrollCourseDto): Promise<CourseEnrollment> {
+    const [course, agent] = await Promise.all([
+      this.educationRepository.getCourse(courseId),
+      this.prisma.agent.findUnique({ where: { id: data.agentId } })
+    ]);
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
+    // Check if agent meets prerequisites
+    await this.validateAgentPrerequisites(data.agentId, course.prerequisites);
+
+    // Check capacity limits
+    await this.checkEnrollmentCapacity(agent.id);
+
+    const enrollment = await this.educationRepository.enrollInCourse(courseId, data);
+
+    // Auto-enroll in prerequisites if not completed
+    await this.autoEnrollPrerequisites(courseId, data.agentId);
+
+    // Update agent's last training date
+    await this.prisma.agent.update({
+      where: { id: data.agentId },
+      data: { lastTrainingDate: new Date() }
+    });
+
     return enrollment;
   }
 
-  /**
-   * Start course
-   */
-  async startCourse(enrollmentId: string): Promise<CourseEnrollment | null> {
-    const enrollment = enrollments.get(enrollmentId);
-    if (!enrollment) return null;
+  async enrollInLearningPath(learningPathId: string, data: EnrollLearningPathDto): Promise<PathEnrollment> {
+    const path = await this.educationRepository.getLearningPath(learningPathId);
+    const agent = await this.prisma.agent.findUnique({ where: { id: data.agentId } });
 
-    enrollment.status = 'in_progress';
-    enrollment.startedAt = new Date().toISOString();
-    enrollment.progress.lastAccessedAt = new Date().toISOString();
-    enrollments.set(enrollmentId, enrollment);
-    return enrollment;
-  }
-
-  /**
-   * Complete module
-   */
-  async completeModule(params: {
-    enrollmentId: string;
-    moduleId: string;
-    timeSpent?: number;
-    quizScore?: number;
-  }): Promise<CourseEnrollment | null> {
-    const enrollment = enrollments.get(params.enrollmentId);
-    if (!enrollment) return null;
-
-    const course = courses.get(enrollment.courseId);
-    if (!course) return null;
-
-    // Add module to completed if not already
-    if (!enrollment.progress.completedModules.includes(params.moduleId)) {
-      enrollment.progress.completedModules.push(params.moduleId);
+    if (!path) {
+      throw new Error('Learning path not found');
     }
 
-    // Update quiz score if provided
-    if (params.quizScore !== undefined) {
-      enrollment.progress.quizScores[params.moduleId] = params.quizScore;
+    if (!agent) {
+      throw new Error('Agent not found');
     }
 
-    // Update time spent
-    if (params.timeSpent) {
-      enrollment.progress.timeSpent += params.timeSpent;
-    }
+    // Check if agent meets prerequisites
+    await this.validateAgentPrerequisites(data.agentId, path.prerequisites);
 
-    // Calculate overall progress
-    const totalModules = course.modules.filter(m => m.isRequired).length;
-    const completedRequired = enrollment.progress.completedModules.filter(mId =>
-      course.modules.find(m => m.id === mId)?.isRequired
-    ).length;
-    enrollment.progress.overallProgress = totalModules > 0
-      ? Math.round((completedRequired / totalModules) * 100)
-      : 0;
+    // Check capacity
+    await this.checkEnrollmentCapacity(agent.id);
 
-    // Check if course is complete
-    if (enrollment.progress.overallProgress === 100) {
-      enrollment.status = 'completed';
-      enrollment.completedAt = new Date().toISOString();
-    }
+    const enrollment = await this.educationRepository.enrollInLearningPath(learningPathId, data);
 
-    enrollment.progress.lastAccessedAt = new Date().toISOString();
-    enrollments.set(params.enrollmentId, enrollment);
-    return enrollment;
-  }
-
-  /**
-   * Get enrollment by ID
-   */
-  async getEnrollmentById(enrollmentId: string): Promise<CourseEnrollment | null> {
-    return enrollments.get(enrollmentId) || null;
-  }
-
-  /**
-   * Get agent enrollments
-   */
-  async getAgentEnrollments(agentId: string): Promise<CourseEnrollment[]> {
-    return Array.from(enrollments.values()).filter(e => e.agentId === agentId);
-  }
-
-  /**
-   * Get course enrollments
-   */
-  async getCourseEnrollments(courseId: string): Promise<CourseEnrollment[]> {
-    return Array.from(enrollments.values()).filter(e => e.courseId === courseId);
-  }
-
-  // ========================================
-  // CERTIFICATE MANAGEMENT
-  // ========================================
-
-  /**
-   * Issue certificate for completed course
-   */
-  async issueCertificate(params: {
-    courseId: string;
-    agentId: string;
-    score?: number;
-  }): Promise<Certificate> {
-    const certificate: Certificate = {
-      id: generateId(),
-      courseId: params.courseId,
-      agentId: params.agentId,
-      certificateNumber: generateCertificateNumber(params.courseId, params.agentId),
-      status: 'earned',
-      issuedAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
-      score: params.score,
-      verificationUrl: `/api/v1/education/certificates/verify/${generateCertificateNumber(params.courseId, params.agentId)}`,
-    };
-
-    certificates.set(certificate.id, certificate);
-    logger.info('Certificate issued', { certificateId: certificate.id, agentId: params.agentId });
-    return certificate;
-  }
-
-  /**
-   * Get certificate by ID
-   */
-  async getCertificateById(certificateId: string): Promise<Certificate | null> {
-    return certificates.get(certificateId) || null;
-  }
-
-  /**
-   * Verify certificate
-   */
-  async verifyCertificate(certificateNumber: string): Promise<Certificate | null> {
-    const certificate = Array.from(certificates.values()).find(
-      c => c.certificateNumber === certificateNumber
-    );
-    return certificate || null;
-  }
-
-  /**
-   * Get agent certificates
-   */
-  async getAgentCertificates(agentId: string): Promise<Certificate[]> {
-    return Array.from(certificates.values()).filter(c => c.agentId === agentId);
-  }
-
-  /**
-   * Revoke certificate
-   */
-  async revokeCertificate(certificateId: string): Promise<Certificate | null> {
-    const certificate = certificates.get(certificateId);
-    if (!certificate) return null;
-
-    certificate.status = 'revoked';
-    certificates.set(certificateId, certificate);
-    return certificate;
-  }
-
-  // ========================================
-  // LEARNING PATH MANAGEMENT
-  // ========================================
-
-  /**
-   * Create learning path
-   */
-  async createLearningPath(params: {
-    title: string;
-    description: string;
-    courses: string[];
-    estimatedDuration: number;
-    certification: boolean;
-    certificateName?: string;
-  }): Promise<LearningPath> {
-    const learningPath: LearningPath = {
-      id: generateId(),
-      title: params.title,
-      description: params.description,
-      courses: params.courses,
-      estimatedDuration: params.estimatedDuration,
-      certification: params.certification,
-      certificateName: params.certificateName,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    learningPaths.set(learningPath.id, learningPath);
-    logger.info('Learning path created', { learningPathId: learningPath.id, title: learningPath.title });
-    return learningPath;
-  }
-
-  /**
-   * Get learning path by ID
-   */
-  async getLearningPathById(pathId: string): Promise<LearningPath | null> {
-    return learningPaths.get(pathId) || null;
-  }
-
-  /**
-   * List learning paths
-   */
-  async listLearningPaths(): Promise<LearningPath[]> {
-    return Array.from(learningPaths.values());
-  }
-
-  // ========================================
-  // TRAINING RECOMMENDATIONS
-  // ========================================
-
-  /**
-   * Generate training recommendations for an agent
-   */
-  async generateRecommendations(agentId: string): Promise<TrainingRecommendation[]> {
-    const recommendations: TrainingRecommendation[] = [];
-    const agentEnrollments = await this.getAgentEnrollments(agentId);
-    const completedCourseIds = agentEnrollments
-      .filter(e => e.status === 'completed')
-      .map(e => e.courseId);
-
-    // Find courses that match agent's specialization gaps
-    const allCourses = Array.from(courses.values()).filter(c => c.status === 'published');
-
-    for (const course of allCourses) {
-      if (!completedCourseIds.includes(course.id)) {
-        // Check if prerequisites are met
-        const prerequisitesMet = course.prerequisites.every(p =>
-          completedCourseIds.includes(p)
-        );
-
-        if (prerequisitesMet) {
-          recommendations.push({
-            agentId,
-            recommendedCourses: [course.id],
-            reason: `Enhance your ${course.category.replace('_', ' ')} knowledge`,
-            priority: course.difficulty === 'advanced' ? 'high' : 'medium',
-            basedOnPerformance: false,
-          });
+    // Auto-enroll in all courses in the path
+    for (const pathCourse of path.courses || []) {
+      if (pathCourse.isRequired) {
+        try {
+          await this.enrollInCourse(pathCourse.courseId, { agentId: data.agentId });
+        } catch (error) {
+          console.warn(`Failed to auto-enroll in course ${pathCourse.courseId}:`, error);
         }
       }
     }
 
-    return recommendations.slice(0, 5);
+    // Update agent's last training date
+    await this.prisma.agent.update({
+      where: { id: data.agentId },
+      data: { lastTrainingDate: new Date() }
+    });
+
+    return enrollment;
   }
 
-  // ========================================
-  // ANALYTICS
-  // ========================================
+  private async validateAgentPrerequisites(agentId: string, prerequisites: string[]): Promise<void> {
+    if (!prerequisites || prerequisites.length === 0) return;
 
-  /**
-   * Get training analytics
-   */
-  async getTrainingAnalytics(): Promise<TrainingAnalytics> {
-    const allCourses = Array.from(courses.values());
-    const allEnrollments = Array.from(enrollments.values());
+    const completedCourses = await this.prisma.courseEnrollment.findMany({
+      where: {
+        agentId,
+        status: 'COMPLETED'
+      },
+      include: {
+        course: true
+      }
+    });
 
-    // Calculate completion rate
-    const completedEnrollments = allEnrollments.filter(e => e.status === 'completed');
-    const completionRate = allEnrollments.length > 0
-      ? (completedEnrollments.length / allEnrollments.length) * 100
-      : 0;
+    const completedCourseIds = completedCourses.map(enrollment => enrollment.courseId);
 
-    // Calculate average score
-    const scores = completedEnrollments
-      .filter(e => e.assessmentScore !== undefined)
-      .map(e => e.assessmentScore!);
-    const averageScore = scores.length > 0
-      ? scores.reduce((a, b) => a + b, 0) / scores.length
-      : 0;
+    for (const prerequisiteId of prerequisites) {
+      if (!completedCourseIds.includes(prerequisiteId)) {
+        const prerequisite = await this.educationRepository.getCourse(prerequisiteId);
+        throw new Error(`Prerequisite not completed: ${prerequisite?.title || prerequisiteId}`);
+      }
+    }
+  }
 
-    // Category distribution
-    const categoryDistribution: Record<CourseCategory, number> = {
-      product_training: 0,
-      compliance: 0,
-      sales_techniques: 0,
-      customer_service: 0,
-      technology: 0,
-      lead_generation: 0,
-      closing_skills: 0,
-      market_knowledge: 0,
-    };
+  private async checkEnrollmentCapacity(agentId: string): Promise<void> {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId }
+    });
 
-    for (const course of allCourses) {
-      categoryDistribution[course.category]++;
+    if (!agent) {
+      throw new Error('Agent not found');
     }
 
-    // Popular courses
-    const courseEnrollments: Record<string, number> = {};
-    for (const enrollment of allEnrollments) {
-      courseEnrollments[enrollment.courseId] = (courseEnrollments[enrollment.courseId] || 0) + 1;
+    const activeEnrollments = await this.prisma.courseEnrollment.count({
+      where: {
+        agentId,
+        status: { in: ['ENROLLED', 'IN_PROGRESS'] }
+      }
+    });
+
+    const maxConcurrentCourses = 5; // Configurable limit
+    if (activeEnrollments >= maxConcurrentCourses) {
+      throw new Error(`Maximum concurrent course limit reached (${maxConcurrentCourses})`);
+    }
+  }
+
+  private async autoEnrollPrerequisites(courseId: string, agentId: string): Promise<void> {
+    const course = await this.educationRepository.getCourse(courseId);
+    if (!course || !course.prerequisites) return;
+
+    for (const prerequisiteId of course.prerequisites) {
+      // Check if already enrolled
+      const existingEnrollment = await this.prisma.courseEnrollment.findUnique({
+        where: {
+          courseId_agentId: {
+            courseId: prerequisiteId,
+            agentId
+          }
+        }
+      });
+
+      if (!existingEnrollment) {
+        try {
+          await this.enrollInCourse(prerequisiteId, { agentId });
+        } catch (error) {
+          console.warn(`Failed to auto-enroll in prerequisite ${prerequisiteId}:`, error);
+        }
+      }
+    }
+  }
+
+  // Progress Tracking
+  async updateModuleProgress(moduleProgressId: string, data: UpdateProgressDto): Promise<ModuleProgress> {
+    const progress = await this.educationRepository.updateModuleProgress(moduleProgressId, data);
+
+    // Check if course is completed
+    await this.checkCourseCompletion(progress.enrollmentId);
+
+    // Update agent training hours
+    if (data.timeSpent) {
+      await this.updateAgentTrainingHours(progress.enrollmentId, data.timeSpent);
     }
 
-    const popularCourses = Object.entries(courseEnrollments)
-      .map(([courseId, count]) => {
-        const course = courses.get(courseId);
-        return {
-          courseId,
-          title: course?.title || 'Unknown',
-          enrollments: count,
-        };
+    return progress;
+  }
+
+  private async checkCourseCompletion(enrollmentId: string): Promise<void> {
+    const enrollment = await this.prisma.courseEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        course: {
+          include: {
+            modules: {
+              where: { isRequired: true }
+            }
+          }
+        },
+        moduleProgresses: true
+      }
+    });
+
+    if (!enrollment) return;
+
+    const requiredModules = enrollment.course.modules;
+    const completedModules = enrollment.moduleProgresses.filter(
+      mp => mp.status === 'COMPLETED' && mp.progress >= 70
+    );
+
+    if (requiredModules.length === completedModules.length) {
+      // Course completed
+      const finalScore = this.calculateFinalScore(enrollment.moduleProgresses);
+      
+      await this.prisma.courseEnrollment.update({
+        where: { id: enrollmentId },
+        data: {
+          status: 'COMPLETED',
+          progress: 100,
+          completedAt: new Date(),
+          finalScore,
+          passingScore: finalScore >= 70 ? finalScore : undefined
+        }
+      });
+
+      // Issue certificate if score is passing
+      if (finalScore >= 70) {
+        await this.issueCertificate(enrollment.courseId, enrollment.agentId, finalScore);
+      }
+
+      // Update agent stats
+      await this.updateAgentEducationStats(enrollment.agentId);
+    }
+  }
+
+  private calculateFinalScore(moduleProgresses: ModuleProgress[]): number {
+    const scores = moduleProgresses
+      .filter(mp => mp.status === 'COMPLETED' && mp.module)
+      .map(mp => {
+        // Calculate average of quiz scores if available
+        const quizScores = mp.quizAttempts?.map(attempt => attempt.score) || [];
+        const avgQuizScore = quizScores.length > 0 
+          ? quizScores.reduce((sum, score) => sum + score, 0) / quizScores.length 
+          : mp.progress;
+
+        return avgQuizScore;
+      });
+
+    return scores.length > 0 
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : 0;
+  }
+
+  private async issueCertificate(courseId: string, agentId: string, score: number): Promise<CourseCertification> {
+    const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+    return this.prisma.courseCertification.create({
+      data: {
+        courseId,
+        agentId,
+        certificateNumber,
+        score,
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year from now
+      }
+    });
+  }
+
+  private async updateAgentTrainingHours(enrollmentId: string, additionalMinutes: number): Promise<void> {
+    const enrollment = await this.prisma.courseEnrollment.findUnique({
+      where: { id: enrollmentId }
+    });
+
+    if (!enrollment) return;
+
+    await this.prisma.agent.update({
+      where: { id: enrollment.agentId },
+      data: {
+        totalTrainingHours: {
+          increment: Math.round(additionalMinutes / 60 * 100) / 100 // Round to 2 decimal places
+        }
+      }
+    });
+  }
+
+  private async updateAgentEducationStats(agentId: string): Promise<void> {
+    const [certificationsCount, agent] = await Promise.all([
+      this.prisma.courseCertification.count({
+        where: { agentId, isActive: true }
+      }),
+      this.prisma.agent.findUnique({
+        where: { id: agentId }
       })
-      .sort((a, b) => b.enrollments - a.enrollments)
-      .slice(0, 5);
+    ]);
 
-    return {
-      totalCourses: allCourses.length,
-      totalEnrollments: allEnrollments.length,
-      completionRate,
-      averageScore,
-      popularCourses,
-      categoryDistribution,
-    };
+    if (agent) {
+      await this.prisma.agent.update({
+        where: { id: agentId },
+        data: {
+          certificationsCount,
+          lastTrainingDate: new Date()
+        }
+      });
+    }
   }
 
-  // ========================================
-  // ASSESSMENTS
-  // ========================================
+  // Assessment System
+  async submitQuiz(quizId: string, data: SubmitQuizDto): Promise<QuizAttempt> {
+    const attempt = await this.educationRepository.submitQuiz(quizId, data);
 
-  /**
-   * Submit assessment
-   */
-  async submitAssessment(params: {
-    enrollmentId: string;
-    answers: Record<string, string | string[]>;
-  }): Promise<{ passed: boolean; score: number; feedback: string[] }> {
-    const enrollment = enrollments.get(params.enrollmentId);
-    if (!enrollment) {
-      return { passed: false, score: 0, feedback: ['Enrollment not found'] };
-    }
+    // Update module progress if quiz was passed
+    if (attempt.passed) {
+      const moduleProgress = await this.prisma.moduleProgress.findUnique({
+        where: { id: data.moduleProgressId }
+      });
 
-    const course = courses.get(enrollment.courseId);
-    if (!course || !course.assessment) {
-      return { passed: false, score: 0, feedback: ['Assessment not found'] };
-    }
-
-    if (enrollment.assessmentAttempts >= course.assessment.maxAttempts) {
-      return { passed: false, score: 0, feedback: ['Maximum attempts reached'] };
-    }
-
-    // Calculate score
-    let correctAnswers = 0;
-    const feedback: string[] = [];
-
-    for (const question of course.assessment.questions) {
-      const userAnswer = params.answers[question.id];
-      const isCorrect = Array.isArray(userAnswer)
-        ? JSON.stringify(userAnswer.sort()) === JSON.stringify(
-            Array.isArray(question.correctAnswer) ? question.correctAnswer.sort() : [question.correctAnswer]
-          )
-        : userAnswer === question.correctAnswer;
-
-      if (isCorrect) {
-        correctAnswers++;
-      } else {
-        feedback.push(`Question "${question.question}": Incorrect. ${question.correctAnswer}`);
+      if (moduleProgress) {
+        await this.updateModuleProgress(moduleProgress.id, {
+          status: 'COMPLETED',
+          progress: 100
+        });
       }
     }
 
-    const score = Math.round((correctAnswers / course.assessment.questions.length) * 100);
-    const passed = score >= course.assessment.passingScore;
+    return attempt;
+  }
 
-    enrollment.assessmentScore = score;
-    enrollment.assessmentAttempts++;
-    enrollments.set(params.enrollmentId, enrollment);
+  // Agent Education Management
+  async updateAgentEducation(agentId: string, data: UpdateAgentEducationDto): Promise<Agent> {
+    return this.educationRepository.updateAgentEducation(agentId, data);
+  }
 
-    if (passed) {
-      // Issue certificate
-      await this.issueCertificate({
-        courseId: enrollment.courseId,
-        agentId: enrollment.agentId,
-        score,
-      });
-      enrollment.status = 'certified';
-      enrollments.set(params.enrollmentId, enrollment);
+  async getAgentEducationProfile(agentId: string): Promise<AgentEducationProfile | null> {
+    const profile = await this.educationRepository.getAgentEducationProfile(agentId);
+    
+    if (!profile) return null;
+
+    // Add computed fields
+    const computedProfile = {
+      ...profile,
+      progressStats: {
+        ...profile.progressStats,
+        completionRate: profile.progressStats.totalCoursesEnrolled > 0 
+          ? (profile.progressStats.totalCoursesCompleted / profile.progressStats.totalCoursesEnrolled) * 100 
+          : 0
+      }
+    };
+
+    return computedProfile;
+  }
+
+  // Helper Methods
+  private async getCoursesBySpecialization(specialization: InsuranceType): Promise<Course[]> {
+    const result = await this.educationRepository.getCourses({
+      isActive: true
+    });
+
+    return result.courses.filter(course => 
+      course.tags.includes(specialization) || 
+      course.category === 'SPECIALIZATIONS'
+    );
+  }
+
+  // Analytics and Reporting
+  async getEducationAnalytics(): Promise<EducationStats> {
+    return this.educationRepository.getEducationStats();
+  }
+
+  async getAgentProgressReport(agentId: string): Promise<{
+    agent: Agent;
+    progress: {
+      totalCourses: number;
+      completedCourses: number;
+      inProgressCourses: number;
+      totalHours: number;
+      certifications: number;
+      averageScore: number;
+    };
+    recentActivity: Array<{
+      type: 'enrollment' | 'completion' | 'certification';
+      courseName: string;
+      date: Date;
+      score?: number;
+    }>;
+  }> {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId }
+    });
+
+    if (!agent) {
+      throw new Error('Agent not found');
     }
 
-    return { passed, score, feedback };
+    const enrollments = await this.prisma.courseEnrollment.findMany({
+      where: { agentId },
+      include: { course: true }
+    });
+
+    const certifications = await this.prisma.courseCertification.findMany({
+      where: { agentId, isActive: true },
+      include: { course: true }
+    });
+
+    const progress = {
+      totalCourses: enrollments.length,
+      completedCourses: enrollments.filter(e => e.status === 'COMPLETED').length,
+      inProgressCourses: enrollments.filter(e => e.status === 'IN_PROGRESS').length,
+      totalHours: agent.totalTrainingHours,
+      certifications: certifications.length,
+      averageScore: enrollments
+        .filter(e => e.finalScore)
+        .reduce((sum, e) => sum + (e.finalScore || 0), 0) / enrollments.filter(e => e.finalScore).length || 0
+    };
+
+    const recentActivity = [
+      ...enrollments
+        .filter(e => e.enrolledAt)
+        .map(e => ({
+          type: 'enrollment' as const,
+          courseName: e.course.title,
+          date: e.enrolledAt
+        })),
+      ...enrollments
+        .filter(e => e.completedAt)
+        .map(e => ({
+          type: 'completion' as const,
+          courseName: e.course.title,
+          date: e.completedAt,
+          score: e.finalScore
+        })),
+      ...certifications
+        .map(c => ({
+          type: 'certification' as const,
+          courseName: c.course.title,
+          date: c.issuedAt,
+          score: c.score
+        }))
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 10);
+
+    return {
+      agent,
+      progress,
+      recentActivity
+    };
+  }
+
+  // Bulk Operations
+  async enrollAgentInRecommendedCourses(agentId: string): Promise<CourseEnrollment[]> {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId }
+    });
+
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
+    // Get recommendations based on agent's specialization and performance
+    const recommendations = await this.getPersonalizedRecommendations(agentId);
+    const enrollments: CourseEnrollment[] = [];
+
+    for (const courseId of recommendations) {
+      try {
+        const enrollment = await this.enrollInCourse(courseId, { agentId });
+        enrollments.push(enrollment);
+      } catch (error) {
+        console.warn(`Failed to enroll in recommended course ${courseId}:`, error);
+      }
+    }
+
+    return enrollments;
+  }
+
+  private async getPersonalizedRecommendations(agentId: string): Promise<string[]> {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId }
+    });
+
+    if (!agent) return [];
+
+    // Get agent's current enrollments
+    const currentEnrollments = await this.prisma.courseEnrollment.findMany({
+      where: { agentId }
+    });
+
+    const enrolledCourseIds = currentEnrollments.map(e => e.courseId);
+
+    // Get courses based on agent's specialization
+    const courses = await this.educationRepository.getCourses({
+      isActive: true
+    });
+
+    // Filter out already enrolled courses and return recommendations
+    return courses.courses
+      .filter(course => !enrolledCourseIds.includes(course.id))
+      .filter(course => 
+        agent.specializations.some(spec => 
+          course.tags.includes(spec) || course.category === 'SPECIALIZATIONS'
+        )
+      )
+      .slice(0, 5) // Return top 5 recommendations
+      .map(course => course.id);
+  }
+
+  // Compliance and Reporting
+  async getComplianceReport(): Promise<{
+    totalAgents: number;
+    compliantAgents: number;
+    nonCompliantAgents: Array<{
+      agent: Agent;
+      missingCourses: string[];
+      expiredCertifications: CourseCertification[];
+    }>;
+    complianceRate: number;
+  }> {
+    const agents = await this.prisma.agent.findMany({
+      where: { isActive: true }
+    });
+
+    const mandatoryCourses = await this.educationRepository.getCourses({
+      isMandatory: true,
+      isActive: true
+    });
+
+    const complianceResults = await Promise.all(
+      agents.map(async (agent) => {
+        const [completedEnrollments, certifications] = await Promise.all([
+          this.prisma.courseEnrollment.findMany({
+            where: {
+              agentId: agent.id,
+              status: 'COMPLETED'
+            },
+            include: { course: true }
+          }),
+          this.prisma.courseCertification.findMany({
+            where: {
+              agentId: agent.id,
+              isActive: true
+            }
+          })
+        ]);
+
+        const completedCourseIds = completedEnrollments.map(e => e.courseId);
+        const missingCourses = mandatoryCourses.courses
+          .filter(course => !completedCourseIds.includes(course.id))
+          .map(course => course.title);
+
+        const expiredCertifications = certifications.filter(
+          cert => cert.expiresAt && cert.expiresAt < new Date()
+        );
+
+        return {
+          agent,
+          missingCourses,
+          expiredCertifications,
+          isCompliant: missingCourses.length === 0 && expiredCertifications.length === 0
+        };
+      })
+    );
+
+    const compliantAgents = complianceResults.filter(result => result.isCompliant).length;
+
+    return {
+      totalAgents: agents.length,
+      compliantAgents,
+      nonCompliantAgents: complianceResults
+        .filter(result => !result.isCompliant)
+        .map(result => ({
+          agent: result.agent,
+          missingCourses: result.missingCourses,
+          expiredCertifications: result.expiredCertifications
+        })),
+      complianceRate: agents.length > 0 ? (compliantAgents / agents.length) * 100 : 0
+    };
   }
 }
