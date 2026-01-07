@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { 
-  MarketAnalysisEngine, 
-  EcosystemPartnershipManager, 
-  AgencyNetworkManager,  
-  NetworkEffectsEngine 
+import {
+  MarketAnalysisEngine,
+  EcosystemPartnershipManager,
+  AgencyNetworkManager,
+  NetworkEffectsEngine
 } from '@leadgen/strategy';
 
 @Injectable()
 export class StrategyService {
   private readonly logger = new Logger(StrategyService.name);
-  
+
   constructor(
     private readonly marketAnalysisEngine: MarketAnalysisEngine,
     private readonly ecosystemPartnershipManager: EcosystemPartnershipManager,
@@ -26,13 +26,13 @@ export class StrategyService {
     this.logger.log(`Fetching acquisition timeline for target ${targetId}`);
     const opportunities = await this.marketAnalysisEngine.analyzeMarketConsolidationOpportunities();
     const opportunity = opportunities.find(o => o.targets.some(t => t.id === targetId));
-    
+
     if (!opportunity) {
-      throw new Error(`Acquisition target ${targetId} not found in opportunities`);
+      throw new Error('Acquisition target not found');
     }
-    
+
     const target = opportunity.targets.find(t => t.id === targetId);
-    return this.marketAnalysisEngine.generateConsolidationTimeline({
+    return await this.marketAnalysisEngine.generateConsolidationTimeline({
       ...opportunity,
       targets: [target]
     });
@@ -44,12 +44,12 @@ export class StrategyService {
   }
 
   async getPartnersByTier(tier: string): Promise<any> {
-    this.logger.log(`Fetching ${tier} tier partners`);
+    this.logger.log(`Fetching partners by tier: ${tier}`);
     return await this.ecosystemPartnershipManager.getPartnersByTier(tier);
   }
 
   async getPartnersByType(type: string): Promise<any> {
-    this.logger.log(`Fetching ${type} partners`);
+    this.logger.log(`Fetching partners by type: ${type}`);
     return await this.ecosystemPartnershipManager.getPartnersByType(type);
   }
 
@@ -65,7 +65,14 @@ export class StrategyService {
 
   async calculateRevenueShare(partnerId: string, leadsGenerated: number): Promise<any> {
     this.logger.log(`Calculating revenue share for partner ${partnerId}`);
-    return await this.ecosystemPartnershipManager.calculateRevenueShare(partnerId, leadsGenerated);
+    const revenueShare = await this.ecosystemPartnershipManager.calculateRevenueShare(partnerId, leadsGenerated);
+    return { partnerId, leadsGenerated, revenueShare };
+  }
+
+  async updatePartnerActivationMetrics(partnerId: string, metrics: any): Promise<any> {
+    this.logger.log(`Updating activation metrics for partner ${partnerId}`);
+    await this.ecosystemPartnershipManager.trackPartnerActivation(partnerId, metrics);
+    return { success: true, partnerId };
   }
 
   async getAgencyNetworkMetrics(): Promise<any> {
@@ -74,27 +81,34 @@ export class StrategyService {
   }
 
   async getAgenciesByRegion(region: string): Promise<any> {
-    this.logger.log(`Fetching agencies in region: ${region}`);
+    this.logger.log(`Fetching agencies by region: ${region}`);
     return await this.agencyNetworkManager.getAgenciesByRegion(region);
   }
 
   async getAgenciesBySpecialization(specialization: string): Promise<any> {
-    this.logger.log(`Fetching agencies with specialization: ${specialization}`);
+    this.logger.log(`Fetching agencies by specialization: ${specialization}`);
     return await this.agencyNetworkManager.getAgenciesBySpecialization(specialization);
   }
 
   async getAgencyPerformanceReport(agencyId: string): Promise<any> {
-    this.logger.log(`Fetching performance report for agency ${agencyId}`);
+    this.logger.log(`Fetching agency performance report: ${agencyId}`);
     return await this.agencyNetworkManager.getAgencyPerformanceReport(agencyId);
   }
 
   async calculateCommission(agencyId: string, leadValue: number): Promise<any> {
     this.logger.log(`Calculating commission for agency ${agencyId}`);
-    return await this.agencyNetworkManager.calculateCommission(agencyId, leadValue);
+    const commission = await this.agencyNetworkManager.calculateCommission(agencyId, leadValue);
+    return { agencyId, leadValue, commission };
+  }
+
+  async updateAgencyTier(agencyId: string): Promise<any> {
+    this.logger.log(`Updating tier for agency ${agencyId}`);
+    const tier = await this.agencyNetworkManager.updateAgencyTier(agencyId);
+    return { agencyId, tier };
   }
 
   async getNetworkGrowthForecast(): Promise<any> {
-    this.logger.log('Fetching agency network growth forecast');
+    this.logger.log('Fetching network growth forecast');
     return await this.agencyNetworkManager.getNetworkGrowthForecast();
   }
 
@@ -119,19 +133,19 @@ export class StrategyService {
   }
 
   async analyzeNetworkReinforcement(): Promise<any> {
-    this.logger.log('Analyzing network reinforcement');
+    this.logger.log('Fetching network reinforcement analysis');
     return await this.networkEffectsEngine.analyzeNetworkReinforcement();
   }
 
   async getNetworkExpansionOpportunities(): Promise<any> {
     this.logger.log('Fetching network expansion opportunities');
-    return await this.networkEffectsEngine.generateNetworkExpansionOpportunities();
+    return await this.networkEffectsEngine.getNetworkExpansionOpportunities();
   }
 
   async distributeLeadToAgencies(lead: any): Promise<any> {
-    this.logger.log('Distributing lead to agencies');
-    const assignedAgencyId = await this.agencyNetworkManager.distributeLead(lead);
-    return { leadId: lead.id, assignedAgencyId };
+    this.logger.log(`Distributing lead ${lead.id} to agencies`);
+    const result = await this.agencyNetworkManager.distributeLead(lead);
+    return { leadId: lead.id, assignedAgencyId: result };
   }
 
   async executeLeadExchange(sourceAgencyId: string, receivingAgencyId: string, lead: any): Promise<any> {
@@ -139,20 +153,10 @@ export class StrategyService {
     return await this.networkEffectsEngine.executeLeadExchange(sourceAgencyId, receivingAgencyId, lead);
   }
 
-  async updatePartnerActivationMetrics(partnerId: string, metrics: any): Promise<void> {
-    this.logger.log(`Updating activation metrics for partner ${partnerId}`);
-    await this.ecosystemPartnershipManager.trackPartnerActivation(partnerId, metrics);
-  }
-
-  async updateAgencyTier(agencyId: string): Promise<any> {
-    this.logger.log(`Updating tier for agency ${agencyId}`);
-    const newTier = await this.agencyNetworkManager.updateAgencyTier(agencyId);
-    return { agencyId, newTier };
-  }
-
   async getComprehensiveStrategyReport(): Promise<any> {
     this.logger.log('Generating comprehensive strategy report');
-    
+
+    // Aggregate all strategy data
     const [
       consolidationOpportunities,
       ecosystemMetrics,
@@ -186,7 +190,7 @@ export class StrategyService {
       },
       agencyNetwork: {
         metrics: agencyMetrics,
-        networkDensity: `Active agencies across ${new Set(this.agencyNetworkManager['agencies'].map(a => a.location.region)).size} regions`,
+        networkDensity: `Active agencies across multiple regions`,
         growthTrajectory: agencyMetrics.networkGrowthRate
       },
       networkEffects: {
@@ -198,63 +202,36 @@ export class StrategyService {
         moatStrength: competitiveMoatStrength,
         marketLeadership: 'Dominant in West Coast, expanding in Northeast',
         strategicAdvantages: [
-          'Leading agency network with 90+ active partners',
+          'Leading agency network with 150+ active partners',
           'Advanced technology platform with AI/ML capabilities',
           'Strong network effects and high switching costs',
           'Comprehensive ecosystem of technology and data partners'
         ]
-      },
-      strategicRecommendations: this.generateStrategicRecommendations({
-        consolidationOpportunities,
-        ecosystemMetrics,
-        agencyMetrics,
-        networkEffects
-      })
+      }
     };
   }
 
   private calculateCompetitiveMoatStrength(data: any): string {
     const { ecosystemMetrics, networkEffects, agencyMetrics } = data;
-    
+   
     let moatScore = 0;
-    
+   
     // Network effects strength (0-25 points)
     moatScore += Math.min(networkEffects.networkEfficiency * 25, 25);
-    
+   
     // Ecosystem health (0-25 points)
     moatScore += Math.min(ecosystemMetrics.ecosystemHealth / 100 * 25, 25);
-    
+
     // Agency network scale (0-25 points)
-    moatScore += Math.min(agencyMetrics.totalAgencies / 200 * 25, 25);
-    
-    // Revenue diversification (0-25 points)
+    moatScore += Math.min(agencyMetrics.totalAgencies / 500 * 25, 25);
+
+    // Revenue diversification (0-25 points)  
     moatScore += Math.min(ecosystemMetrics.revenueContributed / 5000000 * 25, 25);
-    
+
     if (moatScore >= 80) return 'Very Strong';
     if (moatScore >= 60) return 'Strong';
     if (moatScore >= 40) return 'Moderate';
     if (moatScore >= 20) return 'Weak';
     return 'Very Weak';
-  }
-
-  private generateStrategicRecommendations(data: any): string[] {
-    const recommendations = [];
-    
-    if (data.consolidationOpportunities.length > 0) {
-      recommendations.push('Execute top 3 market consolidation opportunities within 6 months');
-    }
-    
-    if (data.ecosystemMetrics.growthRate < 0.3) {
-      recommendations.push('Accelerate ecosystem development - target 35%+ monthly growth');
-    }
-    
-    if (data.networkEffects.networkEfficiency < 0.6) {
-      recommendations.push('Improve network efficiency through better matching algorithms');
-    }
-    
-    recommendations.push('Focus on international expansion in 2-3 priority markets');
-    recommendations.push('Strengthen competitive moat through strategic partnerships and IP development');
-    
-    return recommendations;
   }
 }

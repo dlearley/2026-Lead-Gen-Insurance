@@ -498,52 +498,60 @@ export class NetworkEffectsEngine {
   private calculateCompoundingEffects(): any {
     const participantGrowthRate = 0.28; // 28% monthly growth
     const valueGrowthRate = 0.45; // 45% monthly value growth
-    const featureAdoptionRate = 0.15; // 15% monthly feature adoption
+    const adoptionGrowthRate = 0.35; // 35% monthly adoption growth
 
     return {
-      monthly: {
-        networkValue: participantGrowthRate * valueGrowthRate,
-        featureImpact: featureAdoptionRate * 2.1
+      threeMonths: {
+        participants: Math.round(this.participants.length * Math.pow(1 + participantGrowthRate, 3)),
+        value: Math.round(this.participants.reduce((sum, p) => sum + p.valueProvided + p.valueReceived, 0) * Math.pow(1 + valueGrowthRate, 3)),
+        adoption: Math.round(this.ecosystemFeatures.reduce((sum, f) => sum + f.adoptionRate, 0) * Math.pow(1 + adoptionGrowthRate, 3))
       },
-      quarterly: {
-        networkValue: Math.pow(1 + participantGrowthRate * valueGrowthRate, 3) - 1,
-        featureImpact: Math.pow(1 + featureAdoptionRate * 2.1, 3) - 1
+      sixMonths: {
+        participants: Math.round(this.participants.length * Math.pow(1 + participantGrowthRate, 6)),
+        value: Math.round(this.participants.reduce((sum, p) => sum + p.valueProvided + p.valueReceived, 0) * Math.pow(1 + valueGrowthRate, 6)),
+        adoption: Math.round(this.ecosystemFeatures.reduce((sum, f) => sum + f.adoptionRate, 0) * Math.pow(1 + adoptionGrowthRate, 6))
       },
-      annual: {
-        networkValue: Math.pow(1 + participantGrowthRate * valueGrowthRate, 12) - 1,
-        featureImpact: Math.pow(1 + featureAdoptionRate * 2.1, 12) - 1
+      twelveMonths: {
+        participants: Math.round(this.participants.length * Math.pow(1 + participantGrowthRate, 12)),
+        value: Math.round(this.participants.reduce((sum, p) => sum + p.valueProvided + p.valueReceived, 0) * Math.pow(1 + valueGrowthRate, 12)),
+        adoption: Math.round(this.ecosystemFeatures.reduce((sum, f) => sum + f.adoptionRate, 0) * Math.pow(1 + adoptionGrowthRate, 12))
       }
     };
   }
 
-  async generateNetworkExpansionOpportunities(): Promise<any[]> {
-    const opportunities = [];
+  async getNetworkExpansionOpportunities(): Promise<any> {
+    const currentMetrics = await this.calculateNetworkEffects();
+    const growthRate = 0.28; // 28% monthly growth
 
-    // Identify underserved segments
-    const underservedTypes = ['carrier', 'mga', 'wholesale'];
-    for (const type of underservedTypes) {
-      const currentCount = this.participants.filter(p => p.type === type).length;
-      if (currentCount < 2) {
-        opportunities.push({
-          type: 'participant_recruitment',
-          target: type,
-          potentialImpact: 'High network diversity and value creation',
-          priority: 'high'
-        });
-      }
-    }
-
-    // Identify feature gaps
-    const lowAdoptionFeatures = this.ecosystemFeatures.filter(f => f.adoptionRate < 0.5);
-    for (const feature of lowAdoptionFeatures) {
-      opportunities.push({
-        type: 'feature_promotion',
-        target: feature.name,
-        potentialImpact: `Increase network effects by ${Math.round((feature.adoptionRate * feature.networkEffectMultiplier) * 100)}%`,
-        priority: 'medium'
-      });
-    }
-
-    return opportunities;
+    return {
+      currentState: {
+        participants: currentMetrics.networkSize,
+        connections: currentMetrics.totalConnections,
+        value: currentMetrics.totalValueExchanged
+      },
+      expansionPotential: {
+        threeMonths: {
+          participants: Math.round(currentMetrics.networkSize * Math.pow(1 + growthRate, 3)),
+          connections: Math.round(currentMetrics.totalConnections * Math.pow(1 + growthRate, 3)),
+          value: Math.round(currentMetrics.totalValueExchanged * Math.pow(1 + growthRate, 3))
+        },
+        sixMonths: {
+          participants: Math.round(currentMetrics.networkSize * Math.pow(1 + growthRate, 6)),
+          connections: Math.round(currentMetrics.totalConnections * Math.pow(1 + growthRate, 6)),
+          value: Math.round(currentMetrics.totalValueExchanged * Math.pow(1 + growthRate, 6))
+        },
+        twelveMonths: {
+          participants: Math.round(currentMetrics.networkSize * Math.pow(1 + growthRate, 12)),
+          connections: Math.round(currentMetrics.totalConnections * Math.pow(1 + growthRate, 12)),
+          value: Math.round(currentMetrics.totalValueExchanged * Math.pow(1 + growthRate, 12))
+        }
+      },
+      strategicRecommendations: [
+        'Expand partner ecosystem to increase network density',
+        'Enhance feature adoption through training and incentives',
+        'Focus on high-value participants for maximum network effects',
+        'Develop new collaboration features to increase engagement'
+      ]
+    };
   }
 }

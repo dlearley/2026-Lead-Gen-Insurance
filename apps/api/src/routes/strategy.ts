@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { 
+import {
   MarketAnalysisEngine, 
   EcosystemPartnershipManager, 
   AgencyNetworkManager, 
@@ -418,7 +418,7 @@ router.post('/network/execute-lead-exchange', async (req, res) => {
 router.get('/comprehensive-report', async (req, res) => {
   try {
     logger.info('Generating comprehensive strategy report');
-    
+
     // Aggregate all strategy data
     const [
       consolidationOpportunities,
@@ -431,14 +431,14 @@ router.get('/comprehensive-report', async (req, res) => {
       agencyNetworkManager.getNetworkMetrics(),
       networkEffectsEngine.calculateNetworkEffects()
     ]);
-    
+
     const competitiveMoatStrength = calculateCompetitiveMoatStrength({
       consolidationOpportunities,
       ecosystemMetrics,
       agencyMetrics,
       networkEffects
     });
-    
+
     const report = {
       marketConsolidation: {
         opportunities: consolidationOpportunities,
@@ -472,7 +472,7 @@ router.get('/comprehensive-report', async (req, res) => {
         ]
       }
     };
-    
+
     res.json({
       success: true,
       data: report,
@@ -490,21 +490,21 @@ router.get('/comprehensive-report', async (req, res) => {
 
 function calculateCompetitiveMoatStrength(data: any): string {
   const { ecosystemMetrics, networkEffects, agencyMetrics } = data;
-  
+ 
   let moatScore = 0;
-  
+ 
   // Network effects strength (0-25 points)
   moatScore += Math.min(networkEffects.networkEfficiency * 25, 25);
-  
+ 
   // Ecosystem health (0-25 points)
   moatScore += Math.min(ecosystemMetrics.ecosystemHealth / 100 * 25, 25);
-  
+
   // Agency network scale (0-25 points)
   moatScore += Math.min(agencyMetrics.totalAgencies / 500 * 25, 25);
-  
+
   // Revenue diversification (0-25 points)  
   moatScore += Math.min(ecosystemMetrics.revenueContributed / 5000000 * 25, 25);
-  
+
   if (moatScore >= 80) return 'Very Strong';
   if (moatScore >= 60) return 'Strong';
   if (moatScore >= 40) return 'Moderate';
