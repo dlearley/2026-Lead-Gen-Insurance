@@ -1,7 +1,8 @@
 // ========================================
-// CDP TYPES (Phase 11.2)
+// BEHAVIOR & PERSONALIZATION TYPES
 // ========================================
-export * from './cdp.js';
+
+export * from './behavior';
 
 // ========================================
 // USER TYPES
