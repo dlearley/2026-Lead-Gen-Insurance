@@ -183,7 +183,588 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
-// Enums for type safety
+// Financial Products
+model FinancialProduct {
+  id                    String              @id @default(uuid())
+  organizationId        String?
+  productName           String
+  productType           ProductType
+  providerId            String
+  description           String?
+  category              String
+  subcategory           String?
+  status                ProductStatus       @default(ACTIVE)
+  minInvestment         Decimal?            @db.Decimal(15, 2)
+  maxInvestment         Decimal?            @db.Decimal(15, 2)
+  fees                  Json?
+  terms                 Json?
+  regulatoryClassification Json?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([organizationId])
+  @@index([providerId])
+  @@index([productType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("financial_products")
+}
+
+model ProductVariant {
+  id              String   @id @default(uuid())
+  productId       String
+  variantName     String
+  variantCode     String?
+  tierLevel       Int?
+  features        Json?
+  pricing         Json?
+  requirements    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([productId])
+  @@index([tierLevel])
+  @@map("product_variants")
+}
+
+// Financial Advisors
+model FinancialAdvisor {
+  id                  String           @id @default(uuid())
+  organizationId      String?
+  userId              String?
+  licenseNumber       String           @unique
+  licenseType         String[]
+  specializations     String[]
+  credentials         Json?
+  maxClients          Int              @default(50)
+  currentClients      Int              @default(0)
+  aum                 Decimal?         @db.Decimal(15, 2)
+  status              AdvisorStatus    @default(ACTIVE)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("financial_advisors")
+}
+
+// Financial Planning
+model FinancialPlan {
+  id                 String        @id @default(uuid())
+  customerId         String
+  advisorId          String?
+  planType           String?
+  status             PlanStatus    @default(DRAFT)
+  creationDate       DateTime?
+  lastReviewDate     DateTime?
+  nextReviewDate     DateTime?
+  planDocumentUrl    String?
+  recommendations    Json?
+  goals              Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([customerId])
+  @@index([advisorId])
+  @@index([status])
+  @@index([creationDate])
+  @@index([nextReviewDate])
+  @@map("financial_plans")
+}
+
+model FinancialGoal {
+  id                 String       @id @default(uuid())
+  customerId         String
+  goalType           String?
+  goalDescription    String?
+  targetAmount       Decimal?     @db.Decimal(15, 2)
+  targetDate         DateTime?
+  currentProgress    Decimal?     @db.Decimal(15, 2) @default(0)
+  priorityLevel      Int          @default(3)
+  status             GoalStatus   @default(NOT_STARTED)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([targetDate])
+  @@index([priorityLevel])
+  @@map("financial_goals")
+}
+
+// Wealth Management
+model CustomerAccount {
+  id                    String   @id @default(uuid())
+  customerId            String
+  accountName           String?
+  accountType           String?
+  externalAccountId     String?
+  institutionName       String?
+  balance               Decimal? @default(0) @db.Decimal(15, 2)
+  currency              String   @default("USD")
+  isAggregated          Boolean  @default(false)
+  aggregationSource     String?
+  lastSyncedAt          DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([externalAccountId])
+  @@index([isAggregated])
+  @@index([lastSyncedAt])
+  @@map("customer_accounts")
+}
+
+model Portfolio {
+  id                 String         @id @default(uuid())
+  customerId         String
+  portfolioName      String?
+  portfolioType      PortfolioType?
+  status             PortfolioStatus @default(ACTIVE)
+  totalValue         Decimal?       @default(0) @db.Decimal(15, 2)
+  cashPosition       Decimal?       @default(0) @db.Decimal(15, 2)
+  targetAllocation   Json?
+  actualAllocation   Json?
+  performanceYtd     Decimal?       @default(0) @db.Decimal(10, 4)
+  performance1yr     Decimal?       @default(0) @db.Decimal(10, 4)
+  riskScore          Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([customerId])
+  @@index([portfolioType])
+  @@index([status])
+  @@index([riskScore])
+  @@index([createdAt])
+  @@map("portfolios")
+}
+
+model PortfolioHolding {
+  id                 String   @id @default(uuid())
+  portfolioId        String
+  securityId         String?
+  symbol             String?
+  quantity           Decimal? @db.Decimal(15, 4)
+  costBasis          Decimal? @default(0) @db.Decimal(15, 2)
+  currentValue       Decimal? @default(0) @db.Decimal(15, 2)
+  purchaseDate       DateTime?
+  unrealizedGainLoss Decimal? @default(0) @db.Decimal(15, 2)
+  allocationPercentage Decimal? @default(0) @db.Decimal(5, 4)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([portfolioId])
+  @@index([symbol])
+  @@index([securityId])
+  @@map("portfolio_holdings")
+}
+
+// Open Banking & Data
+model LinkedAccount {
+  id                     String   @id @default(uuid())
+  customerId             String
+  externalAccountId      String?
+  externalInstitutionId  String?
+  institutionName        String?
+  accountType            String?
+  accountNumberMasked    String?
+  routingNumber          String?
+  balance                Decimal? @default(0) @db.Decimal(15, 2)
+  currency               String   @default("USD")
+  isActive               Boolean  @default(true)
+  lastSyncedAt           DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([externalAccountId])
+  @@index([isActive])
+  @@index([lastSyncedAt])
+  @@map("linked_accounts")
+}
+
+model FinancialTransaction {
+  id                  String   @id @default(uuid())
+  customerId          String
+  accountId           String?
+  transactionDate     DateTime
+  transactionType     String?
+  category            String?
+  amount              Decimal  @db.Decimal(15, 2)
+  merchant            String?
+  description         String?
+  transactionIdExternal String?
+  createdAt           DateTime @default(now())
+
+  @@index([customerId])
+  @@index([accountId])
+  @@index([transactionDate])
+  @@index([category])
+  @@index([transactionIdExternal])
+  @@map("financial_transactions")
+}
+
+model SpendingAnalytics {
+  id                  String   @id @default(uuid())
+  customerId          String
+  periodMonth         DateTime
+  totalSpending       Decimal? @default(0) @db.Decimal(15, 2)
+  categoryBreakdown   Json?
+  incomeTotal         Decimal? @default(0) @db.Decimal(15, 2)
+  savingsRate         Decimal? @default(0) @db.Decimal(5, 4)
+  debtPayments        Decimal? @default(0) @db.Decimal(15, 2)
+  createdAt           DateTime @default(now())
+
+  @@index([customerId])
+  @@index([periodMonth])
+  @@unique([customerId, periodMonth])
+  @@map("spending_analytics")
+}
+
+// Product Applications
+model ProductApplication {
+  id                 String           @id @default(uuid())
+  customerId         String
+  productId          String?
+  variantId          String?
+  advisorId          String?
+  applicationDate    DateTime         @default(now())
+  status             ApplicationStatus @default(DRAFT)
+  applicationData    Json?
+  documents          Json?
+  approvedDate       DateTime?
+  enrollmentDate     DateTime?
+  decisionReason     String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([advisorId])
+  @@index([status])
+  @@index([applicationDate])
+  @@index([approvedDate])
+  @@map("product_applications")
+}
+
+model CustomerProduct {
+  id                String              @id @default(uuid())
+  customerId        String
+  productId         String?
+  variantId         String?
+  enrollmentDate    DateTime?
+  accountNumber     String?
+  status            CustomerProductStatus @default(ACTIVE)
+  balance           Decimal?            @default(0) @db.Decimal(15, 2)
+  currentValue      Decimal?            @default(0) @db.Decimal(15, 2)
+  performance       Decimal?            @default(0) @db.Decimal(10, 4)
+  lastStatementDate DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([status])
+  @@index([enrollmentDate])
+  @@map("customer_products")
+}
+
+// Recommendations
+model ProductRecommendation {
+  id                  String   @id @default(uuid())
+  customerId          String
+  productId           String?
+  recommendationType  String?
+  confidenceScore     Decimal? @default(0) @db.Decimal(5, 4)
+  reason              String?
+  recommendedDate     DateTime @default(now())
+  viewed              Boolean  @default(false)
+  clicked             Boolean  @default(false)
+  applied             Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([confidenceScore])
+  @@index([recommendedDate])
+  @@index([viewed])
+  @@index([clicked])
+  @@index([applied])
+  @@map("product_recommendations")
+}
+
+// Financial Wellness
+model WellnessProgram {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  programName     String
+  description     String?
+  programType     String?
+  targetSegments  Json?
+  status          WellnessStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("wellness_programs")
+}
+
+model WellnessEnrollment {
+  id                String          @id @default(uuid())
+  customerId        String
+  programId         String
+  enrollmentDate    DateTime        @default(now())
+  completionStatus  Decimal?        @default(0) @db.Decimal(5, 4)
+  score             Int?
+  status            WellnessStatus  @default(ACTIVE)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([programId])
+  @@index([status])
+  @@index([enrollmentDate])
+  @@map("wellness_enrollments")
+}
+
+model WellnessActivity {
+  id                 String   @id @default(uuid())
+  enrollmentId       String
+  activityType       String?
+  activityName       String?
+  completedDate      DateTime?
+  pointsEarned       Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  @@index([enrollmentId])
+  @@index([completedDate])
+  @@map("wellness_activities")
+}
+
+// Compliance
+model ComplianceDocument {
+  id                  String   @id @default(uuid())
+  organizationId      String?
+  documentType        String?
+  documentVersion     Int      @default(1)
+  effectiveDate       DateTime?
+  documentUrl         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([documentType])
+  @@index([effectiveDate])
+  @@index([documentVersion])
+  @@map("compliance_documents")
+}
+
+model AuditLog {
+  id                  String   @id @default(uuid())
+  organizationId      String?
+  userId              String?
+  actionType          String?
+  entityType          String?
+  entityId            String?
+  changes             Json?
+  timestamp           DateTime @default(now())
+  ipAddress           String?
+  createdAt           DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([actionType])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([timestamp])
+  @@index([ipAddress])
+  @@map("audit_logs")
+}
+
+// Partnerships
+model FinancialPartner {
+  id                  String          @id @default(uuid())
+  organizationId      String?
+  partnerName         String
+  partnerType         String?
+  status              PartnerStatus   @default(ACTIVE)
+  agreementDate       DateTime?
+  terms               Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([partnerType])
+  @@index([status])
+  @@index([agreementDate])
+  @@map("financial_partners")
+}
+
+model CommissionTracking {
+  id                   String          @id @default(uuid())
+  partnerId            String
+  productId            String?
+  customerId           String?
+  applicationId        String?
+  commissionAmount     Decimal?        @default(0) @db.Decimal(15, 2)
+  commissionPercentage Decimal?        @default(0) @db.Decimal(5, 4)
+  status               CommissionStatus @default(PENDING)
+  paymentDate          DateTime?
+  createdAt            DateTime        @default(now())
+
+  @@index([partnerId])
+  @@index([productId])
+  @@index([customerId])
+  @@index([status])
+  @@index([paymentDate])
+  @@map("commission_tracking")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  firstName       String?
+  lastName        String?
+  phone           String?
+  status          UserStatus @default(ACTIVE)
+  role            UserRole   @default(CUSTOMER)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Organization {
+  id              String    @id @default(uuid())
+  name            String
+  type            String?
+  status          OrgStatus @default(ACTIVE)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([name])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Financial Analytics
+model FinancialAnalytics {
+  id                     String   @id @default(uuid())
+  customerId             String   @unique
+  analysisDate           DateTime @default(now())
+  netWorth               Decimal? @default(0) @db.Decimal(15, 2)
+  assetAllocation        Json?
+  debtToIncomeRatio      Decimal? @default(0) @db.Decimal(5, 4)
+  savingsRate            Decimal? @default(0) @db.Decimal(5, 4)
+  financialHealthScore   Int?
+  riskProfile            String?
+  createdAt              DateTime @default(now())
+
+  @@index([customerId])
+  @@index([analysisDate])
+  @@index([financialHealthScore])
+  @@index([riskProfile])
+  @@map("financial_analytics")
+}
+
+// Enums for Financial Services
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum UserRole {
+  CUSTOMER
+  ADVISOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrgStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ProductType {
+  BANKING
+  INVESTMENT
+  INSURANCE
+  RETIREMENT
+  WEALTH
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum AdvisorStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PlanStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  ON_TRACK
+  AT_RISK
+  COMPLETED
+}
+
+enum PortfolioType {
+  MODEL
+  ROBO
+  DIRECT
+  MANAGED
+}
+
+enum PortfolioStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DECLINED
+  ENROLLED
+}
+
+enum CustomerProductStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+enum WellnessStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+}
+
+// Original Enums
 enum LeadStatus {
   RECEIVED
   PROCESSING
@@ -222,4 +803,15 @@ enum PartnershipStatus {
   SUSPENDED
   TERMINATED
   RENEWAL_NEEDED
+}
+
+enum PartnerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CommissionStatus {
+  PENDING
+  EARNED
+  PAID
 }
