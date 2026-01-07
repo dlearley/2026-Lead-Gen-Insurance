@@ -223,3 +223,244 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
+// Insurance License Management
+model InsuranceLicense {
+  id                String      @id @default(cuid())
+  agentId           String
+  licenseNumber     String
+  licenseType       String      // "Property", "Casualty", "Health", "Life", "Variable", "Universal", "Title"
+  states            String[]    // Array of states where licensed
+  lines             String[]    // Lines of authority (e.g., ["Auto", "Home", "Life"])
+  issuanceDate      DateTime
+  expiryDate        DateTime
+  status            String      @default("Active") // "Active", "Suspended", "Revoked", "Expired", "Pending"
+  verificationDate  DateTime?
+  verificationSource String?    // e.g., "NIPR", "StateBoard", "Manual"
+  producerNumber    String?
+  appointmentStatus String?     // "Appointed", "Terminated", "Pending"
+  backgroundCheck   String      // "Passed", "Failed", "Pending", "Waived"
+  fingerprintedDate DateTime?
+  complianceIssues  String[]    // Array of known compliance issues
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@unique([agentId, licenseNumber])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+// Carrier Appointment & Authority
+model CarrierAppointment {
+  id                String      @id @default(cuid())
+  agentId           String
+  carrierId         String      // Reference to insurance carrier
+  carrierName       String      // Carrier name for audit
+  appointmentDate   DateTime
+  terminationDate   DateTime?
+  authorizedLines   String[]    // Lines authorized by carrier (may be subset of license)
+  appointmentStatus String      @default("Active") // "Active", "Suspended", "Terminated", "Inactive"
+  commissionSplit   String?     // JSON with commission structure
+  contractUrl       String?     // URL to appointment contract
+  complianceStatus  String      // "Compliant", "NonCompliant", "UnderReview"
+  violations        String[]    // Array of violation descriptions
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@unique([agentId, carrierId])
+  @@index([appointmentStatus])
+}
+
+// Product Compliance Rules
+model InsuranceProductRule {
+  id                String      @id @default(cuid())
+  productType       String      // "Auto", "Home", "Health", "Life", "Umbrella", etc.
+  jurisdiction      String      // State code (CA, NY, TX) or "Federal"
+  ruleType          String      // "MinPremium", "MaxDeductible", "RequiredDisclosure", "AgeLimit", "MedicalUnderwriting"
+  ruleDescription   String
+  ruleCondition     String      // JSON schema or expression for rule evaluation
+  severity          String      // "Critical", "High", "Medium", "Low"
+  effectiveDate     DateTime
+  expiryDate        DateTime?
+  status            String      @default("Active") // "Active", "Draft", "Archived"
+  sourceReference   String?     // e.g., "Insurance Commissioner Bulletin", "Statute Section"
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@unique([productType, jurisdiction, ruleType])
+}
+
+// Fair Lending Compliance Rules (ECOA, FHA, etc.)
+model FairLendingRule {
+  id                String      @id @default(cuid())
+  ruleType          String      // "ECOA", "FHA", "CRA", "FCRA", "StateLaw", "InsuranceRegulation"
+  regulation        String      // e.g., "ECOA Section 701", "FHA Section 3605"
+  description       String      // Full description of the regulation
+  prohibitedFactors String[]    // Array of prohibited factors (race, color, religion, sex, national origin, etc.)
+  jurisdiction      String      // "Federal" or state code
+  affectedProducts  String[]    // Products affected by this rule
+  complianceActions String[]    // Required compliance actions
+  testingMethod     String?     // How to test compliance
+  penalties         String?     // Potential penalties
+  effectiveDate     DateTime
+  status            String      @default("Active")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+// Disparate Impact Testing & Monitoring
+model DisparateImpactMonitor {
+  id                String      @id @default(cuid())
+  monitoringPeriod  String      // YYYY-MM (month) or YYYY-Q# (quarter) or YYYY (annual)
+  protectedClass    String      // "Race", "Color", "Religion", "Sex", "NationalOrigin", "Age", "Disability"
+  product           String      // Product type monitored
+  totalApplications Int
+  approvedByClass   String      // JSON with approval counts by class
+  deniedByClass     String      // JSON with denial counts by class
+  approvalRateByClass String    // JSON with approval rate % by class
+  disparateImpact   Boolean     // Calculated disparate impact (80% rule)
+  disparityRatio    Float       // Actual approval rate difference
+  flagged           Boolean     @default(false)
+  reviewedDate      DateTime?
+  reviewNotes       String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@unique([monitoringPeriod, protectedClass, product])
+}
+
+// Quote & Premium Compliance
+model QuoteCompliance {
+  id                String      @id @default(cuid())
+  quoteId           String
+  productType       String
+  state             String
+  appliedRules      String[]    // Rules that were applied to this quote
+  violations        String[]    // Violations detected
+  premiumBefore     Float       // Premium before adjustments
+  premiumAfter      Float       // Premium after compliance adjustments
+  adjustments       String      // JSON with adjustment details
+  complianceStatus  String      // "Compliant", "NonCompliant", "ManualReview"
+  reviewedBy        String?
+  reviewNotes       String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([quoteId])
+  @@index([complianceStatus])
+}
+
+// Required Disclosures
+model RequiredDisclosure {
+  id                String      @id @default(cuid())
+  jurisdiction      String      // State code or "Federal"
+  productType       String      // "Auto", "Home", "Health", "Life", etc.
+  disclosureType    String      // "RateDisclosure", "UnderwritingFactors", "CancellationPolicy", "AppealsProcess", "GLBA", "CCPA"
+  disclosureText    String      // Full disclosure text
+  format            String      // "Email", "PDF", "WebPage", "Paper", "Verbal"
+  timing            String      // When disclosure must be made (e.g., "Before Quote", "Before Binding", "Upon Request")
+  isRequired        Boolean     @default(true)
+  isSensitive       Boolean     @default(false) // Requires special tracking
+  effectiveDate     DateTime
+  expiryDate        DateTime?
+  status            String      @default("Active")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@unique([jurisdiction, productType, disclosureType])
+}
+
+// Disclosure Delivery Tracking
+model DisclosureDelivery {
+  id                String      @id @default(cuid())
+  leadId            String
+  disclosureId      String
+  disclosureType    String
+  productType       String
+  state             String
+  deliveryMethod    String      // "Email", "WebPage", "PDF", "Paper"
+  deliveryDate      DateTime    @default(now())
+  deliveredAt       DateTime?
+  readDate          DateTime?   // When lead viewed disclosure
+  acknowledged      Boolean     @default(false)
+  acknowledgmentDate DateTime?
+  proof             String?     // URL to delivery proof (signed document, read receipt, etc.)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([leadId])
+  @@index([deliveryDate])
+  @@index([acknowledged])
+}
+
+// Underwriting & Declination Rules
+model UnderwritingRule {
+  id                String      @id @default(cuid())
+  productType       String
+  state             String
+  ruleDescription   String
+  ruleExpression    String      // JSON schema or DSL for rule evaluation
+  action            String      // "Approve", "Decline", "ManualReview", "RequestInfo", "CounterOffer"
+  reasoning         String      // Why rule triggers this action
+  auditTrail        Boolean     @default(true)
+  requiresManual    Boolean     @default(false) // Requires human review
+  effectiveDate     DateTime
+  expiryDate        DateTime?
+  status            String      @default("Active")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+// Agent Compliance History
+model AgentComplianceRecord {
+  id                String      @id @default(cuid())
+  agentId           String
+  eventType         String      // "Complaint", "Investigation", "Sanction", "Training", "Audit", "Violation"
+  severity          String      // "Critical", "High", "Medium", "Low"
+  description       String
+  source            String?     // "RegulatoryComplaint", "InternalAudit", "CustomerComplaint", "ExternalReview"
+  state             String?     // Which state it occurred in
+  dateOccurred      DateTime
+  dateResolved      DateTime?
+  resolution        String?
+  status            String      // "Open", "Resolved", "Suspended", "Terminated"
+  attachments       String[]    // URLs to supporting documents
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([agentId])
+  @@index([eventType])
+  @@index([status])
+}
+
+// Anti-Discrimination Rules
+model AntiDiscriminationRule {
+  id                String      @id @default(cuid())
+  regulation        String      // "ECOA", "FHA", "ADA", "StateLaw"
+  jurisdiction      String      // State code or "Federal"
+  prohibitedFactors String[]    // Prohibited discrimination factors
+  applicableProducts String[]   // Which products this applies to
+  checkMethod       String      // How to check for discrimination
+  actionRequired    String      // Action if discrimination detected
+  effectiveDate     DateTime
+  status            String      @default("Active")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+// Insurance Statutes & Regulations Repository
+model InsuranceRegulation {
+  id                String      @id @default(cuid())
+  jurisdiction      String      // State code or "Federal"
+  regulationType    String      // "UnfairPractice", "DiscriminationProhibition", "DisclosureRequirement", "RateRegulation", "ReserveRequirement"
+  statute           String      // Statute name/number
+  description       String
+  fullText          String?     // Full regulation text (optional)
+  effectiveDate     DateTime
+  expiryDate        DateTime?
+  penalties         String?     // Potential penalties
+  enforcingAgency   String      // "Insurance Commissioner", "Attorney General", etc.
+  contactInfo       String?     // Contact info for enforcing agency
+  lastReviewedDate  DateTime
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}

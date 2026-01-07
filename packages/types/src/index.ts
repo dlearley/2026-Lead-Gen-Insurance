@@ -828,3 +828,9 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
+
+// ========================================
+// INSURANCE COMPLIANCE TYPES
+// ========================================
+
+export * from './insurance-compliance.types.js';
