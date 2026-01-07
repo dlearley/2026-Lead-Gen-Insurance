@@ -783,183 +783,916 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// ========================================
-// FRAUD DETECTION & CLAIMS INTELLIGENCE - Phase 27.4
-// ========================================
+// Claims Management Models
 
-// Fraud detection models configuration
-model FraudDetectionModel {
-  id                String   @id @default(uuid())
-  name              String   @db.VarChar(255)
-  modelType         String   @db.VarChar(100) // behavioral, ml_classifier, rule_based, network
-  insuranceLine     String?  @db.VarChar(50)
-  modelVersion      Int?
-  trainingDate      DateTime?
-  performanceMetrics Json?
-  featureImportance Json?
-  isActive          Boolean  @default(false)
-  createdAt         DateTime @default(now())
+// Policy model - linked to carriers for claims
+model Policy {
+  id              String      @id @default(uuid())
+  policyNumber    String      @unique
+  policyType      InsuranceType
+  carrierId       String
+  insuredId       String
+  effectiveDate   DateTime
+  expirationDate  DateTime
+  status          PolicyStatus @default(ACTIVE)
+  premium         Decimal?    @db.Decimal(12, 2)
+  coverageLimit   Decimal?    @db.Decimal(12, 2)
+  deductible      Decimal?    @db.Decimal(10, 2)
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relationships
+  carrier         Carrier     @relation(fields: [carrierId], references: [id])
+  claims          Claim[]
+  
+  // Indexes
+  @@index([policyNumber])
+  @@index([carrierId])
+  @@index([insuredId])
+  @@index([status])
 }
 
-// Claims fraud assessments
-model ClaimFraudAssessment {
-  id                  String   @id @default(uuid())
-  claimId             String
-  assessmentDate      DateTime?
-  fraudProbability    Float?
-  fraudRiskLevel      String?  @db.VarChar(20) // High, Medium, Low
-  riskFactors         Json?
-  ruleTriggers        Json?
-  behavioralAnomalies Json?
-  networkRisk         Boolean  @default(false)
-  fraudNetworkId      String?
-  investigatorNotes   String?
-  flagForInvestigation Boolean  @default(false)
-  createdAt           DateTime @default(now())
-
-  @@index([claimId])
-  @@index([fraudProbability(sort: Desc)])
-  @@index([fraudRiskLevel])
+enum PolicyStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
 }
 
-// Claims outcome predictions
-model ClaimOutcomePrediction {
-  id                       String    @id @default(uuid())
-  claimId                  String
-  predictedSettlementAmount Decimal?  @db.Decimal(10, 2)
-  settlementConfidence     Float?
-  predictedResolutionDays  Int?
-  likelihoodDispute        Float?
-  litigationRiskProbability Float?
-  reserveRecommendation    Decimal?  @db.Decimal(10, 2)
-  predictionTimestamp      DateTime?
-  actualSettlementAmount   Decimal?  @db.Decimal(10, 2)
-  actualResolutionDays     Int?
-  predictionAccuracy       Float?
-  createdAt                DateTime  @default(now())
+// Insured model - stores insured person information
+model Insured {
+  id              String      @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String      @unique
+  phone           String?
+  dateOfBirth     DateTime?
+  ssn             String?     @db.VarChar(11)
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+  driverLicense   String?
+  occupation      String?
+  maritalStatus   String?
+  status          String      @default("active")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  @@index([claimId])
+  // Relationships
+  policies        Policy[]
+  claims          Claim[]
+  
+  // Indexes
+  @@index([email])
+  @@index([phone])
+  @@index([lastName, firstName])
 }
 
-// Fraud networks
-model FraudNetwork {
-  id                    String   @id @default(uuid())
-  networkType           String?  @db.VarChar(50) // organized_ring, family_network, provider_conspiracy
-  memberCount           Int?
-  totalFraudLoss        Decimal? @db.Decimal(12, 2)
-  confidenceScore       Float?
-  status                String   @db.VarChar(50) // active, under_investigation, closed
-  lawEnforcementReported Boolean  @default(false)
-  reportDate            DateTime?
-  notes                 String?
-  createdAt             DateTime @default(now())
+// Core Claims Model
+model Claim {
+  id                        String        @id @default(uuid())
+  organizationId            String
+  claimNumber               String        @unique
+  claimType                 ClaimType
+  policyId                  String
+  insuredId                 String
+  claimantId                String?       // May be different from insured (third party)
+  
+  // Claim Details
+  lossType                  String?       // "auto_accident", "home_fire", "injury", etc.
+  lossDescription           String?
+  lossDate                  DateTime
+  lossLocation              String?
+  lossLatitude              Decimal?      @db.Decimal(10, 8)
+  lossLongitude             Decimal?      @db.Decimal(11, 8)
+  
+  // Report Information
+  reportedDate              DateTime      @default(now())
+  reportedById              String?
+  reportChannel             ReportChannel
+  reportReferenceNumber     String?
+  
+  // Financial Details
+  claimedAmount             Decimal?      @db.Decimal(12, 2)
+  estimatedDamageAmount     Decimal?      @db.Decimal(12, 2)
+  deductibleAmount          Decimal?      @db.Decimal(10, 2)
+  reservedAmount            Decimal?      @db.Decimal(12, 2)
+  paidAmount                Decimal       @default(0) @db.Decimal(12, 2)
+  subrogationRecovery       Decimal       @default(0) @db.Decimal(12, 2)
+  netClaimCost              Decimal?      @db.Decimal(12, 2)
+  
+  // Status & Workflow
+  status                    ClaimStatus   @default(REPORTED)
+  denyReason                String?
+  denyReasonCode            String?
+  
+  // Carrier Information
+  carrierClaimId            String?
+  carrierId                 String?
+  
+  // Third Parties
+  thirdPartyInvolved        Boolean       @default(false)
+  thirdPartyClaimantId      String?
+  thirdPartyInsurerId       String?
+  
+  // Fraud & Risk
+  fraudIndicator            Boolean       @default(false)
+  fraudProbabilityScore     Decimal?      @db.Decimal(3, 2) // 0.0-1.0
+  riskLevel                 RiskLevel?
+  
+  // Metadata
+  internalNotes             String?
+  customerNotes             String?
+  metadata                  Json?
+  tags                      Json?         // Array of tags
+  
+  // Audit
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  createdBy                 String?
+  updatedBy                 String?
+  deletedAt                 DateTime?
 
-  @@index([status, memberCount(sort: Desc)])
+  // Relationships
+  policy                    Policy        @relation(fields: [policyId], references: [id])
+  insured                   Insured       @relation(fields: [insuredId], references: [id])
+  carrier                   Carrier?      @relation(fields: [carrierId], references: [id])
+  statusHistory             ClaimStatusHistory[]
+  assignments               ClaimAssignment[]
+  documents                 ClaimDocument[]
+  attachments               ClaimAttachment[]
+  payments                  ClaimPayment[]
+  settlements               ClaimSettlement[]
+  communications            ClaimCommunication[]
+  notes                     ClaimNote[]
+  taskList                  ClaimTask[]
+  fraudIndicators           ClaimFraudIndicator[]
+  subrogation               ClaimSubrogation?
+  metrics                   ClaimMetrics?
+  
+  // Indexes
+  @@index([policyId])
+  @@index([status])
+  @@index([lossDate])
+  @@index([reportedDate])
+  @@index([carrierId])
+  @@index([claimNumber])
+  @@index([fraudIndicator])
+  @@index([createdAt])
 }
 
-// Fraud network members
-model FraudNetworkMember {
-  id                  String   @id @default(uuid())
-  networkId           String
-  memberType          String?  @db.VarChar(50) // claimant, provider, witness, beneficiary
-  memberId            String?
-  memberInfo          Json?
-  connectionStrength  Float?
-  addedDate           DateTime?
-  createdAt           DateTime @default(now())
+enum ClaimType {
+  COLLISION
+  THEFT
+  LIABILITY
+  COMPREHENSIVE
+  PROPERTY
+  CASUALTY
+  OTHER
 }
 
-// Claims automation rules
-model ClaimsAutomationRule {
-  id              String   @id @default(uuid())
-  ruleName        String   @db.VarChar(255)
-  ruleType        String   @db.VarChar(100) // auto_approve, auto_request_docs, auto_route, auto_pay
-  conditionLogic  Json?
-  action          String   @db.VarChar(255)
-  priority        Int?
-  isActive        Boolean  @default(true)
-  successRate     Float?
-  createdAt       DateTime @default(now())
+enum ReportChannel {
+  PHONE
+  EMAIL
+  WEB_PORTAL
+  MOBILE_APP
+  THIRD_PARTY
+  API
 }
 
-// Claims processing history
-model ClaimsProcessingHistory {
-  id                  String   @id @default(uuid())
-  claimId             String
-  eventType           String   @db.VarChar(100) // submitted, reviewed, fraud_flagged, approved, rejected, paid
-  eventData           Json?
-  processedByAgent    String?
-  processedBySystem   String?  @db.VarChar(100) // AI engine, automation rule, manual
-  timestamp           DateTime?
-  notes               String?
-  createdAt           DateTime @default(now())
+enum ClaimStatus {
+  REPORTED
+  ASSIGNED
+  INVESTIGATING
+  APPROVED
+  DENIED
+  APPEALED
+  SETTLED
+  CLOSED
+  ARCHIVED
 }
 
-// Settlement recommendations
-model SettlementRecommendation {
-  id                    String   @id @default(uuid())
-  claimId               String
-  recommendedAmount     Decimal? @db.Decimal(10, 2)
-  confidenceLevel       Float?
-  negotiationStrategy   String?  @db.VarChar(50) // aggressive, balanced, conservative
-  litigationCostEstimate Decimal? @db.Decimal(10, 2)
-  subrogationPotential  Decimal? @db.Decimal(10, 2)
-  justification         String?
-  createdAt             DateTime @default(now())
-  recommendedTimestamp   DateTime?
-
-  @@index([claimId])
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
-// Claims analytics
-model ClaimsAnalytics {
-  id                       String   @id @default(uuid())
-  periodDate               DateTime @db.Date
-  insuranceLine            String?  @db.VarChar(50)
-  totalClaims              Int?
-  fraudDetected            Int?
-  fraudDetectionRate       Float?
-  averageProcessingDays    Float?
-  averageSettlementRatio   Float? // settled_amount / claimed_amount
-  subrogationRecovery      Decimal? @db.Decimal(12, 2)
-  litigationCases          Int?
-  litigationSuccessRate    Float?
-  updatedAt                DateTime @default(now())
-
-  @@unique([periodDate, insuranceLine])
-  @@index([insuranceLine, periodDate(sort: Desc)])
-}
-
-// Anomaly detection events
-model AnomalyEvent {
-  id              String   @id @default(uuid())
+// Claims Status History
+model ClaimStatusHistory {
+  id              String      @id @default(uuid())
   claimId         String
-  anomalyType     String?  @db.VarChar(100) // size, timing, frequency, network, document, behavioral
-  anomalyScore    Float? // 0-100
-  severity        String?  @db.VarChar(20) // Critical, High, Medium, Low
-  description     String?
-  triggeredByModel String?  @db.VarChar(100)
-  requiresReview  Boolean  @default(true)
-  reviewedBy      String?
-  reviewTimestamp DateTime?
-  createdAt       DateTime @default(now())
+  oldStatus       String?
+  newStatus       String
+  statusChangeDate DateTime   @default(now())
+  changedBy       String?
+  reason          String?
+  source          StatusSource @default(SYSTEM)
+  createdAt       DateTime    @default(now())
 
-  @@index([claimId, severity(sort: Desc)])
+  // Relationships
+  claim           Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([statusChangeDate])
 }
 
-// Claims investigation tracking
-model ClaimsInvestigation {
-  id                  String   @id @default(uuid())
-  claimId             String
-  investigationType   String?  @db.VarChar(50) // fraud, coverage, liability, provider
-  investigationReason String?
-  assignedInvestigator String?
-  status              String   @db.VarChar(50) // open, in_progress, completed, closed
-  findings            String?
-  fraudConfirmed      Boolean?
-  investigationCost   Decimal? @db.Decimal(10, 2)
-  resolutionDate      DateTime?
-  createdAt           DateTime @default(now())
+enum StatusSource {
+  SYSTEM
+  USER
+  CARRIER
+}
 
+// Adjuster Management
+model Adjuster {
+  id                String          @id @default(uuid())
+  adjusterCode      String          @unique
+  firstName         String
+  lastName          String
+  email             String          @unique
+  phone             String?
+  licenseNumber     String?
+  licenseState      String?
+  adjusterType      AdjusterType    @default(STAFF)
+  expertiseAreas    Json?           // ['auto', 'property', 'liability']
+  currentCaseload   Int             @default(0)
+  maxCaseload       Int?
+  status            AdjusterStatus  @default(ACTIVE)
+  carrierId         String?
+  organizationId    String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relationships
+  assignments       ClaimAssignment[]
+  availability      AdjusterAvailability[]
+  
+  // Indexes
+  @@index([email])
+  @@index([adjusterCode])
+  @@index([status])
+  @@index([carrierId])
+}
+
+enum AdjusterType {
+  STAFF
+  INDEPENDENT
+  THIRD_PARTY
+}
+
+enum AdjusterStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  RETIRED
+}
+
+// Claim Assignment
+model ClaimAssignment {
+  id                String            @id @default(uuid())
+  claimId           String
+  adjusterId        String
+  assignmentDate    DateTime          @default(now())
+  removalDate       DateTime?
+  assignmentReason  String?
+  priority          AssignmentPriority @default(NORMAL)
+  status            AssignmentStatus  @default(ACTIVE)
+  createdAt         DateTime          @default(now())
+
+  // Relationships
+  claim             Claim             @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  adjuster          Adjuster          @relation(fields: [adjusterId], references: [id])
+  
+  // Indexes
   @@index([claimId])
+  @@index([adjusterId])
+  @@index([status])
+  @@index([assignmentDate])
+}
+
+enum AssignmentPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  REASSIGNED
+  COMPLETED
+}
+
+// Adjuster Availability
+model AdjusterAvailability {
+  id                    String                @id @default(uuid())
+  adjusterId            String
+  availableFrom         DateTime
+  availableUntil        DateTime
+  availabilityStatus    AvailabilityStatus    @default(AVAILABLE)
+  reason                String?
+  createdAt             DateTime              @default(now())
+
+  // Relationships
+  adjuster              Adjuster              @relation(fields: [adjusterId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([adjusterId])
+  @@index([availableFrom])
+  @@index([availableUntil])
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
+// Claims Documents & Attachments
+model ClaimDocument {
+  id                    String                @id @default(uuid())
+  claimId               String
+  documentType          DocumentType
+  documentName          String
+  filePath              String?
+  s3Key                 String?
+  fileSize              Int?
+  mimeType              String?
+  
+  // Metadata
+  uploadedBy            String?
+  uploadedDate          DateTime              @default(now())
+  uploadedByType        UploadedByType
+  description           String?
+  
+  // Availability
+  isSharedWithInsured   Boolean               @default(false)
+  isSharedWithCarrier   Boolean               @default(false)
+  isConfidential        Boolean               @default(false) // Internal only
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  accessLog             ClaimDocumentAccessLog[]
+  
+  // Indexes
+  @@index([claimId])
+  @@index([documentType])
+  @@index([uploadedDate])
+}
+
+enum DocumentType {
+  LOSS_OF_USE
+  REPAIR_ESTIMATE
+  POLICE_REPORT
+  PHOTOS
+  MEDICAL_RECORDS
+  INVOICES
+  RECEIPTS
+  CORRESPONDENCE
+  SETTLEMENT_AGREEMENT
+  DENIAL_LETTER
+  OTHER
+}
+
+enum UploadedByType {
+  INSURED
+  AGENT
+  ADJUSTER
+  SYSTEM
+}
+
+model ClaimAttachment {
+  id                    String                @id @default(uuid())
+  claimId               String
+  attachmentType        String                // photo, video, audio, document, etc.
+  attachmentCategory    AttachmentCategory
+  attachmentUrl         String?
+  s3Key                 String?
+  fileSize              Int?
+  mimeType              String?
+  description           String?
+  metadata              Json?                 // {width, height, duration, etc.}
+  createdByType         CreatedByType
+  createdAt             DateTime              @default(now())
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([attachmentCategory])
+  @@index([createdAt])
+}
+
+enum AttachmentCategory {
+  DAMAGE
+  EVIDENCE
+  COMMUNICATION
+  RECEIPT
+  OTHER
+}
+
+enum CreatedByType {
+  INSURED
+  ADJUSTER
+  SYSTEM
+}
+
+model ClaimDocumentAccessLog {
+  id                    String                @id @default(uuid())
+  documentId            String
+  userId                String?
+  accessType            AccessType
+  accessedAt            DateTime              @default(now())
+  ipAddress             String?
+
+  // Relationships
+  document              ClaimDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([documentId])
+  @@index([accessedAt])
+}
+
+enum AccessType {
+  VIEW
+  DOWNLOAD
+  SHARE
+}
+
+// Claims Payments & Settlements
+model ClaimPayment {
+  id                    String                @id @default(uuid())
+  claimId               String
+  paymentType           PaymentType
+  paymentMethod         PaymentMethod
+  requestedDate         DateTime?
+  approvedDate          DateTime?
+  paymentDate           DateTime?
+  paymentAmount         Decimal               @db.Decimal(12, 2)
+  paymentStatus         PaymentStatus         @default(REQUESTED)
+  checkNumber           String?
+  confirmationNumber    String?
+  payeeType             PayeeType
+  payeeId               String?
+  
+  // Notes
+  paymentNotes          String?
+  denialReason          String?
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([paymentStatus])
+  @@index([paymentDate])
+}
+
+enum PaymentType {
+  PARTIAL
+  FINAL
+  ADVANCE
+  SUPPLEMENTAL
+}
+
+enum PaymentMethod {
+  CHECK
+  ACH
+  WIRE
+  DEBIT_CARD
+}
+
+enum PaymentStatus {
+  REQUESTED
+  APPROVED
+  PENDING
+  SENT
+  RECEIVED
+  FAILED
+  CANCELLED
+}
+
+enum PayeeType {
+  INSURED
+  VENDOR
+  ADJUSTER
+  OTHER
+}
+
+model ClaimSettlement {
+  id                    String                @id @default(uuid())
+  claimId               String
+  settlementDate        DateTime?
+  settlementAmount      Decimal               @db.Decimal(12, 2)
+  settlementType        SettlementType
+  settlementStatus      SettlementStatus      @default(PROPOSED)
+  
+  // Settlement Terms
+  settlementTerms       String?
+  releaseSigned         Boolean               @default(false)
+  releaseSignedDate     DateTime?
+  
+  // Subrogation
+  subrogationReserved   Boolean               @default(false)
+  subrogationAmount     Decimal?              @db.Decimal(12, 2)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([settlementStatus])
+  @@index([settlementDate])
+}
+
+enum SettlementType {
+  NEGOTIATED
+  STRUCTURED
+  LUMP_SUM
+  COURT_ORDERED
+}
+
+enum SettlementStatus {
+  PROPOSED
+  ACCEPTED
+  EXECUTED
+  CLOSED
+}
+
+model ClaimPaymentSchedule {
+  id                    String                @id @default(uuid())
+  claimId               String
+  paymentScheduleType   PaymentScheduleType
+  totalAmount           Decimal               @db.Decimal(12, 2)
+  paymentFrequency      PaymentFrequency
+  firstPaymentDate      DateTime
+  lastPaymentDate       DateTime?
+  status                PaymentScheduleStatus @default(ACTIVE)
+  createdAt             DateTime              @default(now())
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([status])
+}
+
+enum PaymentScheduleType {
+  STRUCTURED_SETTLEMENT
+  INSTALLMENT
+  ANNUITY
+}
+
+enum PaymentFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+enum PaymentScheduleStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+  CANCELLED
+}
+
+// Claims Communication & Notes
+model ClaimCommunication {
+  id                        String                    @id @default(uuid())
+  claimId                   String
+  communicationType         CommunicationType
+  direction                 CommunicationDirection
+  communicatedWithType      CommunicatedWithType
+  communicatedWithId        String?
+  
+  // Content
+  subject                   String?
+  message                   String?
+  
+  // Details
+  communicationDate         DateTime                  @default(now())
+  durationMinutes           Int?                      // For calls
+  communicationSummary      String?
+  outcome                   String?
+  
+  createdBy                 String?
+  createdAt                 DateTime                  @default(now())
+
+  // Relationships
+  claim                     Claim                     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([communicationType])
+  @@index([communicationDate])
+}
+
+enum CommunicationType {
+  CALL
+  EMAIL
+  SMS
+  LETTER
+  IN_PERSON
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CommunicatedWithType {
+  INSURED
+  ADJUSTER
+  VENDOR
+  ATTORNEY
+  THIRD_PARTY
+}
+
+model ClaimNote {
+  id                    String                @id @default(uuid())
+  claimId               String
+  noteType              NoteType
+  noteTitle             String
+  noteContent           String
+  isConfidential        Boolean               @default(false)
+  priority              NotePriority          @default(NORMAL)
+  
+  createdBy             String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([noteType])
+  @@index([createdAt])
+}
+
+enum NoteType {
+  INTERNAL
+  EXTERNAL
+  INVESTIGATION
+  DECISION
+}
+
+enum NotePriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+model ClaimTask {
+  id                    String                @id @default(uuid())
+  claimId               String
+  taskTitle             String
+  taskDescription       String?
+  taskType              TaskType
+  dueDate               DateTime?
+  assignedTo            String?
+  status                TaskStatus            @default(PENDING)
+  priority              TaskPriority          @default(NORMAL)
+  createdAt             DateTime              @default(now())
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([assignedTo])
+}
+
+enum TaskType {
+  INVESTIGATION
+  CONTACT
+  DOCUMENT
+  DECISION
+  OTHER
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Claims Fraud Detection
+model ClaimFraudIndicator {
+  id                    String                @id @default(uuid())
+  claimId               String
+  indicatorType         FraudIndicatorType
+  indicatorName         String
+  confidenceScore       Decimal               @db.Decimal(3, 2) // 0.0-1.0
+  description           String?
+  recommendation        String?
+  flaggedDate           DateTime              @default(now())
+  reviewedBy            String?
+  reviewDate            DateTime?
+  status                FraudStatus           @default(PENDING_REVIEW)
+  createdAt             DateTime              @default(now())
+
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+  @@index([status])
+  @@index([flaggedDate])
+}
+
+enum FraudIndicatorType {
+  DUPLICATE_CLAIM
+  STAGED_LOSS
+  INFLATED_DAMAGE
+  SUSPICIOUS_TIMING
+  UNUSUAL_PATTERN
+  CLAIMANT_HISTORY
+}
+
+enum FraudStatus {
+  PENDING_REVIEW
+  FALSE_POSITIVE
+  CONFIRMED
+}
+
+// Subrogation & Recovery
+model ClaimSubrogation {
+  id                        String              @id @default(uuid())
+  claimId                   String              @unique
+  subrogationCaseNumber     String?
+  defendantId               String?             // Third party at fault
+  defendantName             String?
+  defendantInsurerId        String?
+  defendantInsurerName      String?
+  
+  // Claim Details
+  lossAmount                Decimal             @db.Decimal(12, 2)
+  recoveryAmount            Decimal             @default(0) @db.Decimal(12, 2)
+  recoveryPercentage        Decimal?            @db.Decimal(5, 2)
+  
+  // Status
+  status                    SubrogationStatus   @default(IDENTIFIED)
+  assignedToId              String?             // Subrogation specialist
+  
+  // Timeline
+  identifiedDate            DateTime            @default(now())
+  recoveryDate              DateTime?
+  closureDate               DateTime?
+  
+  // Notes
+  caseSummary               String?
+  recoveryPlan              String?
+  
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  // Relationships
+  claim                     Claim               @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  activities                SubrogationActivity[]
+  
+  // Indexes
+  @@index([claimId])
+  @@index([status])
+  @@index([identifiedDate])
+}
+
+enum SubrogationStatus {
+  IDENTIFIED
+  IN_PROGRESS
+  SETTLED
+  CLOSED
+}
+
+model SubrogationActivity {
+  id                    String                @id @default(uuid())
+  subrogationId         String
+  activityType          ActivityType
+  activityDate          DateTime              @default(now())
+  description           String
+  createdBy             String?
+  createdAt             DateTime              @default(now())
+
+  // Relationships
+  subrogation           ClaimSubrogation      @relation(fields: [subrogationId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([subrogationId])
+  @@index([activityDate])
+}
+
+enum ActivityType {
+  LETTER_SENT
+  RESPONSE_RECEIVED
+  DEMAND
+  NEGOTIATION
+  SETTLEMENT
+  LAWSUIT
+}
+
+// Claims Analytics
+model ClaimMetrics {
+  id                        String                @id @default(uuid())
+  claimId                   String                @unique
+  daysToAssignment          Int?
+  daysToFirstPayment        Int?
+  daysToClosure             Int?
+  adjusterEfficiencyScore   Decimal?              @db.Decimal(3, 1) // 0-100
+  insuredSatisfactionScore  Decimal?              @db.Decimal(3, 1)
+  resolutionStatus          ResolutionStatus
+  createdAt                 DateTime              @default(now())
+
+  // Relationships
+  claim                     Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([claimId])
+}
+
+enum ResolutionStatus {
+  TIMELY
+  DELAYED
+  EXPEDITED
+}
+
+// Carrier Integration Models
+model CarrierClaimSync {
+  id                    String                @id @default(uuid())
+  claimId               String
+  carrierId             String
+  externalClaimId       String
+  syncDirection         SyncDirection
+  lastSyncAt            DateTime?
+  syncStatus            SyncStatus            @default(PENDING)
+  errorMessage          String?
+  syncCount             Int                   @default(0)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  // Relationships
+  claim                 Claim                 @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  carrier               Carrier               @relation(fields: [carrierId], references: [id])
+  
+  // Indexes
+  @@index([claimId])
+  @@index([carrierId])
+  @@index([syncStatus])
+}
+
+enum SyncDirection {
+  TO_CARRIER
+  FROM_CARRIER
+  BIDIRECTIONAL
+}
+
+enum SyncStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+model ClaimWebhook {
+  id                    String                @id @default(uuid())
+  carrierId             String
+  eventType             String                // claim_status_updated, payment_made, etc.
+  webhookUrl            String
+  secret                String?
+  isActive              Boolean               @default(true)
+  lastReceivedAt        DateTime?
+  createdAt             DateTime              @default(now())
+  
+  // Relationships
+  carrier               Carrier               @relation(fields: [carrierId], references: [id])
+  
+  // Indexes
+  @@index([carrierId])
+  @@index([isActive])
 }

@@ -440,12 +440,6 @@ export interface NotificationFilterParams {
 }
 
 // ========================================
-// OBSERVABILITY & SLO TYPES
-// ========================================
-
-export * from './observability';
-
-// ========================================
 // CARRIER TYPES
 // ========================================
 
@@ -1488,3 +1482,334 @@ export interface RecommendAdjusterRequest {
   adjusterIds: string[];
   complexity?: 'simple' | 'moderate' | 'complex';
   location?: { latitude: number; longitude: number };
+}
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  partnershipTier?: PartnershipTier;
+  partnershipStatus?: PartnershipStatus;
+  contractStartDate: Date;
+  contractEndDate?: Date;
+  commissionRate?: number;
+  isActive?: boolean;
+  integrationEnabled?: boolean;
+  apiEndpoint?: string;
+  apiKey?: string;
+}
+
+export interface UpdateCarrierDto {
+  name?: string;
+  description?: string;
+  website?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  partnershipTier?: PartnershipTier;
+  partnershipStatus?: PartnershipStatus;
+  contractStartDate?: Date;
+  contractEndDate?: Date;
+  commissionRate?: number;
+  isActive?: boolean;
+  integrationEnabled?: boolean;
+  apiEndpoint?: string;
+  apiKey?: string;
+}
+
+export interface CarrierFilterParams {
+  name?: string;
+  partnershipStatus?: PartnershipStatus | PartnershipStatus[];
+  partnershipTier?: PartnershipTier | PartnershipTier[];
+  isActive?: boolean;
+  integrationEnabled?: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateCarrierPerformanceMetricDto {
+  carrierId: string;
+  month: number;
+  year: number;
+  leadsReceived: number;
+  leadsConverted: number;
+  conversionRate: number;
+  averageResponseTime: number;
+  averageQuoteValue: number;
+  customerSatisfaction: number;
+  onTimeDeliveryRate: number;
+}
+
+export interface UpdateCarrierPerformanceMetricDto {
+  leadsReceived?: number;
+  leadsConverted?: number;
+  conversionRate?: number;
+  averageResponseTime?: number;
+  averageQuoteValue?: number;
+  customerSatisfaction?: number;
+  onTimeDeliveryRate?: number;
+}
+
+export interface Agent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  licenseNumber: string;
+  specializations: string[];
+  location: {
+    city: string;
+    state: string;
+    country: string;
+  };
+  rating: number;
+  isActive: boolean;
+  maxLeadCapacity: number;
+  currentLeadCount: number;
+  averageResponseTime: number;
+  conversionRate: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LeadAssignment {
+  id: string;
+  leadId: string;
+  agentId: string;
+  assignedAt: Date;
+  status: 'pending' | 'accepted' | 'rejected' | 'timeout';
+  acceptedAt?: Date;
+  notes?: string;
+}
+
+export interface Event {
+  id: string;
+  type: string;
+  source: string;
+  data: unknown;
+  timestamp: Date;
+  metadata?: Record<string, unknown>;
+}
+
+// ========================================
+// REFERRAL PROGRAM TYPES
+// ========================================
+
+export type PartnerStatus = 'active' | 'inactive' | 'suspended' | 'terminated';
+
+export type ReferralSource = 
+  | 'website'
+  | 'mobile_app'
+  | 'email'
+  | 'phone'
+  | 'in_person'
+  | 'social_media'
+  | 'other';
+
+export type ReferralStatus = 
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'converted'
+  | 'paid'
+  | 'expired';
+
+export type RewardStatus = 
+  | 'pending'
+  | 'calculated'
+  | 'approved'
+  | 'paid'
+  | 'cancelled';
+
+export interface Partner {
+  id: string;
+  userId?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  referralCode: string;
+  status: PartnerStatus;
+  commissionRate: number;
+  totalReferrals: number;
+  successfulReferrals: number;
+  totalEarnings: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Referral {
+  id: string;
+  partnerId: string;
+  leadId?: string;
+  referralCode: string;
+  source: ReferralSource;
+  status: ReferralStatus;
+  referredAt: Date;
+  acceptedAt?: Date;
+  rejectedAt?: Date;
+  convertedAt?: Date;
+  conversionValue?: number;
+  notes?: string;
+  partner?: Partner;
+  lead?: Lead;
+  reward?: Reward;
+}
+
+export interface Reward {
+  id: string;
+  partnerId: string;
+  referralId: string;
+  amount: number;
+  currency: string;
+  status: RewardStatus;
+  calculatedAt: Date;
+  paidAt?: Date;
+  paymentMethod?: string;
+  transactionId?: string;
+  notes?: string;
+  partner?: Partner;
+  referral?: Referral;
+}
+
+export interface CreatePartnerDto {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  commissionRate?: number;
+  userId?: string;
+}
+
+export interface UpdatePartnerDto {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  companyName?: string;
+  commissionRate?: number;
+  status?: PartnerStatus;
+}
+
+export interface CreateReferralDto {
+  partnerId: string;
+  referralCode: string;
+  source: ReferralSource;
+  leadId?: string;
+  notes?: string;
+}
+
+export interface UpdateReferralDto {
+  status?: ReferralStatus;
+  leadId?: string;
+  notes?: string;
+  conversionValue?: number;
+}
+
+export interface CreateRewardDto {
+  partnerId: string;
+  referralId: string;
+  amount: number;
+  currency?: string;
+  notes?: string;
+}
+
+export interface UpdateRewardDto {
+  status?: RewardStatus;
+  amount?: number;
+  paymentMethod?: string;
+  transactionId?: string;
+  notes?: string;
+}
+
+export interface PartnerFilterParams {
+  status?: PartnerStatus;
+  search?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page?: number;
+  limit?: number;
+}
+
+export interface ReferralFilterParams {
+  partnerId?: string;
+  leadId?: string;
+  status?: ReferralStatus;
+  source?: ReferralSource;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface RewardFilterParams {
+  partnerId?: string;
+  referralId?: string;
+  status?: RewardStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ReferralAnalytics {
+  totalReferrals: number;
+  successfulReferrals: number;
+  conversionRate: number;
+  totalRevenue: number;
+  averageConversionValue: number;
+  topPartners: Array<{
+    partnerId: string;
+    partnerName: string;
+    referralCount: number;
+    conversionCount: number;
+    earnings: number;
+  }>;
+  sourceDistribution: Record<ReferralSource, number>;
+  statusDistribution: Record<ReferralStatus, number>;
+}
+
+export interface ProcessingResult {
+  success: boolean;
+  data?: unknown;
+  error?: Error;
+  processingTime: number;
+}
+
+// Claims Management (Phase 10.1)
+export * from './claims.js';
+
+export * from './events.js';
+export * from './analytics.js';
+
+// Customer Types
+export * from './customers.js';
+
+// Report Types
+export * from './reports.js';
+
+// Business Intelligence Types
+export * from './bi.js';
+
+// Validation Schemas
+export * from './validation.js';
+export * from './scoring.js';
+
+// Integration Types
+export * from './integrations.js';
+
+// Retention Types
+export * from './retention.js';
+
+// VIP & Community
+export * from './vip.js';
+export * from './community.js';
