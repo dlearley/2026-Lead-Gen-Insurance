@@ -28,11 +28,7 @@ import communityRouter from './routes/community.js';
 import communityNetworkRouter from './routes/community-network.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import partnersRouter from './routes/partners.js';
-import applicationsRouter from './routes/applications.js';
-import apiKeysRouter from './routes/api-keys.js';
-import webhooksRouter from './routes/webhooks.js';
-import marketplaceRouter from './routes/marketplace.js';
+import orchestrationRouter from './routes/orchestration.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -86,13 +82,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/community-network', communityNetworkRouter);
   app.use('/api/v1/claims', claimsRouter);
-  
-  // Phase 30: Partner Ecosystem Routes
-  app.use('/api/v1/partners', partnersRouter);
-  app.use('/api/v1/applications', applicationsRouter);
-  app.use('/api/v1/keys', apiKeysRouter);
-  app.use('/api/v1/webhooks', webhooksRouter);
-  app.use('/api/v1/marketplace', marketplaceRouter);
+  app.use('/api/v1/orchestration', orchestrationRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);

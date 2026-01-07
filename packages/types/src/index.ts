@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Features & Data
-export * from './features.js';
+// Orchestration Types
+export * from './orchestration.js';

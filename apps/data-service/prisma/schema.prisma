@@ -1364,381 +1364,223 @@ enum Direction {
 }
 
 // ========================================
-// CUSTOMER DATA PLATFORM (CDP) - PHASE 11.2
+// WORKFLOW & ORCHESTRATION
 // ========================================
 
-// Customer Portal - from Phase 9.1
-model Customer {
-  id            String   @id @default(uuid())
-  leadId        String   @unique
-  email         String   @unique
-  passwordHash  String
-  phoneNumber   String?
-  isVerified    Boolean  @default(false)
-  lastLoginAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  profile        CustomerProfile?
-  documents      CustomerDocument[]
-  messages       CustomerMessage[]
-  
-  // CDP Relations
-  identities     CustomerIdentity[]
-  events         CustomerEvent[]
-  traits         CustomerTrait[]
-  segmentMembers CustomerSegmentMembership[]
-
-  @@index([email])
-  @@index([leadId])
-  @@index([isVerified])
-  @@map("customers")
-}
-
-model CustomerProfile {
-  id               String   @id @default(uuid())
-  customerId       String   @unique
-  dateOfBirth      DateTime?
-  preferredContact String   @default("email")
-  address          Json?
-  emergencyContact Json?
-  preferences      Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@map("customer_profiles")
-}
-
-model CustomerDocument {
-  id           String   @id @default(uuid())
-  customerId   String
-  fileName     String
-  fileUrl      String
-  fileSize     Int
-  mimeType     String
-  documentType String
-  status       String   @default("pending")
-  verifiedBy   String?
-  verifiedAt   DateTime?
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@index([status])
-  @@index([documentType])
-  @@map("customer_documents")
-}
-
-model CustomerMessage {
-  id         String   @id @default(uuid())
-  customerId String
-  agentId    String?
-  senderType String
-  subject    String?
-  message    String   @db.Text
-  isRead     Boolean  @default(false)
-  readAt     DateTime?
-  createdAt  DateTime @default(now())
-
-  // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@index([agentId])
-  @@index([isRead])
-  @@index([createdAt])
-  @@map("customer_messages")
-}
-
-// ========================================
-// CDP - IDENTITY RESOLUTION
-// ========================================
-
-model CustomerIdentity {
-  id           String   @id @default(uuid())
-  customerId   String
-  identityType IdentityType
-  identityValue String
-  provider     String?
-  verifiedAt   DateTime?
-  isPrimary    Boolean  @default(false)
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@unique([identityType, identityValue])
-  @@index([customerId])
-  @@index([identityType])
-  @@index([identityValue])
-  @@map("customer_identities")
-}
-
-enum IdentityType {
-  EMAIL
-  PHONE
-  DEVICE_ID
-  SESSION_ID
-  EXTERNAL_ID
-  COOKIE_ID
-  IP_ADDRESS
-}
-
-// ========================================
-// CDP - BEHAVIORAL EVENTS
-// ========================================
-
-model CustomerEvent {
-  id            String   @id @default(uuid())
-  customerId    String?
-  anonymousId   String?
-  sessionId     String?
-  eventType     EventType
-  eventName     String
-  eventCategory String?
-  properties    Json?
-  context       Json?
-  timestamp     DateTime @default(now())
-  
-  // Device & Browser info
-  deviceType    String?
-  browser       String?
-  os            String?
-  ipAddress     String?
-  userAgent     String?
-  
-  // Location
-  country       String?
-  region        String?
-  city          String?
-  
-  // Metadata
-  metadata      Json?
-
-  // Relations
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@index([anonymousId])
-  @@index([sessionId])
-  @@index([eventType])
-  @@index([eventName])
-  @@index([timestamp])
-  @@map("customer_events")
-}
-
-enum EventType {
-  PAGE_VIEW
-  BUTTON_CLICK
-  FORM_SUBMIT
-  QUOTE_REQUEST
-  QUOTE_VIEW
-  DOCUMENT_UPLOAD
-  DOCUMENT_VIEW
-  MESSAGE_SENT
-  MESSAGE_READ
-  PROFILE_UPDATE
-  LOGIN
-  LOGOUT
-  PURCHASE
-  POLICY_VIEW
-  CLAIM_SUBMIT
-  SEARCH
-  CUSTOM
-}
-
-// ========================================
-// CDP - CUSTOMER TRAITS & ATTRIBUTES
-// ========================================
-
-model CustomerTrait {
-  id           String   @id @default(uuid())
-  customerId   String
-  traitKey     String
-  traitValue   Json
-  traitType    TraitType
-  source       String   @default("system")
-  computedAt   DateTime?
-  expiresAt    DateTime?
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@unique([customerId, traitKey])
-  @@index([customerId])
-  @@index([traitKey])
-  @@index([traitType])
-  @@map("customer_traits")
-}
-
-enum TraitType {
-  DEMOGRAPHIC
-  BEHAVIORAL
-  COMPUTED
-  TRANSACTIONAL
-  PREFERENCE
-  ENGAGEMENT
-  RISK
-  LIFECYCLE
-}
-
-// ========================================
-// CDP - SEGMENTATION
-// ========================================
-
-model CustomerSegment {
-  id          String   @id @default(uuid())
+model Workflow {
+  id          String          @id @default(uuid())
   name        String
   description String?
-  segmentType SegmentType
-  rules       Json?
+  version     Int             @default(1)
+  status      WorkflowStatus  @default(DRAFT)
+  category    String
+  triggers    Json
+  steps       Json
+  errorHandlers Json?
+  timeout     Int?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  executions  WorkflowExecution[]
+
+  @@index([status])
+  @@index([category])
+  @@map("workflows")
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model WorkflowExecution {
+  id              String          @id @default(uuid())
+  workflowId      String
+  workflowVersion Int
+  status          ExecutionStatus @default(PENDING)
+  input           Json
+  output          Json?
+  currentStepId   String?
+  startedAt       DateTime        @default(now())
+  completedAt     DateTime?
+  error           String?
+  metadata        Json?
+
+  // Relations
+  workflow        Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepsExecuted   StepExecution[]
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("workflow_executions")
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+model StepExecution {
+  id            String          @id @default(uuid())
+  executionId    String
+  stepId        String
+  stepName      String
+  status        ExecutionStatus @default(PENDING)
+  input         Json?
+  output        Json?
+  startedAt     DateTime        @default(now())
+  completedAt   DateTime?
+  duration      Int?
+  attempt       Int             @default(1)
+  error         String?
+  logs          Json?
+
+  // Relations
+  execution     WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+  @@index([stepId])
+  @@index([status])
+  @@map("step_executions")
+}
+
+model Webhook {
+  id          String   @id @default(uuid())
+  name        String
+  url         String
+  method      HttpMethod @default(POST)
+  headers     Json?
+  secret      String?
   isActive    Boolean  @default(true)
+  retryPolicy Json?
+  timeout     Int?
+  events      String[]
   metadata    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  members CustomerSegmentMembership[]
+  events      WebhookEvent[]
 
-  @@index([segmentType])
   @@index([isActive])
-  @@map("customer_segments")
+  @@map("webhooks")
 }
 
-enum SegmentType {
-  STATIC
-  DYNAMIC
-  BEHAVIORAL
-  PREDICTIVE
-  LIFECYCLE
-  RFM
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
 }
 
-model CustomerSegmentMembership {
+model WebhookEvent {
   id          String   @id @default(uuid())
-  customerId  String
-  segmentId   String
-  joinedAt    DateTime @default(now())
-  leftAt      DateTime?
-  isActive    Boolean  @default(true)
-  metadata    Json?
+  webhookId   String
+  eventType  String
+  payload    Json
+  statusCode Int?
+  response   String?  @db.Text
+  success    Boolean
+  attempt    Int      @default(1)
+  sentAt     DateTime @default(now())
+  completedAt DateTime?
+  error      String?
 
   // Relations
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  segment  CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
-  @@unique([customerId, segmentId])
-  @@index([customerId])
-  @@index([segmentId])
+  @@index([webhookId])
+  @@index([eventType])
+  @@index([success])
+  @@index([sentAt])
+  @@map("webhook_events")
+}
+
+model TransformationRule {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  inputSchema Json
+  outputSchema Json
+  transformations Json
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([isActive])
-  @@map("customer_segment_memberships")
+  @@map("transformation_rules")
 }
 
-// ========================================
-// CDP - CONSENT & PRIVACY
-// ========================================
+model OrchestrationMetrics {
+  id                       String          @id @default(uuid())
+  workflowId               String
+  totalExecutions          Int             @default(0)
+  successfulExecutions     Int             @default(0)
+  failedExecutions         Int             @default(0)
+  averageExecutionTime     Float           @default(0)
+  averageStepExecutionTime Float           @default(0)
+  successRate              Float           @default(0)
+  lastExecutionAt          DateTime?
+  lastExecutionStatus      ExecutionStatus?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 
-model CustomerConsent {
-  id            String   @id @default(uuid())
-  customerId    String
-  consentType   ConsentType
-  granted       Boolean
-  grantedAt     DateTime?
-  revokedAt     DateTime?
-  expiresAt     DateTime?
-  source        String?
-  ipAddress     String?
-  metadata      Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([customerId, consentType])
-  @@index([customerId])
-  @@index([consentType])
-  @@index([granted])
-  @@map("customer_consents")
+  @@unique([workflowId])
+  @@index([workflowId])
+  @@map("orchestration_metrics")
 }
 
-enum ConsentType {
-  MARKETING_EMAIL
-  MARKETING_SMS
-  MARKETING_PUSH
-  DATA_PROCESSING
-  THIRD_PARTY_SHARING
-  ANALYTICS_TRACKING
-  PERSONALIZATION
-  PROFILING
+model CircuitBreaker {
+  id               String              @id @default(uuid())
+  serviceId        String             @unique
+  state            CircuitBreakerState @default(CLOSED)
+  failureCount     Int                @default(0)
+  lastFailureTime  DateTime?
+  lastSuccessTime  DateTime?
+  threshold        Int                @default(5)
+  timeout          Int                @default(60000)
+  halfOpenMaxCalls Int                @default(3)
+  halfOpenCalls    Int                @default(0)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([serviceId])
+  @@index([state])
+  @@map("circuit_breakers")
 }
 
-// ========================================
-// CDP - CUSTOMER 360 & ANALYTICS
-// ========================================
-
-model CustomerJourneyStep {
-  id           String   @id @default(uuid())
-  customerId   String
-  stepName     String
-  stepType     String
-  stepOrder    Int
-  timestamp    DateTime @default(now())
-  duration     Int?
-  completed    Boolean  @default(false)
-  exitPoint    Boolean  @default(false)
-  metadata     Json?
-
-  @@index([customerId])
-  @@index([stepName])
-  @@index([timestamp])
-  @@map("customer_journey_steps")
+enum CircuitBreakerState {
+  CLOSED
+  OPEN
+  HALF_OPEN
 }
 
-model CustomerEngagementScore {
-  id              String   @id @default(uuid())
-  customerId      String   @unique
-  overallScore    Float    @default(0)
-  emailScore      Float    @default(0)
-  webScore        Float    @default(0)
-  portalScore     Float    @default(0)
-  recencyScore    Float    @default(0)
-  frequencyScore  Float    @default(0)
-  monetaryScore   Float    @default(0)
-  computedAt      DateTime @default(now())
-  metadata        Json?
+model WorkflowTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  category    String
+  version     String
+  definition  Json
+  parameters  Json
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([customerId])
-  @@index([overallScore])
-  @@map("customer_engagement_scores")
-}
-
-model CustomerLifetimeValue {
-  id                 String   @id @default(uuid())
-  customerId         String   @unique
-  currentValue       Float    @default(0)
-  predictedValue     Float    @default(0)
-  totalPurchases     Int      @default(0)
-  averagePurchaseValue Float  @default(0)
-  purchaseFrequency  Float    @default(0)
-  customerTenure     Int      @default(0)
-  churnProbability   Float?
-  computedAt         DateTime @default(now())
-  metadata           Json?
-
-  @@index([customerId])
-  @@index([currentValue])
-  @@index([predictedValue])
-  @@map("customer_lifetime_values")
+  @@index([category])
+  @@index([isPublic])
+  @@map("workflow_templates")
 }

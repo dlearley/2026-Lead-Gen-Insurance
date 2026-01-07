@@ -36,7 +36,7 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createCommunityNetworkRoutes } from './routes/community-network.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { BrokerBenchmarkService } from './services/benchmark.service.js';
+import orchestrationRoutes from './routes/orchestration.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -110,10 +110,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup voice/video routes
-  app.use('/api/v1/media-sessions', mediaSessionsRoutes);
-  app.use('/api/v1/media-recordings', mediaRecordingsRoutes);
-  app.use('/api/v1/rtc-signal', rtcSignalingRoutes);
+  // Setup orchestration routes
+  app.use('/api/v1', orchestrationRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
