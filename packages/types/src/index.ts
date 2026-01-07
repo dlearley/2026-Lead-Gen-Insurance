@@ -659,7 +659,7 @@ export interface NotificationFilterParams {
 // OBSERVABILITY & SLO TYPES
 // ========================================
 
-export * from './observability';
+export * from './observability.js';
 
 // ========================================
 // CARRIER TYPES
