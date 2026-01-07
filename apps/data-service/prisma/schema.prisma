@@ -1364,335 +1364,381 @@ enum Direction {
 }
 
 // ========================================
-// A/B TESTING & ORCHESTRATION (Phase 16.3.8)
+// CUSTOMER DATA PLATFORM (CDP) - PHASE 11.2
 // ========================================
 
-model Experiment {
-  id              String             @id @default(uuid())
-  name            String
-  description     String?
-  hypothesis      String?
-  status          ExperimentStatus   @default(DRAFT)
-  type            ExperimentType
-  targetMetric    String
-  sampleSize      Int?
-  durationDays    Int?
-  startDate       DateTime?
-  endDate         DateTime?
-  trafficAllocation Float            @default(1.0)
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+// Customer Portal - from Phase 9.1
+model Customer {
+  id            String   @id @default(uuid())
+  leadId        String   @unique
+  email         String   @unique
+  passwordHash  String
+  phoneNumber   String?
+  isVerified    Boolean  @default(false)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  variants        ExperimentVariant[]
-  assignments     ExperimentAssignment[]
-  results         ExperimentResult[]
+  // Relations
+  profile        CustomerProfile?
+  documents      CustomerDocument[]
+  messages       CustomerMessage[]
+  
+  // CDP Relations
+  identities     CustomerIdentity[]
+  events         CustomerEvent[]
+  traits         CustomerTrait[]
+  segmentMembers CustomerSegmentMembership[]
 
-  @@map("experiments")
-}
-
-model ExperimentVariant {
-  id              String             @id @default(uuid())
-  experimentId    String
-  name            String
-  description     String?
-  configuration   Json
-  allocationWeight Float             @default(1.0)
-  isControl       Boolean            @default(false)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  experiment      Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  assignments     ExperimentAssignment[]
-  results         ExperimentResult[]
-
-  @@index([experimentId])
-  @@map("experiment_variants")
-}
-
-model ExperimentAssignment {
-  id              String             @id @default(uuid())
-  experimentId    String
-  variantId       String
-  leadId          String
-  assignedAt      DateTime           @default(now())
-  metadata        Json?
-
-  experiment      Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  variant         ExperimentVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  @@index([experimentId])
-  @@index([variantId])
+  @@index([email])
   @@index([leadId])
-  @@unique([experimentId, leadId])
-  @@map("experiment_assignments")
+  @@index([isVerified])
+  @@map("customers")
 }
 
-model ExperimentResult {
-  id              String             @id @default(uuid())
-  experimentId    String
-  variantId       String
-  metricName      String
-  metricValue     Float
-  sampleSize      Int
-  confidenceLevel Float?
-  pValue          Float?
-  isSignificant   Boolean            @default(false)
-  calculatedAt    DateTime           @default(now())
-
-  experiment      Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  variant         ExperimentVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  @@index([experimentId])
-  @@index([variantId])
-  @@map("experiment_results")
-}
-
-model Campaign {
-  id              String             @id @default(uuid())
-  name            String
-  description     String?
-  status          CampaignStatus     @default(DRAFT)
-  type            CampaignType
-  frequencyCap    Int?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  steps           CampaignStep[]
-  leads           CampaignLead[]
-
-  @@map("campaigns")
-}
-
-model CampaignStep {
-  id              String             @id @default(uuid())
-  campaignId      String
-  order           Int
-  channel         ChannelType
-  delaySeconds    Int                @default(0)
-  messageTemplateId String?
-  conditions      Json?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  campaign        Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  messageTemplate ChannelMessage?    @relation(fields: [messageTemplateId], references: [id])
-
-  @@index([campaignId])
-  @@map("campaign_steps")
-}
-
-model CampaignLead {
-  id              String             @id @default(uuid())
-  campaignId      String
-  leadId          String
-  status          EnrollmentStatus   @default(ACTIVE)
-  currentStepOrder Int               @default(0)
-  lastActionAt    DateTime?
-  nextActionAt    DateTime?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  campaign        Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([leadId])
-  @@index([status])
-  @@index([nextActionAt])
-  @@map("campaign_leads")
-}
-
-model LeadState {
-  id              String             @id @default(uuid())
-  leadId          String             @unique
-  stage           LeadStage          @default(NEW)
-  engagementScore Float              @default(0.0)
-  offersMade      Json?
-  lastChannel     ChannelType?
-  lastContactAt   DateTime?
-  metadata        Json?
-  updatedAt       DateTime           @updatedAt
-
-  @@index([leadId])
-  @@index([stage])
-  @@map("lead_states")
-}
-
-model ChannelMessage {
-  id              String             @id @default(uuid())
-  name            String
-  channel         ChannelType
-  content         String
-  subject         String?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  campaignSteps   CampaignStep[]
-
-  @@map("channel_messages")
-}
-
-model AttributionLog {
-  id              String             @id @default(uuid())
-  leadId          String
-  channel         ChannelType
-  touchpointType  TouchpointType
-  weight          Float
-  conversionValue Float?
-  metadata        Json?
-  timestamp       DateTime           @default(now())
-
-  @@index([leadId])
-  @@index([channel])
-  @@index([timestamp])
-  @@map("attribution_logs")
-}
-
-model OrchestrationEvent {
-  id              String             @id @default(uuid())
-  leadId          String
-  type            OrchestrationEventType
-  channel         ChannelType?
-  campaignId      String?
-  stepId          String?
-  experimentId    String?
-  variantId       String?
-  data            Json?
-  timestamp       DateTime           @default(now())
-
-  @@index([leadId])
-  @@index([type])
-  @@index([campaignId])
-  @@index([timestamp])
-  @@map("orchestration_events")
-}
-
-enum ExperimentStatus {
-  DRAFT
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
-enum ExperimentType {
-  OFFER
-  MESSAGING
-  CHANNEL_SEQUENCE
-  TIMING
-  AGENT_COACHING
-  LEAD_ROUTING
-}
-
-enum CampaignStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
-  ARCHIVED
-}
-
-enum CampaignType {
-  WELCOME
-  NURTURE
-  WIN_BACK
-  FOLLOW_UP
-  RETENTION
-}
-
-enum ChannelType {
-  VOICE
-  EMAIL
-  SMS
-  WEB
-  IN_APP
-}
-
-enum EnrollmentStatus {
-  ACTIVE
-  PAUSED
-  COMPLETED
-  OPTED_OUT
-}
-
-enum LeadStage {
-  NEW
-  CONTACTED
-  ENGAGED
-  QUOTED
-  ACCEPTED
-  REJECTED
-  CONVERTED
-  CHURN_RISK
-}
-
-enum TouchpointType {
-  FIRST_TOUCH
-  INTERMEDIATE
-  LAST_TOUCH
-}
-
-enum OrchestrationEventType {
-  MESSAGE_SENT
-  MESSAGE_OPENED
-  MESSAGE_CLICKED
-  OFFER_PRESENTED
-  OFFER_ACCEPTED
-  OFFER_REJECTED
-  CONVERSION
-}
-
-model RetentionCampaign {
-  id              String   @id @default(uuid())
-  name            String
-  description     String?
-  type            String
-  status          String
-  targetAudience  Json
-  startDate       DateTime?
-  endDate         DateTime?
-  leadsTargeted   Int      @default(0)
-  leadsEngaged    Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  touchpoints     CustomerTouchpoint[]
-
-  @@map("retention_campaigns")
-}
-
-model CustomerTouchpoint {
-  id                  String   @id @default(uuid())
-  leadId              String
-  retentionCampaignId String
-  channel             String
-  touchpointType      String
-  status              String
-  subject             String?
-  content             Json
-  sentAt              DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  campaign            RetentionCampaign @relation(fields: [retentionCampaignId], references: [id], onDelete: Cascade)
-  lead                Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@map("customer_touchpoints")
-}
-
-model CustomerEngagement {
+model CustomerProfile {
   id               String   @id @default(uuid())
-  leadId           String   @unique
-  preferredChannel String?
-  emailOpenRate    Float    @default(0.0)
-  responseRate     Float    @default(0.0)
-  lastInteraction  DateTime?
+  customerId       String   @unique
+  dateOfBirth      DateTime?
+  preferredContact String   @default("email")
+  address          Json?
+  emergencyContact Json?
+  preferences      Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  lead             Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  @@map("customer_engagements")
+  @@index([customerId])
+  @@map("customer_profiles")
+}
+
+model CustomerDocument {
+  id           String   @id @default(uuid())
+  customerId   String
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String
+  documentType String
+  status       String   @default("pending")
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([status])
+  @@index([documentType])
+  @@map("customer_documents")
+}
+
+model CustomerMessage {
+  id         String   @id @default(uuid())
+  customerId String
+  agentId    String?
+  senderType String
+  subject    String?
+  message    String   @db.Text
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([agentId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("customer_messages")
+}
+
+// ========================================
+// CDP - IDENTITY RESOLUTION
+// ========================================
+
+model CustomerIdentity {
+  id           String   @id @default(uuid())
+  customerId   String
+  identityType IdentityType
+  identityValue String
+  provider     String?
+  verifiedAt   DateTime?
+  isPrimary    Boolean  @default(false)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([identityType, identityValue])
+  @@index([customerId])
+  @@index([identityType])
+  @@index([identityValue])
+  @@map("customer_identities")
+}
+
+enum IdentityType {
+  EMAIL
+  PHONE
+  DEVICE_ID
+  SESSION_ID
+  EXTERNAL_ID
+  COOKIE_ID
+  IP_ADDRESS
+}
+
+// ========================================
+// CDP - BEHAVIORAL EVENTS
+// ========================================
+
+model CustomerEvent {
+  id            String   @id @default(uuid())
+  customerId    String?
+  anonymousId   String?
+  sessionId     String?
+  eventType     EventType
+  eventName     String
+  eventCategory String?
+  properties    Json?
+  context       Json?
+  timestamp     DateTime @default(now())
+  
+  // Device & Browser info
+  deviceType    String?
+  browser       String?
+  os            String?
+  ipAddress     String?
+  userAgent     String?
+  
+  // Location
+  country       String?
+  region        String?
+  city          String?
+  
+  // Metadata
+  metadata      Json?
+
+  // Relations
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([anonymousId])
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([eventName])
+  @@index([timestamp])
+  @@map("customer_events")
+}
+
+enum EventType {
+  PAGE_VIEW
+  BUTTON_CLICK
+  FORM_SUBMIT
+  QUOTE_REQUEST
+  QUOTE_VIEW
+  DOCUMENT_UPLOAD
+  DOCUMENT_VIEW
+  MESSAGE_SENT
+  MESSAGE_READ
+  PROFILE_UPDATE
+  LOGIN
+  LOGOUT
+  PURCHASE
+  POLICY_VIEW
+  CLAIM_SUBMIT
+  SEARCH
+  CUSTOM
+}
+
+// ========================================
+// CDP - CUSTOMER TRAITS & ATTRIBUTES
+// ========================================
+
+model CustomerTrait {
+  id           String   @id @default(uuid())
+  customerId   String
+  traitKey     String
+  traitValue   Json
+  traitType    TraitType
+  source       String   @default("system")
+  computedAt   DateTime?
+  expiresAt    DateTime?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, traitKey])
+  @@index([customerId])
+  @@index([traitKey])
+  @@index([traitType])
+  @@map("customer_traits")
+}
+
+enum TraitType {
+  DEMOGRAPHIC
+  BEHAVIORAL
+  COMPUTED
+  TRANSACTIONAL
+  PREFERENCE
+  ENGAGEMENT
+  RISK
+  LIFECYCLE
+}
+
+// ========================================
+// CDP - SEGMENTATION
+// ========================================
+
+model CustomerSegment {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  segmentType SegmentType
+  rules       Json?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members CustomerSegmentMembership[]
+
+  @@index([segmentType])
+  @@index([isActive])
+  @@map("customer_segments")
+}
+
+enum SegmentType {
+  STATIC
+  DYNAMIC
+  BEHAVIORAL
+  PREDICTIVE
+  LIFECYCLE
+  RFM
+}
+
+model CustomerSegmentMembership {
+  id          String   @id @default(uuid())
+  customerId  String
+  segmentId   String
+  joinedAt    DateTime @default(now())
+  leftAt      DateTime?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  segment  CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, segmentId])
+  @@index([customerId])
+  @@index([segmentId])
+  @@index([isActive])
+  @@map("customer_segment_memberships")
+}
+
+// ========================================
+// CDP - CONSENT & PRIVACY
+// ========================================
+
+model CustomerConsent {
+  id            String   @id @default(uuid())
+  customerId    String
+  consentType   ConsentType
+  granted       Boolean
+  grantedAt     DateTime?
+  revokedAt     DateTime?
+  expiresAt     DateTime?
+  source        String?
+  ipAddress     String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([customerId, consentType])
+  @@index([customerId])
+  @@index([consentType])
+  @@index([granted])
+  @@map("customer_consents")
+}
+
+enum ConsentType {
+  MARKETING_EMAIL
+  MARKETING_SMS
+  MARKETING_PUSH
+  DATA_PROCESSING
+  THIRD_PARTY_SHARING
+  ANALYTICS_TRACKING
+  PERSONALIZATION
+  PROFILING
+}
+
+// ========================================
+// CDP - CUSTOMER 360 & ANALYTICS
+// ========================================
+
+model CustomerJourneyStep {
+  id           String   @id @default(uuid())
+  customerId   String
+  stepName     String
+  stepType     String
+  stepOrder    Int
+  timestamp    DateTime @default(now())
+  duration     Int?
+  completed    Boolean  @default(false)
+  exitPoint    Boolean  @default(false)
+  metadata     Json?
+
+  @@index([customerId])
+  @@index([stepName])
+  @@index([timestamp])
+  @@map("customer_journey_steps")
+}
+
+model CustomerEngagementScore {
+  id              String   @id @default(uuid())
+  customerId      String   @unique
+  overallScore    Float    @default(0)
+  emailScore      Float    @default(0)
+  webScore        Float    @default(0)
+  portalScore     Float    @default(0)
+  recencyScore    Float    @default(0)
+  frequencyScore  Float    @default(0)
+  monetaryScore   Float    @default(0)
+  computedAt      DateTime @default(now())
+  metadata        Json?
+
+  @@index([customerId])
+  @@index([overallScore])
+  @@map("customer_engagement_scores")
+}
+
+model CustomerLifetimeValue {
+  id                 String   @id @default(uuid())
+  customerId         String   @unique
+  currentValue       Float    @default(0)
+  predictedValue     Float    @default(0)
+  totalPurchases     Int      @default(0)
+  averagePurchaseValue Float  @default(0)
+  purchaseFrequency  Float    @default(0)
+  customerTenure     Int      @default(0)
+  churnProbability   Float?
+  computedAt         DateTime @default(now())
+  metadata           Json?
+
+  @@index([customerId])
+  @@index([currentValue])
+  @@index([predictedValue])
+  @@map("customer_lifetime_values")
 }

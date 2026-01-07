@@ -35,8 +35,7 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createCommunityNetworkRoutes } from './routes/community-network.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { MarketplaceService } from './services/marketplace.service.js';
-import { createMarketplaceRoutes } from './routes/marketplace.routes.js';
+import cdpRoutes from './routes/cdp.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -79,6 +78,9 @@ const start = async (): Promise<void> => {
 
   // Setup customer portal routes
   app.use('/api/customers', customersRoutes);
+
+  // Setup CDP routes
+  app.use('/api/v1/cdp', cdpRoutes);
 
   // Setup BI routes
   app.use('/api/v1/bi', biRoutes);
