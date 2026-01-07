@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orchestrator-config
+data:
+  # Service Discovery
+  API_URL: "http://api:80"
+  DATA_SERVICE_URL: "http://data-service:80"
+
+  # Database
+  DATABASE_URL: "postgresql://postgres:5432/insurance_lead_gen"
+  DATABASE_POOL_MIN: "2"
+  DATABASE_POOL_MAX: "15"
+  DATABASE_CONNECTION_TIMEOUT: "30000"
+
+  # Redis
+  REDIS_URL: "redis://redis:6379"
+  REDIS_CACHE_TTL: "3600"
+  REDIS_MAX_RETRIES: "3"
+
+  # Neo4j
+  NEO4J_URI: "bolt://neo4j:7687"
+  NEO4J_USER: "neo4j"
+
+  # Qdrant
+  QDRANT_URL: "http://qdrant:6333"
+  QDRANT_COLLECTION: "ai_embeddings"
+
+  # NATS
+  NATS_URL: "nats://nats:4222"
+  NATS_STREAM: "orchestration"
+  NATS_CONSUMER: "orchestrator"
+
+  # AI/ML Configuration
+  AI_MODEL_PATH: "/app/models"
+  AI_MODEL_VERSION: "v2"
+  AI_CACHE_ENABLED: "true"
+  AI_MAX_CONCURRENT_REQUESTS: "5"
+  AI_REQUEST_TIMEOUT: "60000"
+
+  # OpenAI Configuration (from secrets)
+  OPENAI_MODEL: "gpt-4-turbo"
+  OPENAI_MAX_TOKENS: "4000"
+  OPENAI_TEMPERATURE: "0.7"
+
+  # Lead Scoring
+  LEAD_SCORING_MODEL: "xgboost-v2"
+  LEAD_SCORING_THRESHOLD: "0.7"
+  LEAD_SCORING_BATCH_SIZE: "100"
+
+  # Customer Retention
+  RETENTION_MODEL: "random-forest-v2"
+  RETENTION_CHURN_THRESHOLD: "0.5"
+  RETENTION_ANALYTICS_ENABLED: "true"
+
+  # Logging
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # Performance
+  REQUEST_TIMEOUT: "60000"
+  MAX_CONCURRENT_WORKFLOWS: "10"
+  WORKFLOW_TIMEOUT: "300000"
+
+  # Batch Processing
+  BATCH_SIZE: "50"
+  BATCH_TIMEOUT: "30000"
+
+  # OpenTelemetry
+  OTEL_EXPORTER_JAEGER_ENDPOINT: "http://jaeger-collector:14268/api/traces"
+  OTEL_SERVICE_NAME: "orchestrator"
+  OTEL_SAMPLING_PROBABILITY: "0.2"

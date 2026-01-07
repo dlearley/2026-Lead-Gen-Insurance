@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  # Redis Configuration
+  REDIS_REPLICATION_MODE: master
+
+  # Memory Management
+  MAXMEMORY: 2gb
+  MAXMEMORY_POLICY: allkeys-lru
+  MAXMEMORY_SAMPLES: 5
+
+  # Persistence
+  SAVE: "900 1 300 10 60 10000"
+  APPENDONLY: "yes"
+  APPENDFSYNC: everysec
+
+  # Network
+  TCP_KEEPALIVE: "300"
+  TCP_BACKLOG: "511"
+
+  # Performance
+  TIMEOUT: "0"
+  TCP_BACKLOG: "511"
+  Databases: "16"
+
+  # Replication
+  REPLICA_READ_ONLY: "yes"
+  REPLICA_SERVE_STALE_DATA: "yes"
+  REPLICA_PRIORITY: "100"
+  REPLICA_ANNOUNCE_IP: ""
+  REPLICA_ANNOUNCE_PORT: "6379"
+  REPLICA_ANNOUNCE_BUS_PORT: "6380"
+  REPLICA_PING_SERVAL_PERIOD: "10"
+  REPLICA_TIMEOUT: "60"
+  REPL_DISABLE_TCP_NODELAY: "no"
+  REPL_BACKLOG_SIZE: "1mb"
+  REPL_BACKLOG_TTL: "3600"
+  REPL_BACKLOG_NO_REPLICA: "no"
+  REPLICA_LAZY_FLUSH: "no"
+
+  # Security
+  PROTECTED_MODE: "yes"
+
+  # Slow Log
+  SLOWLOG_LOG_SLOWER_THAN: "10000"
+  SLOWLOG_MAX_LEN: "128"
+
+  # Latency Monitor
+  LATENCY_MONITOR_THRESHOLD: "100"
+
+  # Event Notification
+  NOTIFY_KEYSPACE_EVENTS: ""
+
+  # Advanced Config
+  HASH_MAX_ZIPLIST_ENTRIES: "512"
+  HASH_MAX_ZIPLIST_VALUE: "64"
+  LIST_MAX_ZIPLIST_SIZE: "-2"
+  LIST_COMPRESS_DEPTH: "0"
+  SET_MAX_INTSET_ENTRIES: "512"
+  ZSET_MAX_ZIPLIST_ENTRIES: "128"
+  ZSET_MAX_ZIPLIST_VALUE: "64"
+  HLL_SPARSE_MAX_BYTES: "3000"
+  STREAM_NODE_MAX_BYTES: "4096"
+  STREAM_NODE_MAX_ENTRIES: "100"
+  ACTIVEREHASHING_YES: "yes"
+  CLIENT_OUTPUT_BUFFER_LIMIT_NORMAL: "0 0 0"
+  CLIENT_OUTPUT_BUFFER_LIMIT_REPLICA: "256mb 64mb 60"
+  CLIENT_OUTPUT_BUFFER_LIMIT_PUBSUB: "32mb 8mb 60"
+  HZ: "10"
+  DYNAMIC_HZ: "yes"
+  AOF_REWRITE_INCREMENTAL_FSYNC: "yes"
+  RDB_SAVE_INCREMENTAL_FSYNC: "yes"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config-file
+data:
+  redis.conf: |
+    # Redis Configuration File
+
+    # Network
+    bind 0.0.0.0
+    protected-mode yes
+    port 6379
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+
+    # General
+    daemonize no
+    supervised no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile ""
+    databases 16
+
+    # Snapshotting
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+
+    # Replication
+    replica-serve-stale-data yes
+    replica-read-only yes
+    repl-diskless-sync no
+    repl-diskless-sync-delay 5
+    repl-disable-tcp-nodelay no
+    replica-priority 100
+
+    # Security
+    requirepass ${REDIS_PASSWORD}
+
+    # Limits
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+
+    # Append Only Mode
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    aof-load-truncated yes
+    aof-use-rdb-preamble yes
+
+    # Lua scripting
+    lua-time-limit 5000
+
+    # Slow log
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+
+    # Latency monitor
+    latency-monitor-threshold 100
+
+    # Event notification
+    notify-keyspace-events ""
+
+    # Advanced config
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+    list-max-ziplist-size -2
+    list-compress-depth 0
+    set-max-intset-entries 512
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+    hll-sparse-max-bytes 3000
+    stream-node-max-bytes 4096
+    stream-node-max-entries 100
+    activerehashing yes
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+    hz 10
+    dynamic-hz yes
+    aof-rewrite-incremental-fsync yes
+    rdb-save-incremental-fsync yes

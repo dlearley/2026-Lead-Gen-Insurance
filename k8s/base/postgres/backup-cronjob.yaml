@@ -1,151 +1,96 @@
-# PostgreSQL Automated Backup CronJob
-# Runs daily backups at 2 AM UTC
-
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: postgres-backup
-  namespace: postgresql-operator
   labels:
-    app: postgres-backup
+    app: postgres
 spec:
-  schedule: "0 2 * * *"  # 2 AM UTC
-  successfulJobsHistoryLimit: 7
-  failedJobsHistoryLimit: 3
+  schedule: "0 2 * * *"  # Daily at 2 AM
   concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
-      backoffLimit: 3
-      activeDeadlineSeconds: 3600
       template:
-        metadata:
-          labels:
-            app: postgres-backup
         spec:
-          serviceAccountName: postgres-backup
+          serviceAccountName: postgres
           restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            fsGroup: 999
           containers:
           - name: backup
-            image: ghcr.io/cloudnative-pg/postgresql:16.1
+            image: postgres:16-alpine
             command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
-              set -euo pipefail
+              set -e
+              NOW=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="/backup/postgres_backup_${NOW}.sql.gz"
 
-              # Configuration
-              BACKUP_DIR="/backups"
-              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-              BACKUP_FILE="postgres-backup-${TIMESTAMP}.dump"
-              S3_BUCKET="s3://insurance-lead-gen-postgres-backups"
+              echo "Starting backup at $(date)"
+              PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h postgres -U postgres -d $POSTGRES_DB | gzip > $BACKUP_FILE
 
-              # Create backup directory
-              mkdir -p ${BACKUP_DIR}
+              # Upload to S3 (if AWS) or GCS (if GCP)
+              if [ -n "$AWS_S3_BUCKET" ]; then
+                aws s3 cp $BACKUP_FILE s3://$AWS_S3_BUCKET/postgres/backup_${NOW}.sql.gz
+              fi
 
-              echo "========================================"
-              echo "Starting PostgreSQL backup"
-              echo "Timestamp: $(date)"
-              echo "========================================"
+              # Keep only last 7 days of local backups
+              find /backup -name "postgres_backup_*.sql.gz" -mtime +7 -delete
 
-              # Run pg_dump
-              echo "Running pg_dump..."
-              pg_dump \
-                -h postgres-cluster-rw.postgresql-operator.svc.cluster.local \
-                -U postgres \
-                -d insurance_lead_gen \
-                -F c \
-                -f "${BACKUP_DIR}/${BACKUP_FILE}" \
-                -v
-
-              # Compress backup
-              echo "Compressing backup..."
-              gzip -f "${BACKUP_DIR}/${BACKUP_FILE}"
-
-              # Upload to S3
-              echo "Uploading to S3..."
-              aws s3 cp \
-                "${BACKUP_DIR}/${BACKUP_FILE}.gz" \
-                "${S3_BUCKET}/manual/" \
-                --storage-class STANDARD_IA \
-                --metadata "backup-date=$(date +%Y-%m-%d)" \
-                --content-encoding gzip
-
-              # Get backup size
-              BACKUP_SIZE=$(du -h "${BACKUP_DIR}/${BACKUP_FILE}.gz" | cut -f1)
-              echo "Backup size: ${BACKUP_SIZE}"
-
-              # Cleanup local backup
-              rm -f "${BACKUP_DIR}/${BACKUP_FILE}.gz"
-
-              echo "========================================"
-              echo "PostgreSQL backup completed successfully"
-              echo "Backup file: ${BACKUP_FILE}.gz"
-              echo "Backup size: ${BACKUP_SIZE}"
-              echo "========================================"
+              echo "Backup completed at $(date)"
+            envFrom:
+            - secretRef:
+                name: postgres-secrets
             env:
-            - name: PGPASSWORD
+            - name: POSTGRES_DB
               valueFrom:
-                secretKeyRef:
-                  name: postgres-superuser-password
-                  key: password
-            - name: AWS_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-backup-credentials
-                  key: accessKeyId
-            - name: AWS_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-backup-credentials
-                  key: secretAccessKey
-            - name: AWS_REGION
+                configMapKeyRef:
+                  name: postgres-config
+                  key: POSTGRES_DB
+            - name: AWS_S3_BUCKET
+              value: "insurance-lead-gen-backups"
+            - name: AWS_DEFAULT_REGION
               value: "us-east-1"
             resources:
               requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
                 cpu: 500m
                 memory: 1Gi
-              limits:
-                cpu: 2000m
-                memory: 4Gi
             volumeMounts:
-            - name: backup-storage
-              mountPath: /backups
+            - name: backup
+              mountPath: /backup
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                - ALL
           volumes:
-          - name: backup-storage
-            emptyDir:
-              sizeLimit: 10Gi
+          - name: backup
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc
+          nodeSelector:
+            node-type: database
+          tolerations:
+          - key: dedicated
+            operator: Equal
+            value: database
+            effect: NoSchedule
 ---
-# Service Account
 apiVersion: v1
-kind: ServiceAccount
+kind: PersistentVolumeClaim
 metadata:
-  name: postgres-backup
-  namespace: postgresql-operator
----
-# IAM Role for S3 Access
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: postgres-backup-policy
-  namespace: postgresql-operator
-data:
-  policy.json: |
-    {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Sid": "S3BackupAccess",
-          "Effect": "Allow",
-          "Action": [
-            "s3:PutObject",
-            "s3:GetObject",
-            "s3:ListBucket",
-            "s3:DeleteObject"
-          ],
-          "Resource": [
-            "arn:aws:s3:::insurance-lead-gen-postgres-backups",
-            "arn:aws:s3:::insurance-lead-gen-postgres-backups/*"
-          ]
-        }
-      ]
-    }
+  name: postgres-backup-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: standard-ssd
+  resources:
+    requests:
+      storage: 500Gi

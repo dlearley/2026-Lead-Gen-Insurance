@@ -1,0 +1,296 @@
+---
+# Service Accounts for each service
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-service
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orchestrator
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redis
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neo4j
+  namespace: insurance-lead-gen
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qdrant
+  namespace: insurance-lead-gen
+---
+# Role for API service
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: api-role
+  namespace: insurance-lead-gen
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: api-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: api
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: api-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role for Data Service
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: data-service-role
+  namespace: insurance-lead-gen
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: data-service-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: data-service
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: data-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role for Orchestrator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orchestrator-role
+  namespace: insurance-lead-gen
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods", "pods/exec"]
+  verbs: ["get", "list", "create"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orchestrator-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: orchestrator
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: orchestrator-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role for Backend
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backend-role
+  namespace: insurance-lead-gen
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+- apiGroups: ["batch"]
+  resources: ["cronjobs", "jobs"]
+  verbs: ["create", "get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backend-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: backend
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: backend-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Role for Databases
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: database-role
+  namespace: insurance-lead-gen
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: postgres
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: database-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: redis-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: redis
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: database-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: neo4j-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: neo4j
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: database-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qdrant-rolebinding
+  namespace: insurance-lead-gen
+subjects:
+- kind: ServiceAccount
+  name: qdrant
+  namespace: insurance-lead-gen
+roleRef:
+  kind: Role
+  name: database-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# ClusterRole for cluster-wide operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: insurance-lead-gen-cluster-admin
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: insurance-lead-gen-cluster-admin-binding
+subjects:
+- kind: ServiceAccount
+  name: api
+  namespace: insurance-lead-gen
+- kind: ServiceAccount
+  name: data-service
+  namespace: insurance-lead-gen
+- kind: ServiceAccount
+  name: orchestrator
+  namespace: insurance-lead-gen
+- kind: ServiceAccount
+  name: backend
+  namespace: insurance-lead-gen
+roleRef:
+  kind: ClusterRole
+  name: insurance-lead-gen-cluster-admin
+  apiGroup: rbac.authorization.k8s.io

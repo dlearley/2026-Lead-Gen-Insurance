@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insurance-lead-gen-dev
+  labels:
+    name: insurance-lead-gen-dev
+    environment: dev

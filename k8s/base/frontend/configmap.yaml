@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  # API Configuration
+  API_URL: "http://api:80"
+  API_TIMEOUT: "30000"
+
+  # Static Asset Configuration
+  STATIC_CACHE_MAX_AGE: "86400"
+  ASSET_CDN_URL: "https://cdn.insurance-platform.com"
+
+  # Session Configuration
+  SESSION_COOKIE_NAME: "lead_gen_session"
+  SESSION_SECRET: ""  # From secrets
+  SESSION_MAX_AGE: "604800"
+
+  # Rate Limiting
+  RATE_LIMIT_WINDOW: "60000"
+  RATE_LIMIT_MAX: "200"
+
+  # CORS Configuration
+  CORS_ALLOWED_ORIGINS: "https://insurance-platform.com"
+  CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_ALLOWED_HEADERS: "Content-Type,Authorization"
+
+  # Feature Flags
+  FEATURE_AI_CHAT: "true"
+  FEATURE_LEAD_PORTAL: "true"
+  FEATURE_CUSTOMER_DASHBOARD: "true"
+  FEATURE_REFERRAL_PROGRAM: "true"
+
+  # Analytics
+  GOOGLE_ANALYTICS_ID: ""  # From secrets
+  SEGMENT_WRITE_KEY: ""  # From secrets
+
+  # SEO
+  SITE_NAME: "2026 Insurance Lead Generation Platform"
+  SITE_DESCRIPTION: "Advanced AI-powered insurance lead generation platform"
+  SITE_KEYWORDS: "insurance,leads,generation,AI,automation"
+
+  # Social Media
+  TWITTER_HANDLE: "@insurance_platform"
+  FACEBOOK_PAGE: "https://facebook.com/insurance-platform"
+
+  # Support
+  SUPPORT_EMAIL: "support@insurance-platform.com"
+  SUPPORT_PHONE: "+1-800-INSURANCE"
+
+  # CDN Configuration
+  CDN_ENABLED: "true"
+  CDN_CACHE_CONTROL: "public, max-age=86400"
+
+  # Performance
+  COMPRESSION_ENABLED: "true"
+  GZIP_TYPES: "text/plain,text/css,application/json,application/javascript,text/xml,application/xml,application/xml+rss,text/javascript"
+
+  # Security Headers
+  HSTS_ENABLED: "true"
+  HSTS_MAX_AGE: "31536000"
+  HSTS_INCLUDE_SUBDOMAINS: "true"
+  CSP_ENABLED: "true"
+  X_FRAME_OPTIONS: "DENY"
+  X_CONTENT_TYPE_OPTIONS: "nosniff"
