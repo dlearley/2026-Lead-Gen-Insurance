@@ -1349,371 +1349,192 @@ enum Direction {
 }
 
 // ========================================
-// BROKER EDUCATION & UPSKILLING PLATFORM (Phase 29)
+// AI-POWERED ROUTING & OPTIMIZATION (Phase 20)
 // ========================================
 
-// Course Management
-model Course {
-  id          String      @id @default(uuid())
-  title       String
-  description String?     @db.Text
-  category    CourseCategory
-  level       CourseLevel @default(BEGINNER)
+model BrokerPerformanceMetrics {
+  id                    String   @id @default(uuid())
+  brokerId              String   @unique
+  conversionRate        Float    @default(0)
+  avgLeadValue          Float    @default(0)
+  avgProcessingTime     Int      @default(0) // in minutes
+  slaComplianceRate     Float    @default(0)
+  totalLeadsAssigned    Int      @default(0)
+  totalLeadsConverted   Int      @default(0)
+  revenueGenerated      Float    @default(0)
+  customerSatisfaction  Float    @default(0)
+  responseTimeAvg       Int      @default(0) // in minutes
+  lastPerformanceUpdate DateTime @default(now())
+  metrics               Json?    // Extended metrics
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([brokerId])
+  @@index([conversionRate])
+  @@index([slaComplianceRate])
+  @@map("broker_performance_metrics")
+}
+
+model RoutingProfile {
+  id               String   @id @default(uuid())
+  leadId           String   @unique
+  brokerAssignedId String
+  routingScore     Float
+  reasoning        Json?    // Detailed reasoning for the routing decision
+  routingFactors   Json?    // Factor weights used in decision
+  performanceData  Json?    // Expected performance outcomes
+  createdAt        DateTime @default(now())
+
+  @@index([leadId])
+  @@index([brokerAssignedId])
+  @@index([routingScore])
+  @@map("routing_profiles")
+}
+
+model RoutingDecision {
+  id                   String   @id @default(uuid())
+  leadId               String
+  brokerId             String
+  score                Float
+  reason               String
+  routingMethod        String   // 'ml_prediction', 'specialty_match', 'capacity_based', etc.
+  confidence           Float    @default(0)
+  alternativeBrokers   Json?    // List of alternative brokers considered
+  performanceOutcome   Json?    // Actual performance metrics after assignment
+  optimizationApplied  Boolean  @default(false)
+  experimentId         String?
+  timestamp            DateTime @default(now())
+
+  @@index([leadId])
+  @@index([brokerId])
+  @@index([routingMethod])
+  @@index([timestamp])
+  @@index([experimentId])
+  @@map("routing_decisions")
+}
+
+model RoutingExperiment {
+  id                    String               @id @default(uuid())
+  name                  String
+  description           String?
+  status                ExperimentStatus     @default(ACTIVE)
   
-  // Course structure
-  duration    Int         // Duration in minutes
-  estimatedHours Float?   // Estimated completion hours
+  // Experiment configuration
+  controlGroup          Json                 // Control routing strategy
+  treatmentGroup        Json                 // Treatment routing strategy
+  segmentRules          Json?                // Lead segmentation rules
+  trafficAllocation     Float                @default(0.5) // 50% control, 50% treatment
   
-  // Content management
-  thumbnailUrl String?
-  contentType ContentType @default(VIDEO)
-  isMandatory Boolean     @default(false)
-  isActive    Boolean     @default(true)
+  // Results and analytics
+  controlMetrics        Json?                // Control group performance
+  treatmentMetrics      Json?                // Treatment group performance
+  statisticalSignificance Float?
+  confidenceLevel       Float                @default(0.95)
+  power                 Float                @default(0.8)
   
-  // Learning objectives
-  objectives  String[]    @default([])
-  prerequisites String[]  @default([])
+  // Winner determination
+  winner                String?              // 'control', 'treatment', or 'inconclusive'
+  winnerReason          String?
+  improvement           Float?               // % improvement of winner
+  rolloutStrategy       String?
   
   // Metadata
-  tags        String[]    @default([])
-  createdBy   String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  startDate             DateTime             @default(now())
+  endDate               DateTime?
+  targetSampleSize      Int?
+  currentSampleSize     Int                  @default(0)
+  metadata              Json?
   
-  // Relations
-  modules     CourseModule[]
-  enrollments CourseEnrollment[]
-  certifications CourseCertification[]
-  
-  @@index([category])
-  @@index([level])
-  @@index([isActive])
-  @@index([tags])
-  @@map("courses")
-}
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
-enum CourseCategory {
-  ONBOARDING
-  COMPLIANCE
-  PRODUCTS
-  SALES_TECHNIQUES
-  CUSTOMER_SERVICE
-  REGULATORY
-  TECHNOLOGY
-  LEADERSHIP
-  SPECIALIZATIONS
-  CONTINUING_EDUCATION
-}
-
-enum CourseLevel {
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-  EXPERT
-}
-
-enum ContentType {
-  VIDEO
-  DOCUMENT
-  INTERACTIVE
-  WEBINAR
-  SIMULATION
-  QUIZ
-}
-
-model CourseModule {
-  id          String    @id @default(uuid())
-  courseId    String
-  title       String
-  description String?   @db.Text
-  orderIndex  Int
-  
-  // Module content
-  content     Json      // Flexible content structure
-  duration    Int?      // Duration in minutes
-  isRequired  Boolean   @default(true)
-  
-  // Assessment
-  hasQuiz     Boolean   @default(false)
-  passingScore Int?     @default(70)
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  // Relations
-  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  quizzes    ModuleQuiz[]
-  progresses ModuleProgress[]
-  
-  @@index([courseId])
-  @@index([orderIndex])
-  @@map("course_modules")
-}
-
-model ModuleQuiz {
-  id          String     @id @default(uuid())
-  moduleId    String
-  title       String
-  description String?    @db.Text
-  
-  // Quiz configuration
-  questions  Json       // Quiz questions structure
-  timeLimit  Int?       // Time limit in minutes
-  maxAttempts Int       @default(3)
-  passingScore Int      @default(70)
-  
-  // Shuffle settings
-  shuffleQuestions Boolean @default(false)
-  shuffleAnswers   Boolean @default(false)
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  // Relations
-  module     CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  attempts   QuizAttempt[]
-  
-  @@index([moduleId])
-  @@map("module_quizzes")
-}
-
-// Learning Paths
-model LearningPath {
-  id          String        @id @default(uuid())
-  title       String
-  description String?       @db.Text
-  category    CourseCategory
-  level       CourseLevel   @default(BEGINNER)
-  
-  // Path structure
-  estimatedHours Float?     // Total estimated completion time
-  isMandatory Boolean      @default(false)
-  isActive    Boolean      @default(true)
-  
-  // Prerequisites
-  prerequisites String[]   @default([])
-  
-  // Target audience
-  targetRoles   String[]   @default([])
-  specialization InsuranceType[]
-  
-  // Metadata
-  tags        String[]     @default([])
-  createdBy   String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  
-  // Relations
-  courses     PathCourse[]
-  enrollments PathEnrollment[]
-  
-  @@index([category])
-  @@index([level])
-  @@index([isActive])
-  @@map("learning_paths")
-}
-
-model PathCourse {
-  id            String      @id @default(uuid())
-  learningPathId String
-  courseId      String
-  orderIndex    Int
-  
-  // Completion requirements
-  isRequired    Boolean     @default(true)
-  passingScore   Int?        @default(70)
-  
-  createdAt     DateTime    @default(now())
-  
-  // Relations
-  learningPath LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
-  course       Course       @relation(fields: [courseId], references: [id])
-  
-  @@index([learningPathId])
-  @@index([courseId])
-  @@index([orderIndex])
-  @@map("path_courses")
-}
-
-// Enrollment and Progress Tracking
-model CourseEnrollment {
-  id          String            @id @default(uuid())
-  courseId    String
-  agentId     String
-  status      EnrollmentStatus  @default(ENROLLED)
-  
-  // Progress tracking
-  progress    Float             @default(0) // 0-100
-  completedAt DateTime?
-  
-  // Assessment scores
-  finalScore  Int?              // Final course score
-  passingScore Int?              // Passing score achieved
-  
-  // Timing
-  enrolledAt  DateTime          @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  
-  // Relations
-  course      Course            @relation(fields: [courseId], references: [id])
-  agent       Agent            @relation(fields: [agentId], references: [id])
-  moduleProgresses ModuleProgress[]
-  
-  @@unique([courseId, agentId])
-  @@index([agentId])
   @@index([status])
-  @@map("course_enrollments")
+  @@index([startDate])
+  @@index([endDate])
+  @@map("routing_experiments")
 }
 
-model ModuleProgress {
-  id              String     @id @default(uuid())
-  enrollmentId    String
-  moduleId        String
-  status          ProgressStatus @default(NOT_STARTED)
+model BrokerCapacity {
+  id                    String   @id @default(uuid())
+  brokerId              String   @unique
+  currentLoadPercentage Float    @default(0)
+  activeLeadCount       Int      @default(0)
+  maxCapacity           Int      @default(10)
+  avgProcessingTime     Int      @default(0) // in minutes
+  slaComplianceRate     Float    @default(0)
+  lastUpdated           DateTime @default(now())
+  capacityTrend         Json?    // Historical capacity trends
+  predictedCapacity     Json?    // ML-based capacity predictions
+  overloadThreshold     Float    @default(0.85) // % of max capacity considered overloaded
+  underloadThreshold    Float    @default(0.5)  // % of max capacity considered underutilized
   
-  // Progress tracking
-  progress        Float      @default(0) // 0-100
-  timeSpent       Int       @default(0) // Time spent in minutes
-  
-  // Completion tracking
-  startedAt       DateTime?
-  completedAt     DateTime?
-  
-  // Relations
-  enrollment      CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  module          CourseModule    @relation(fields: [moduleId], references: [id])
-  quizAttempts   QuizAttempt[]
-  
-  @@unique([enrollmentId, moduleId])
-  @@index([moduleId])
-  @@index([status])
-  @@map("module_progress")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([brokerId])
+  @@index([currentLoadPercentage])
+  @@map("broker_capacity")
 }
 
-enum ProgressStatus {
-  NOT_STARTED
-  IN_PROGRESS
+model RoutingOptimization {
+  id            String   @id @default(uuid())
+  brokerId      String
+  specialties   String[] // Broker specialties for vector matching
+  expertise     Json?    // Detailed expertise breakdown
+  weights       Json?    // Performance weights for different factors
+  
+  // Optimization settings
+  roiWeights    Json?    // Weights for ROI optimization
+  fairnessRules Json?    // Broker fairness constraints
+  exclusions    String[] // Lead types to avoid assigning to this broker
+  preferences   Json?    // Broker routing preferences
+  
+  // Machine learning model parameters
+  modelVersion  String?
+  embeddingVector Json? // Vector representation of broker profile
+  performanceModel Json? // Trained model parameters
+  
+  metadata      Json?
+  updatedAt     DateTime @updatedAt
+
+  @@index([brokerId])
+  @@map("routing_optimization")
+}
+
+model LeadEmbedding {
+  id          String   @id @default(uuid())
+  leadId      String   @unique
+  vector      Json     // Lead vector representation
+  embeddingModel String // Model used for embedding
+  features    Json?    // Extracted features
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leadId])
+  @@map("lead_embeddings")
+}
+
+model SpecialtyMatching {
+  id                String   @id @default(uuid())
+  leadId            String
+  brokerId          String
+  specialtyMatch    Float    // Similarity score between lead and broker specialties
+  semanticMatch     Float    // Vector similarity score
+  weightedScore     Float    // Final weighted matching score
+  matchingFactors   Json?    // Breakdown of matching factors
+  createdAt         DateTime @default(now())
+
+  @@index([leadId])
+  @@index([brokerId])
+  @@index([weightedScore])
+  @@map("specialty_matching")
+}
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
   COMPLETED
-  FAILED
-}
-
-enum EnrollmentStatus {
-  ENROLLED
-  IN_PROGRESS
-  COMPLETED
-  DROPPED
-  FAILED
-}
-
-model PathEnrollment {
-  id             String           @id @default(uuid())
-  learningPathId String
-  agentId        String
-  status         EnrollmentStatus @default(ENROLLED)
-  
-  // Progress tracking
-  progress       Float            @default(0) // 0-100
-  completedAt    DateTime?
-  
-  // Timing
-  enrolledAt     DateTime        @default(now())
-  startedAt      DateTime?
-  completedAt    DateTime?
-  
-  // Relations
-  learningPath   LearningPath    @relation(fields: [learningPathId], references: [id])
-  agent          Agent           @relation(fields: [agentId], references: [id])
-  
-  @@unique([learningPathId, agentId])
-  @@index([agentId])
-  @@index([status])
-  @@map("path_enrollments")
-}
-
-// Assessment System
-model QuizAttempt {
-  id           String         @id @default(uuid())
-  quizId       String
-  moduleProgressId String
-  
-  // Attempt details
-  attemptNumber Int
-  score        Int            // Score achieved (0-100)
-  passed       Boolean
-  timeSpent    Int?           // Time spent in minutes
-  
-  // Questions and answers
-  answers      Json           // User's answers
-  correctAnswers Json?        // Correct answers (for review)
-  
-  // Timing
-  startedAt    DateTime       @default(now())
-  completedAt  DateTime?
-  
-  // Relations
-  quiz         ModuleQuiz     @relation(fields: [quizId], references: [id])
-  moduleProgress ModuleProgress @relation(fields: [moduleProgressId], references: [id])
-  
-  @@index([quizId])
-  @@index([moduleProgressId])
-  @@index([passed])
-  @@map("quiz_attempts")
-}
-
-// Certification System
-model CourseCertification {
-  id          String       @id @default(uuid())
-  courseId    String
-  agentId     String
-  
-  // Certification details
-  certificateNumber String @unique
-  score        Int        // Score achieved
-  issuedAt     DateTime   @default(now())
-  expiresAt    DateTime?
-  
-  // Certification metadata
-  version     String      @default("1.0")
-  isActive    Boolean     @default(true)
-  
-  // Relations
-  course      Course       @relation(fields: [courseId], references: [id])
-  agent       Agent        @relation(fields: [agentId], references: [id])
-  
-  @@unique([courseId, agentId])
-  @@index([agentId])
-  @@index([isActive])
-  @@map("course_certifications")
-}
-
-// Integration with Agent model - add education fields
-// Note: This would extend the existing Agent model above
-/*
-  // Education and Skills (add to existing Agent model)
-  educationLevel EducationLevel @default(NONE)
-  totalTrainingHours Int       @default(0)
-  certificationsCount Int       @default(0)
-  lastTrainingDate DateTime?
-  expertiseAreas   String[]    @default([])
-  skillAssessments Json?       // JSON of skill assessments
-  learningGoals    String[]    @default([])
-  preferredLearningStyle LearningStyle @default(VIDEO)
-*/
-
-enum EducationLevel {
-  NONE
-  HIGH_SCHOOL
-  ASSOCIATE
-  BACHELOR
-  MASTER
-  DOCTORATE
-}
-
-enum LearningStyle {
-  VIDEO
-  TEXT
-  INTERACTIVE
-  HANDS_ON
-  GROUP
+  ROLLED_BACK
+  CANCELLED
 }
