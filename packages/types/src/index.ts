@@ -837,6 +837,9 @@ export * from './integrations.js';
 // Retention Types
 export * from './retention.js';
 
+// Predictive Maintenance Types (Phase 11.3)
+export * from './predictive-maintenance.js';
+
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';

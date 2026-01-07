@@ -34,11 +34,8 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { LeadEnrichmentService } from './services/lead-enrichment-service.js';
-import { OfferRecommendationEngine } from './services/offer-recommendation-engine.js';
-import { CoachingSuggestionService } from './services/coaching-suggestion-service.js';
-import { RiskValidationService } from './services/risk-validation-service.js';
-import { PersonalizationAnalyticsService } from './services/personalization-analytics-service.js';
+import predictiveMaintenanceRoutes from './routes/predictive-maintenance.routes.js';
+import { PredictiveMaintenanceService } from './services/predictive-maintenance-service.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -103,8 +100,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup marketplace routes
-  app.use('/api/v1/marketplace', marketplaceRoutes);
+  // Setup predictive maintenance routes
+  app.use('/api/v1/predictive-maintenance', predictiveMaintenanceRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
