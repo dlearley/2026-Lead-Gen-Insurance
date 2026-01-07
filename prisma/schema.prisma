@@ -205,547 +205,152 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
-// DMV Provider model
-model DMVProvider {
-  id                String   @id @default(uuid())
-  providerName      String
-  providerCode      String   @unique
-  apiEndpoint       String
-  authType          String   // 'oauth2', 'api_key', 'certificate'
-  credentials       Json     // Encrypted credentials
-  supportedStates   Json     // ['CA', 'TX', 'NY', ...]
-  dataTypes         Json     // ['driver_license', 'vehicle_registration', 'violation_history']
-  latencySlaSeconds Int
-  costPerQuery      Decimal  @db.Decimal(6, 2)
-  status            String   // 'active', 'inactive', 'suspended'
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+// Media Session model - tracks voice/video sessions
+model MediaSession {
+  id                   String            @id @default(uuid())
+  sessionId            String            @unique
+  sessionType          MediaSessionType
+  sessionStatus        SessionStatus     @default(SCHEDULED)
+  title                String
+  description          String?
+  createdBy            String
+  maxParticipants      Int?
+  isRecordingEnabled   Boolean           @default(false)
+  isScreenShareEnabled Boolean           @default(true)
+  isWaitingRoomEnabled Boolean           @default(false)
+  isSecure             Boolean           @default(true)
+  encryptionKey        String?
+  roomUrl              String
+  webhookUrl           String?
+  metadata             Json?
+  startTime            DateTime?
+  endTime              DateTime?
+  duration             Int               @default(0)
+  qualityScore         Float?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  @@index([providerCode])
+  // Relationships
+  participants         RoomParticipant[]
+  recordings           MediaRecording[]
+  callLogs             CallLog[]
+  signalMessages       SignalMessage[]
+
+  // Indexes
+  @@index([sessionId])
+  @@index([sessionStatus])
+  @@index([sessionType])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+// RoomParticipant model - tracks participants in voice/video sessions
+model RoomParticipant {
+  id                   String            @id @default(uuid())
+  sessionId            String
+  participantId        String
+  userId               String?
+  displayName          String
+  email                String?
+  phone                String?
+  avatarUrl            String?
+  role                 ParticipantRole
+  status               ParticipantStatus @default(INVITED)
+  isAudioEnabled       Boolean           @default(false)
+  isVideoEnabled       Boolean           @default(false)
+  isScreenSharing      Boolean           @default(false)
+  isHandRaised         Boolean           @default(false)
+  hasRecordingConsent  Boolean           @default(false)
+  browserInfo          Json?
+  deviceInfo           Json?
+  networkStats         Json?
+  joinedAt             DateTime          @default(now())
+  leftAt               DateTime?
+  lastSeenAt           DateTime          @updatedAt
+
+  // Relationships
+  session              MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([userId])
+  @@index([status])
+  @@index([joinedAt])
+  @@unique([sessionId, participantId])
+}
+
+// MediaRecording model - tracks voice/video recordings
+model MediaRecording {
+  id                String           @id @default(uuid())
+  recordingId       String           @unique
+  sessionId         String
+  participantId     String?
+  format            RecordingFormat
+  status            RecordingStatus  @default(STARTED)
+  storageUrl        String?
+  fileSize          Int?
+  duration          Int              @default(0)
+  quality           RecordingQuality @default(MEDIUM)
+  isAudioOnly       Boolean          @default(false)
+  isComposite       Boolean          @default(false)
+  startTime         DateTime         @default(now())
+  endTime           DateTime?
+  transcriptionId   String?
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+
+  // Relationships
+  session           MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
   @@index([status])
   @@index([createdAt])
 }
 
-// Driver license records model
-model DriverLicenseRecord {
-  id                   String   @id @default(uuid())
-  insuredId            String?
-  firstName            String?
-  lastName             String?
-  dateOfBirth          DateTime?
-  licenseNumber        String?
-  licenseState         String?
-  licenseClass         String?
-  licenseStatus        String?  // 'valid', 'suspended', 'revoked', 'expired'
-  issueDate            DateTime?
-  expirationDate       DateTime?
-  
-  // Violations & Incidents
-  violationCount       Int      @default(0)
-  suspensionCount      Int      @default(0)
-  accidentCount        Int      @default(0)
-  duiCount             Int      @default(0)
-  trafficPoints        Int      @default(0)
-  
-  // Health & Restrictions
-  medicalConditions    String?
-  restrictions         Json?    // ['corrective_lenses', 'hearing_aid', etc.]
-  
-  // Data Quality
-  dataSource           String?
-  lastVerifiedDate     DateTime?
-  dataAgeDays          Int?
-  confidenceScore      Decimal? @db.Decimal(3, 2) // 0.0-1.0
-  
-  // Audit
-  queriedById          String?
-  queryReason          String?
-  queriedAt            DateTime?
-  
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+// CallLog model - tracks call events for analytics
+model CallLog {
+  id          String        @id @default(uuid())
+  sessionId   String
+  participantId String
+  eventType   CallEventType
+  timestamp   DateTime      @default(now())
+  details     Json?
+  qualityMetrics Json?
 
   // Relationships
-  violations           ViolationHistory[]
-  
-  @@index([insuredId])
-  @@index([licenseNumber])
-  @@index([licenseState])
-  @@index([licenseStatus])
-  @@index([createdAt])
+  session     MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  // Indexes
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([eventType])
+  @@index([timestamp])
 }
 
-// Vehicle registration records model
-model VehicleRegistrationRecord {
-  id                         String   @id @default(uuid())
-  policyId                   String?
-  vehicleVin                 String?
-  vehicleMake                String?
-  vehicleModel               String?
-  vehicleYear                Int?
-  vehicleColor               String?
-  
-  // Registration Details
-  registrationNumber         String?
-  registrationState          String?
-  registrationStatus         String?  // 'active', 'inactive', 'suspended', 'lapsed'
-  registrationExpirationDate DateTime?
-  
-  // Ownership
-  ownerName                  String?
-  lienHolder                 String?
-  
-  // Usage
-  odometerReading            Int?
-  usageType                  String?  // 'personal', 'commercial', 'fleet'
-  
-  // Incidents
-  totalLossReported          Boolean  @default(false)
-  stolenReport               Boolean  @default(false)
-  salvageTitle               Boolean  @default(false)
-  
-  // Data Quality
-  dataSource                 String?
-  lastVerifiedDate           DateTime?
-  confidenceScore            Decimal? @db.Decimal(3, 2)
-  
-  queriedById                String?
-  queriedAt                  DateTime?
-  
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
-
-  @@index([policyId])
-  @@index([vehicleVin])
-  @@index([registrationState])
-  @@index([createdAt])
-}
-
-// Violation history model
-model ViolationHistory {
-  id                    String   @id @default(uuid())
-  driverLicenseId       String
-  violationDate         DateTime?
-  violationType         String?  // 'speeding', 'reckless_driving', 'dui', etc.
-  violationDescription  String?
-  violationCode         String?
-  jurisdiction          String?
-  fineAmount            Decimal? @db.Decimal(8, 2)
-  conviction            Boolean  @default(false)
-  suspensionDays        Int?
-  pointsAssessed        Int?
-  createdAt             DateTime @default(now())
+// SignalMessage model - tracks WebRTC signaling messages
+model SignalMessage {
+  id               String     @id @default(uuid())
+  sessionId        String
+  fromParticipantId String
+  toParticipantId  String?
+  messageType      SignalType
+  payload          Json
+  isBroadcast      Boolean    @default(false)
+  timestamp        DateTime   @default(now())
 
   // Relationships
-  driverLicense         DriverLicenseRecord @relation(fields: [driverLicenseId], references: [id], onDelete: Cascade)
+  session          MediaSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 
-  @@index([driverLicenseId])
-  @@index([violationDate])
-  @@index([violationType])
-  @@index([createdAt])
+  // Indexes
+  @@index([sessionId])
+  @@index([fromParticipantId])
+  @@index([toParticipantId])
+  @@index([messageType])
+  @@index([timestamp])
 }
 
-// CLUE records model
-model CLUERecord {
-  id                     String   @id @default(uuid())
-  insuredId              String?
-  insuredName            String?
-  dateOfBirth            DateTime?
-  
-  // Property Address
-  propertyAddress        String?
-  propertyCity           String?
-  propertyState          String?
-  propertyZip            String?
-  
-  // Claims History
-  totalClaims5yr         Int      @default(0)
-  totalClaims10yr        Int      @default(0)
-  
-  // Claim Details
-  claimType              String?  // 'fire', 'theft', 'water', 'liability', 'injury', 'other'
-  claimDate              DateTime?
-  claimAmount            Decimal? @db.Decimal(12, 2)
-  claimStatus            String?  // 'open', 'closed', 'settled'
-  
-  // Data Quality
-  dataSource             String?
-  lastUpdatedDate        DateTime?
-  dataConfidenceScore    Decimal? @db.Decimal(3, 2)
-  
-  // Audit
-  queriedById            String?
-  queryReason            String?
-  queriedAt              DateTime?
-  
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  // Relationships
-  claimDetails           CLUEClaimDetail[]
-  
-  @@index([insuredId])
-  @@index([propertyZip])
-  @@index([claimDate])
-  @@index([createdAt])
-}
-
-// CLUE claim details model
-model CLUEClaimDetail {
-  id                 String   @id @default(uuid())
-  clueRecordId       String
-  claimSequence      Int?
-  claimDate          DateTime?
-  claimType          String?
-  lossAmount         Decimal? @db.Decimal(12, 2)
-  lossDescription    String?
-  claimStatus        String?
-  claimYear          Int?
-  daysSinceClaim     Int?
-  createdAt          DateTime @default(now())
-
-  // Relationships
-  clueRecord         CLUERecord @relation(fields: [clueRecordId], references: [id], onDelete: Cascade)
-
-  @@index([clueRecordId])
-  @@index([claimDate])
-  @@index([claimYear])
-  @@index([createdAt])
-}
-
-// LexisNexis provider model
-model LexisNexisProvider {
-  id                 String   @id @default(uuid())
-  providerName       String
-  providerCode       String   @unique
-  apiEndpoint        String
-  authType           String   // 'oauth2', 'api_key', 'certificate'
-  credentials        Json     // Encrypted credentials
-  availableDataTypes Json     // ['credit', 'background', 'risk', 'identity']
-  status             String   // 'active', 'inactive'
-  createdAt          DateTime @default(now())
-  
-  @@index([providerCode])
-  @@index([status])
-  @@index([createdAt])
-}
-
-// Background check records model
-model BackgroundCheckRecord {
-  id                    String   @id @default(uuid())
-  insuredId             String?
-  firstName             String?
-  lastName              String?
-  dateOfBirth           DateTime?
-  
-  // Identity Verification
-  ssnVerified           Boolean  @default(false)
-  ssnMatchStatus        String?  // 'match', 'no_match', 'partial_match', 'not_verified'
-  identityConfidenceScore Decimal? @db.Decimal(3, 2)
-  
-  // Criminal History
-  criminalRecord        Boolean  @default(false)
-  felonyCount           Int      @default(0)
-  misdemeanorCount      Int      @default(0)
-  violentCrime          Boolean  @default(false)
-  
-  // Fraud Indicators
-  fraudAlertActive      Boolean  @default(false)
-  fraudCount            Int      @default(0)
-  
-  // Address History
-  addressChanges2yr     Int      @default(0)
-  
-  // Data Quality
-  dataSource            String?
-  lastVerifiedDate      DateTime?
-  confidenceScore       Decimal? @db.Decimal(3, 2)
-  
-  // Audit
-  queriedById           String?
-  queryReason           String?
-  queriedAt             DateTime?
-  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@index([insuredId])
-  @@index([ssnVerified])
-  @@index([criminalRecord])
-  @@index([createdAt])
-}
-
-// Credit records model
-model CreditRecord {
-  id                        String   @id @default(uuid())
-  insuredId                 String?
-  creditScore               Int?
-  creditScoreRange          String?  // 'excellent', 'good', 'fair', 'poor', 'very_poor'
-  creditBureau              String?  // Equifax, Experian, TransUnion
-  
-  // Credit Details
-  creditInquiries6mo        Int      @default(0)
-  creditInquiries12mo       Int      @default(0)
-  accountsOpen              Int      @default(0)
-  accountsClosed            Int      @default(0)
-  
-  // Delinquency
-  currentDelinquencies      Int      @default(0)
-  pastDelinquencies         Int      @default(0)
-  
-  // Risk Indicators
-  bankruptcyHistory         Boolean  @default(false)
-  taxLien                   Boolean  @default(false)
-  judgmentRecord            Boolean  @default(false)
-  
-  // Data Quality
-  lastVerifiedDate          DateTime?
-  confidenceScore           Decimal? @db.Decimal(3, 2)
-  
-  // Audit
-  queriedById               String?
-  queryReason               String?
-  queriedAt                 DateTime?
-  
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-
-  @@index([insuredId])
-  @@index([creditScore])
-  @@index([creditBureau])
-  @@index([createdAt])
-}
-
-// Risk assessment records model
-model RiskAssessmentRecord {
-  id                        String   @id @default(uuid())
-  insuredId                 String?
-  assessmentType            String?  // 'auto', 'property', 'overall'
-  
-  // Risk Factors
-  riskScore                 Decimal? @db.Decimal(5, 2)
-  riskLevel                 String?  // 'minimal', 'low', 'moderate', 'elevated', 'high'
-  riskIndicators            Json?    // Array of detected risk factors
-  
-  // Detailed Scores
-  financialRiskScore        Int?
-  behavioralRiskScore       Int?
-  environmentalRiskScore    Int?
-  
-  // Recommendations
-  underwritingRecommendation String?
-  rateAdjustmentPercentage   Decimal? @db.Decimal(5, 2)
-  coverageLimitations        Json?    // Any restrictions recommended
-  
-  // Data Quality
-  lastUpdatedDate           DateTime?
-  confidenceScore           Decimal? @db.Decimal(3, 2)
-  
-  // Audit
-  queriedById               String?
-  queriedAt                 DateTime?
-  
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
-
-  @@index([insuredId])
-  @@index([assessmentType])
-  @@index([riskLevel])
-  @@index([createdAt])
-}
-
-// Data enrichment configuration model
-model DataEnrichmentConfig {
-  id                 String   @id @default(uuid())
-  configName         String
-  triggerEvent       String   // 'policy_created', 'claim_reported', 'quote_requested'
-  enrichmentType     Json     // ['dmv', 'clue', 'lexisnexis']
-  autoEnrich         Boolean  @default(false)
-  priorityOrder      Int      // Order of data source queries
-  fallbackBehavior   String?  // 'skip', 'use_cached', 'manual_review'
-  createdAt          DateTime @default(now())
-  
-  @@index([triggerEvent])
-  @@index([autoEnrich])
-  @@index([createdAt])
-}
-
-// Enrichment tasks model
-model EnrichmentTask {
-  id                      String   @id @default(uuid())
-  policyId                String?
-  claimId                 String?
-  taskType                String   // 'auto_enrich', 'manual_enrich'
-  status                  String   // 'pending', 'in_progress', 'completed', 'failed'
-  
-  // Task Details
-  requestedDataTypes      Json     // ['dmv', 'clue', 'credit']
-  completedDataTypes      Json?
-  failedDataTypes         Json?
-  
-  // Results
-  enrichmentSummary       Json?
-  dataQualityScore        Decimal? @db.Decimal(3, 2)
-  
-  // Metadata
-  triggeredBy             String?
-  triggeredAt             DateTime?
-  completedAt             DateTime?
-  errorDetails            String?
-  
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  @@index([policyId])
-  @@index([claimId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-// Enrichment data cache model
-model EnrichmentDataCache {
-  id                  String   @id @default(uuid())
-  insuredId           String?
-  dataType            String   // 'dmv_license', 'clue', 'credit_score', etc.
-  cachedData          Json
-  cacheAgeHours       Int?
-  cacheValidUntil     DateTime?
-  confidenceScore     Decimal? @db.Decimal(3, 2)
-  createdAt           DateTime @default(now())
-  expiresAt           DateTime @default(dbgenerated("NOW() + INTERVAL '90 days'"))
-  
-  @@index([insuredId])
-  @@index([dataType])
-  @@index([createdAt])
-  @@index([expiresAt])
-}
-
-// Data access consent model
-model DataAccessConsent {
-  id                   String   @id @default(uuid())
-  insuredId            String
-  consentType          String   // 'dmv', 'clue', 'credit_check', 'background_check', 'all'
-  consentStatus        String   // 'requested', 'granted', 'denied', 'revoked'
-  consentGrantedDate   DateTime?
-  consentRevokedDate   DateTime?
-  
-  // Authorization
-  authorizationChannel String?  // 'web', 'email', 'phone', 'paper'
-  authorizationDocumentUrl String?
-  
-  // Validity
-  validFrom            DateTime?
-  validUntil           DateTime?
-  isActive             Boolean  @default(true)
-  
-  // Audit
-  requestedById        String?
-  requestTimestamp     DateTime?
-  
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  @@index([insuredId])
-  @@index([consentType])
-  @@index([consentStatus])
-  @@index([isActive])
-  @@index([createdAt])
-}
-
-// Data access audit log model
-model DataAccessAuditLog {
-  id              String   @id @default(uuid())
-  insuredId       String?
-  dataType        String?
-  provider        String?
-  accessPurpose   String?
-  accessedById    String?
-  accessedAt      DateTime @default(now())
-  consentVerified Boolean
-  ipAddress       String?
-  createdAt       DateTime @default(now())
-  
-  @@index([insuredId])
-  @@index([dataType])
-  @@index([accessedAt])
-  @@index([createdAt])
-}
-
-// Data quality scores model
-model DataQualityScore {
-  id                  String   @id @default(uuid())
-  insuredId           String?
-  dataSource          String?
-  dataType            String?
-  
-  // Quality Metrics
-  completenessScore   Decimal? @db.Decimal(3, 2) // % of required fields populated
-  accuracyScore       Decimal? @db.Decimal(3, 2) // Cross-validation with other sources
-  freshnessScore      Decimal? @db.Decimal(3, 2) // Age of data (0-1, newer is better)
-  consistencyScore    Decimal? @db.Decimal(3, 2) // Consistency across multiple pulls
-  
-  // Overall Score
-  overallQualityScore Decimal? @db.Decimal(3, 2) // 0-1.0
-  qualityLevel        String?  // 'excellent', 'good', 'fair', 'poor'
-  
-  // Issues Detected
-  dataIssues          Json?    // Array of identified issues
-  recommendations     Json?    // Suggestions for improvement
-  
-  lastEvaluatedAt     DateTime?
-  createdAt           DateTime @default(now())
-  
-  @@index([insuredId])
-  @@index([dataSource])
-  @@index([qualityLevel])
-  @@index([createdAt])
-}
-
-// Underwriting rules model
-model UnderwritingRule {
-  id                 String   @id @default(uuid())
-  ruleName           String
-  ruleDescription    String?
-  ruleType           String   // 'auto_approve', 'manual_review', 'decline', 'rate_adjustment'
-  
-  // Conditions
-  conditions         Json     // { "dmv.violation_count": { ">": 2 }, ... }
-  
-  // Actions
-  actionType         String?
-  actionParameters   Json?    // {decline_reason, additional_info}
-  
-  // Metadata
-  priority           Int?
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  
-  @@index([ruleType])
-  @@index([isActive])
-  @@index([priority])
-  @@index([createdAt])
-}
-
-// Rule evaluation results model
-model RuleEvaluationResult {
-  id                   String   @id @default(uuid())
-  policyId             String?
-  ruleId               String?
-  conditionMet         Boolean
-  actionTaken          String?
-  
-  // Evaluation Details
-  evaluatedData        Json?
-  evaluationTimestamp  DateTime @default(now())
-  evaluatedBySystem    Boolean  @default(true)
-  
-  createdAt            DateTime @default(now())
-  
-  @@index([policyId])
-  @@index([ruleId])
-  @@index([createdAt])
-}
 
 // Enums for type safety
 enum LeadStatus {
@@ -787,283 +392,103 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
-// ========================================
-// A/B TESTING & ORCHESTRATION (Phase 16.3.8)
-// ========================================
 
-model Experiment {
-  id              String             @id @default(uuid())
-  name            String
-  description     String?
-  hypothesis      String?
-  status          ExperimentStatus   @default(DRAFT)
-  type            ExperimentType
-  targetMetric    String
-  sampleSize      Int?
-  durationDays    Int?
-  startDate       DateTime?
-  endDate         DateTime?
-  trafficAllocation Float            @default(1.0)
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  variants        ExperimentVariant[]
-  assignments     ExperimentAssignment[]
-  results         ExperimentResult[]
-
-  @@map("experiments")
+// Voice/Video Enums
+enum MediaSessionType {
+  VOICE
+  VIDEO
+  SCREEN_SHARE
+  BROADCAST
 }
 
-model ExperimentVariant {
-  id              String             @id @default(uuid())
-  experimentId    String
-  name            String
-  description     String?
-  configuration   Json
-  allocationWeight Float             @default(1.0)
-  isControl       Boolean            @default(false)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  experiment      Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  assignments     ExperimentAssignment[]
-  results         ExperimentResult[]
-
-  @@index([experimentId])
-  @@map("experiment_variants")
-}
-
-model ExperimentAssignment {
-  id              String             @id @default(uuid())
-  experimentId    String
-  variantId       String
-  leadId          String
-  assignedAt      DateTime           @default(now())
-  metadata        Json?
-
-  experiment      Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  variant         ExperimentVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  @@index([experimentId])
-  @@index([variantId])
-  @@index([leadId])
-  @@unique([experimentId, leadId])
-  @@map("experiment_assignments")
-}
-
-model ExperimentResult {
-  id              String             @id @default(uuid())
-  experimentId    String
-  variantId       String
-  metricName      String
-  metricValue     Float
-  sampleSize      Int
-  confidenceLevel Float?
-  pValue          Float?
-  isSignificant   Boolean            @default(false)
-  calculatedAt    DateTime           @default(now())
-
-  experiment      Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  variant         ExperimentVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  @@index([experimentId])
-  @@index([variantId])
-  @@map("experiment_results")
-}
-
-model Campaign {
-  id              String             @id @default(uuid())
-  name            String
-  description     String?
-  status          CampaignStatus     @default(DRAFT)
-  type            CampaignType
-  frequencyCap    Int?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  steps           CampaignStep[]
-  leads           CampaignLead[]
-
-  @@map("campaigns")
-}
-
-model CampaignStep {
-  id              String             @id @default(uuid())
-  campaignId      String
-  order           Int
-  channel         ChannelType
-  delaySeconds    Int                @default(0)
-  messageTemplateId String?
-  conditions      Json?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  campaign        Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  messageTemplate ChannelMessage?    @relation(fields: [messageTemplateId], references: [id])
-
-  @@index([campaignId])
-  @@map("campaign_steps")
-}
-
-model CampaignLead {
-  id              String             @id @default(uuid())
-  campaignId      String
-  leadId          String
-  status          EnrollmentStatus   @default(ACTIVE)
-  currentStepOrder Int               @default(0)
-  lastActionAt    DateTime?
-  nextActionAt    DateTime?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  campaign        Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([leadId])
-  @@index([status])
-  @@index([nextActionAt])
-  @@map("campaign_leads")
-}
-
-model LeadState {
-  id              String             @id @default(uuid())
-  leadId          String             @unique
-  stage           LeadStage          @default(NEW)
-  engagementScore Float              @default(0.0)
-  offersMade      Json?
-  lastChannel     ChannelType?
-  lastContactAt   DateTime?
-  metadata        Json?
-  updatedAt       DateTime           @updatedAt
-
-  @@index([leadId])
-  @@index([stage])
-  @@map("lead_states")
-}
-
-model ChannelMessage {
-  id              String             @id @default(uuid())
-  name            String
-  channel         ChannelType
-  content         String
-  subject         String?
-  metadata        Json?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  campaignSteps   CampaignStep[]
-
-  @@map("channel_messages")
-}
-
-model AttributionLog {
-  id              String             @id @default(uuid())
-  leadId          String
-  channel         ChannelType
-  touchpointType  TouchpointType
-  weight          Float
-  conversionValue Float?
-  metadata        Json?
-  timestamp       DateTime           @default(now())
-
-  @@index([leadId])
-  @@index([channel])
-  @@index([timestamp])
-  @@map("attribution_logs")
-}
-
-model OrchestrationEvent {
-  id              String             @id @default(uuid())
-  leadId          String
-  type            OrchestrationEventType
-  channel         ChannelType?
-  campaignId      String?
-  stepId          String?
-  experimentId    String?
-  variantId       String?
-  data            Json?
-  timestamp       DateTime           @default(now())
-
-  @@index([leadId])
-  @@index([type])
-  @@index([campaignId])
-  @@index([timestamp])
-  @@map("orchestration_events")
-}
-
-enum ExperimentStatus {
-  DRAFT
-  ACTIVE
-  COMPLETED
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  ENDED
+  FAILED
   CANCELLED
 }
 
-enum ExperimentType {
-  OFFER
-  MESSAGING
-  CHANNEL_SEQUENCE
-  TIMING
-  AGENT_COACHING
-  LEAD_ROUTING
+enum ParticipantRole {
+  HOST
+  CO_HOST
+  PARTICIPANT
+  VIEWER
+  MODERATOR
 }
 
-enum CampaignStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
-  ARCHIVED
+enum ParticipantStatus {
+  INVITED
+  JOINING
+  CONNECTED
+  DISCONNECTED
+  REMOVED
+  ERROR
 }
 
-enum CampaignType {
-  WELCOME
-  NURTURE
-  WIN_BACK
-  FOLLOW_UP
-  RETENTION
+enum RecordingFormat {
+  MP4
+  WEBM
+  MP3
+  WAV
+  M4A
 }
 
-enum ChannelType {
-  VOICE
-  EMAIL
-  SMS
-  WEB
-  IN_APP
-}
-
-enum EnrollmentStatus {
-  ACTIVE
-  PAUSED
+enum RecordingStatus {
+  STARTED
+  IN_PROGRESS
+  STOPPED
   COMPLETED
-  OPTED_OUT
+  FAILED
+  PROCESSING
+  READY
+  DELETED
 }
 
-enum LeadStage {
-  NEW
-  CONTACTED
-  ENGAGED
-  QUOTED
-  ACCEPTED
-  REJECTED
-  CONVERTED
-  CHURN_RISK
+enum RecordingQuality {
+  LOW
+  MEDIUM
+  HIGH
+  HD
+  FULL_HD
+  _4K
 }
 
-enum TouchpointType {
-  FIRST_TOUCH
-  INTERMEDIATE
-  LAST_TOUCH
+enum CallEventType {
+  SESSION_STARTED
+  SESSION_ENDED
+  PARTICIPANT_JOINED
+  PARTICIPANT_LEFT
+  AUDIO_ENABLED
+  AUDIO_DISABLED
+  VIDEO_ENABLED
+  VIDEO_DISABLED
+  SCREEN_SHARE_STARTED
+  SCREEN_SHARE_STOPPED
+  RECORDING_STARTED
+  RECORDING_STOPPED
+  HAND_RAISED
+  HAND_LOWERED
+  CONNECTION_ESTABLISHED
+  CONNECTION_LOST
+  QUALITY_DEGRADED
+  QUALITY_IMPROVED
+  ERROR
 }
 
-enum OrchestrationEventType {
-  MESSAGE_SENT
-  MESSAGE_OPENED
-  MESSAGE_CLICKED
-  OFFER_PRESENTED
-  OFFER_ACCEPTED
-  OFFER_REJECTED
-  CONVERSION
+enum SignalType {
+  OFFER
+  ANSWER
+  ICE_CANDIDATE
+  JOIN
+  LEAVE
+  MUTE
+  UNMUTE
+  START_SCREEN_SHARE
+  STOP_SCREEN_SHARE
+  HAND_RAISE
+  MESSAGE
+  CONNECTION_STATE
+  ROOM_UPDATE
+  ERROR
 }
