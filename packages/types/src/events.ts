@@ -1,3 +1,5 @@
+import type { UnderwritingResult } from './underwriting.js';
+
 export const EVENT_SUBJECTS = {
   LeadReceived: 'lead.received',
   LeadProcessed: 'lead.processed',
@@ -6,6 +8,8 @@ export const EVENT_SUBJECTS = {
   AgentGet: 'agent.get',
   AgentsMatch: 'agents.match',
   RoutingConfigUpdate: 'routing.config.update',
+  UnderwritingRequested: 'underwriting.requested',
+  UnderwritingCompleted: 'underwriting.completed',
 } as const;
 
 export type EventSubject = (typeof EVENT_SUBJECTS)[keyof typeof EVENT_SUBJECTS];
@@ -48,6 +52,24 @@ export type LeadProcessedEvent = EventEnvelope<
   typeof EVENT_SUBJECTS.LeadProcessed,
   {
     leadId: string;
+  }
+>;
+
+export type UnderwritingRequestedEvent = EventEnvelope<
+  typeof EVENT_SUBJECTS.UnderwritingRequested,
+  {
+    leadId: string;
+    policyId?: string;
+    context?: Record<string, unknown>;
+  }
+>;
+
+export type UnderwritingCompletedEvent = EventEnvelope<
+  typeof EVENT_SUBJECTS.UnderwritingCompleted,
+  {
+    leadId: string;
+    policyId?: string;
+    result: UnderwritingResult;
   }
 >;
 
