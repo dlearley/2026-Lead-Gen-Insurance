@@ -42,6 +42,13 @@ export class MetricsCollector {
       labelNames: ['method', 'path', 'service'],
       registers: [this.registry],
     });
+
+    // Cache metrics
+    this.createCounter('cache_hits_total', 'Total number of cache hits', ['type']);
+    this.createCounter('cache_misses_total', 'Total number of cache misses', ['type']);
+
+    // Database metrics
+    this.createHistogram('database_query_duration_seconds', 'Duration of database queries', ['operation', 'table']);
   }
 
   /**
@@ -150,6 +157,7 @@ export class MetricsCollector {
 // Business metrics for lead processing
 export class LeadMetrics {
   private readonly leadsProcessed: Counter<string>;
+  private readonly leadsConverted: Counter<string>;
   private readonly leadsQueueDepth: Gauge<string>;
   private readonly leadProcessingDuration: Histogram<string>;
   private readonly leadScoringDuration: Histogram<string>;
@@ -159,6 +167,13 @@ export class LeadMetrics {
       name: 'leads_processed_total',
       help: 'Total number of leads processed',
       labelNames: ['status', 'source', 'service'],
+      registers: [registry],
+    });
+
+    this.leadsConverted = new Counter({
+      name: 'leads_converted_total',
+      help: 'Total number of leads converted to policies',
+      labelNames: ['type', 'service'],
       registers: [registry],
     });
 
@@ -196,6 +211,10 @@ export class LeadMetrics {
     } catch (error) {
       console.error('Error updating lead processing SLO metrics:', error);
     }
+  }
+
+  recordLeadConverted(type: string, service: string): void {
+    this.leadsConverted.labels(type, service).inc();
   }
 
   setQueueDepth(queue: string, service: string, depth: number): void {

@@ -1,0 +1,120 @@
+{
+  "dashboard": {
+    "title": "Insurance Lead Gen - Optimization & Post-Launch",
+    "uid": "insurance-lead-gen-optimization",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Lead Conversion Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(leads_converted_total[1h]) / rate(leads_processed_total[1h])",
+            "legendFormat": "Conversion Rate"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "show": true
+          },
+          {
+            "format": "short",
+            "show": true
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Cache Hit Rate",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "show": true
+          },
+          {
+            "format": "short",
+            "show": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Slow Database Queries (p99)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(database_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{operation}} on {{table}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "show": true
+          },
+          {
+            "format": "short",
+            "show": true
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "AI API Cost (USD)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(ai_api_cost_total[1h])) * 24",
+            "legendFormat": "Estimated Daily Cost"
+          },
+          {
+            "expr": "ai_api_cost_total",
+            "legendFormat": "Cumulative Cost {{model}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "currencyUSD",
+            "show": true
+          },
+          {
+            "format": "short",
+            "show": true
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Lead Processing Volume (vs 1h ago)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 24, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(leads_processed_total[15m])",
+            "legendFormat": "Current Volume"
+          },
+          {
+            "expr": "rate(leads_processed_total[15m] offset 1h)",
+            "legendFormat": "Volume 1h ago"
+          }
+        ]
+      }
+    ]
+  }
+}

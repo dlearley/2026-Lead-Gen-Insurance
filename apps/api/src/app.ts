@@ -4,8 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { logger, HealthService, createHealthMiddleware } from '@insurance-lead-gen/core';
-import { register } from 'prom-client';
+import { logger, MetricsCollector } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -39,6 +38,7 @@ import rtcSignalingRouter from './routes/rtc-signaling.js';
 
 export function createApp(): express.Express {
   const app = express();
+  const metrics = new MetricsCollector('api-service');
 
   // Initialize health service (will be properly initialized when used)
   let healthService: HealthService | null = null;
@@ -73,6 +73,9 @@ export function createApp(): express.Express {
   app.use(createInputSanitizer());
 
   app.use(metricsCollector.middleware());
+
+  // Metrics middleware
+  app.use(metrics.middleware());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
@@ -153,6 +156,15 @@ export function createApp(): express.Express {
   app.get('/metrics', async (req, res) => {
     res.setHeader('Content-Type', metricsCollector.getContentType());
     res.end(await metricsCollector.getMetrics());
+  });
+
+  app.get('/metrics', async (req, res) => {
+    try {
+      res.set('Content-Type', metrics.getContentType());
+      res.end(await metrics.getMetrics());
+    } catch (error) {
+      res.status(500).end(error);
+    }
   });
 
   app.use('/api/v1/leads', leadsRouter);

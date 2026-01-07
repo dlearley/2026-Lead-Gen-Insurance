@@ -19,6 +19,7 @@ import { store, generateId } from '../storage/in-memory.js';
 import type { Policy, PolicyEndorsement, PolicyInvoice } from '@insurance-lead-gen/types';
 import { paginate } from '../utils/pagination.js';
 import { logger } from '@insurance-lead-gen/core';
+import { leadMetrics } from '../monitoring.js';
 
 const router = Router({ mergeParams: true });
 
@@ -241,6 +242,9 @@ router.post('/:policyId/activate', authMiddleware, async (req: Request, res: Res
       lead.status = 'converted';
       lead.updatedAt = new Date();
       store.leads.set(leadId, lead);
+
+      // Record conversion metric
+      leadMetrics.recordLeadConverted(policy.insuranceType, 'api-service');
 
       const leadActivityId = generateId();
       store.activities.set(leadActivityId, {

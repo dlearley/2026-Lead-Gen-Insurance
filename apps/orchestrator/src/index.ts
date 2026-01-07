@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { logger } from '@insurance-lead-gen/core';
+import { logger, MetricsCollector, initializeTracing } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
 
@@ -15,15 +15,25 @@ import knowledgeBaseRoutes from './routes/knowledge-base.routes.js';
 const config = getConfig();
 const PORT = config.ports.orchestrator;
 
+// Initialize tracing
+initializeTracing({
+  serviceName: 'orchestrator',
+});
+
 const start = async (): Promise<void> => {
   logger.info('Orchestrator service starting', { port: PORT });
 
   // Initialize Express app for health checks
   const app = express();
+  const metrics = new MetricsCollector('orchestrator');
+
   app.use(helmet());
   app.use(cors());
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
+
+  // Metrics middleware
+  app.use(metrics.middleware());
 
   // Health check endpoint
   app.get('/health', (req, res) => {
@@ -34,6 +44,16 @@ const start = async (): Promise<void> => {
       version: '1.0.0',
       uptime: process.uptime(),
     });
+  });
+
+  // Metrics endpoint
+  app.get('/metrics', async (req, res) => {
+    try {
+      res.set('Content-Type', metrics.getContentType());
+      res.end(await metrics.getMetrics());
+    } catch (error) {
+      res.status(500).end(error);
+    }
   });
 
   // Readiness check endpoint

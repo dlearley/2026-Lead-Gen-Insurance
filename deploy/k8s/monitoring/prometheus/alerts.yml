@@ -176,49 +176,45 @@ groups:
           summary: "High rate of AI model errors"
           description: "AI model error rate is above 0.05 per second."
 
-  - name: observability_alerts
+  - name: optimization_alerts
     interval: 1m
     rules:
-      # Prometheus target down
-      - alert: PrometheusTargetDown
-        expr: up == 0
-        for: 2m
+      # Low Cache Hit Rate
+      - alert: LowCacheHitRate
+        expr: rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) < 0.7
+        for: 10m
         labels:
-          severity: critical
-          team: platform
+          severity: warning
         annotations:
-          summary: "Prometheus target is down"
-          description: "Target {{ $labels.job }}/{{ $labels.instance }} is unreachable."
+          summary: "Low cache hit rate detected"
+          description: "Cache hit rate is below 70% for the last 10 minutes."
 
-      # Prometheus configuration reload failed
-      - alert: PrometheusConfigReloadFailed
-        expr: prometheus_config_last_reload_successful == 0
-        for: 5m
-        labels:
-          severity: critical
-          team: platform
-        annotations:
-          summary: "Prometheus configuration reload failed"
-          description: "Prometheus configuration has failed to reload."
-
-      # AlertManager configuration reload failed
-      - alert: AlertManagerConfigReloadFailed
-        expr: alertmanager_config_last_reload_successful == 0
+      # Slow Database Queries
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.99, rate(database_query_duration_seconds_bucket[5m])) > 0.5
         for: 5m
         labels:
           severity: warning
-          team: platform
         annotations:
-          summary: "AlertManager configuration reload failed"
-          description: "AlertManager configuration has failed to reload."
+          summary: "Slow database queries detected"
+          description: "99th percentile database query duration is above 500ms."
 
-      # Observability cost ratio high
-      - alert: HighObservabilityCostRatio
-        expr: (observability_cost / infrastructure_cost) * 100 > 5
-        for: 1h
+      # Sudden Drop in Lead Volume
+      - alert: LeadVolumeDrop
+        expr: rate(leads_processed_total[15m]) < (rate(leads_processed_total[15m] offset 1h) * 0.5)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Sudden drop in lead volume"
+          description: "Lead volume has dropped by more than 50% compared to one hour ago."
+
+      # Low Lead Conversion Rate
+      - alert: LowLeadConversionRate
+        expr: rate(leads_converted_total[1h]) / rate(leads_processed_total[1h]) < 0.05
+        for: 2h
         labels:
           severity: warning
-          team: platform
         annotations:
-          summary: "Observability cost ratio is high"
-          description: "Observability costs are above 5% of infrastructure costs."
+          summary: "Low lead conversion rate"
+          description: "Lead conversion rate is below 5% for the last 2 hours."

@@ -1,5 +1,10 @@
-import { logger } from '@insurance-lead-gen/core';
+import { logger, initializeTracing } from '@insurance-lead-gen/core';
 import { app } from './app.js';
+
+// Initialize tracing
+initializeTracing({
+  serviceName: 'api-service',
+});
 
 const PORT = process.env.API_PORT || 3000;
 
