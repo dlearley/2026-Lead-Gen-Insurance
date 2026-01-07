@@ -1483,8 +1483,17 @@ export interface AdjusterScore {
   recommendation: 'recommended' | 'acceptable' | 'not_recommended';
 }
 
-export interface RecommendAdjusterRequest {
-  claimId: string;
-  adjusterIds: string[];
-  complexity?: 'simple' | 'moderate' | 'complex';
-  location?: { latitude: number; longitude: number };
+// Validation Schemas
+export * from './validation.js';
+export * from './scoring.js';
+
+// Integration Types
+export * from './integrations.js';
+
+// Retention Types
+export * from './retention.js';
+
+// VIP & Community
+export * from './vip.js';
+export * from './community.js';
+export * from './orchestration-ab.js';

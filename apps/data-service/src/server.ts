@@ -8,7 +8,8 @@ import carriersRouter from './routes/carriers.routes.js';
 import brokersRouter from './routes/brokers.routes.js';
 import integrationConfigsRouter from './routes/integration-configs.routes.js';
 import integrationLogsRouter from './routes/integration-logs.routes.js';
-import crmRouter from './routes/crm.routes.js';
+import { experimentsRouter } from './routes/experiments.routes.js';
+import { orchestrationRouter } from './routes/orchestration.routes.js';
 import { AlertService } from './services/alert-service.js';
 
 const config = getConfig();
@@ -54,7 +55,8 @@ app.use('/api/v1/carriers', carriersRouter);
 app.use('/api/v1/brokers', brokersRouter);
 app.use('/api/v1/integration-configs', integrationConfigsRouter);
 app.use('/api/v1/integration-logs', integrationLogsRouter);
-app.use('/api/v1/crm', crmRouter);
+app.use('/api/v1/experiments', experimentsRouter);
+app.use('/api/v1/orchestration', orchestrationRouter);
 
 app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
   logger.error('Unhandled error', { error: err, path: req.path });

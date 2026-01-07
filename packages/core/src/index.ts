@@ -13,5 +13,5 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// Claims Management exports
-export * from './claims/index.js';
+// Orchestration exports
+export * from './orchestration/index.js';
