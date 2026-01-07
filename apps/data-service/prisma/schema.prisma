@@ -89,7 +89,8 @@ model Lead {
   tasks         Task[]
   assignments   LeadAssignment[]
   events        LeadEvent[]
-  importRecords DataImportRecord[]
+  intentSignals IntentSignal[]
+  intentScore   IntentScore?
 
   @@index([status])
   @@index([email])
@@ -1084,44 +1085,46 @@ enum Direction {
 }
 
 // ========================================
-// MARKETPLACE ECOSYSTEM REVENUE (Phase 12.6)
+// INTENT SIGNAL DETECTION (Phase 16.3.4)
 // ========================================
 
-model EcosystemRevenue {
-  id              String         @id @default(uuid())
-  type            RevenueType
-  amount          Float
-  currency        String         @default("USD")
-  status          RevenueStatus  @default(PENDING)
-  sourceId        String
-  sourceType      String
-  brokerId        String?
-  carrierId       String?
-  metadata        Json?
-  processedAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+model IntentSignal {
+  id          String   @id @default(uuid())
+  leadId      String
+  category    String   // WEBSITE, EMAIL, CONTENT, VELOCITY, BUYING, CHURN, EXPANSION
+  type        String   // PRODUCT_PAGE_VISIT, etc.
+  score       Float
+  weight      Float
+  description String
+  metadata    Json?
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
 
+  // Relations
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([category])
   @@index([type])
-  @@index([status])
-  @@index([sourceId])
-  @@index([brokerId])
-  @@index([carrierId])
-  @@index([createdAt])
-  @@map("ecosystem_revenue")
+  @@index([timestamp])
+  @@map("intent_signals")
 }
 
-enum RevenueType {
-  PLATFORM_FEE
-  SUBSCRIPTION
-  SERVICE_FEE
-  REFERRAL_COMMISSION
-  MARKET_ACCESS_FEE
-}
+model IntentScore {
+  id          String   @id @default(uuid())
+  leadId      String   @unique
+  score       Float
+  level       String   // LOW, MEDIUM, HIGH, CRITICAL
+  confidence  Float
+  trend       String   // UP, DOWN, STABLE
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-enum RevenueStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
+  // Relations
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([score])
+  @@index([level])
+  @@map("intent_scores")
 }

@@ -836,6 +836,7 @@ export * from './integrations.js';
 
 // Retention Types
 export * from './retention.js';
+export * from './intent.js';
 
 // Predictive Maintenance Types (Phase 11.3)
 export * from './predictive-maintenance.js';
