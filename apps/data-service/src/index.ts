@@ -34,7 +34,12 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { createEducationRoutes } from './routes/education.routes.js';
+import { createCommunityGroupsRoutes } from './routes/community-groups.routes.js';
+import { createCommunityEventsRoutes } from './routes/community-events.routes.js';
+import { createBadgesRoutes } from './routes/badges.routes.js';
+import { createMentorshipRoutes } from './routes/mentorship.routes.js';
+import { createAgentProfileRoutes } from './routes/agent-profile.routes.js';
+import { createAgentConnectionsRoutes } from './routes/agent-connections.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -87,6 +92,14 @@ const start = async (): Promise<void> => {
   // Setup VIP and community routes
   app.use('/api/v1/vip', createVIPRoutes());
   app.use('/api/v1/community', createCommunityRoutes());
+
+  // Phase 12.5: enhanced community routes
+  app.use('/api/v1/community/groups', createCommunityGroupsRoutes());
+  app.use('/api/v1/community/events', createCommunityEventsRoutes());
+  app.use('/api/v1/community/badges', createBadgesRoutes());
+  app.use('/api/v1/community/mentorship', createMentorshipRoutes());
+  app.use('/api/v1/community/profiles', createAgentProfileRoutes());
+  app.use('/api/v1/community/connections', createAgentConnectionsRoutes());
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));

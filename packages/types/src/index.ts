@@ -834,6 +834,4 @@ export * from './retention.js';
 // VIP & Community
 export * from './vip.js';
 export * from './community.js';
-
-// Education & Training (Phase 12.3)
-export * from './education.js';
+export * from './community-phase-12-5.js';
