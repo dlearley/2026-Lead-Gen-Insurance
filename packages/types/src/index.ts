@@ -800,6 +800,11 @@ export interface ProcessingResult {
   processingTime: number;
 }
 
+// ========================================
+// EDUCATION & TRAINING TYPES (Phase 29)
+// ========================================
+export * from './education.js';
+
 // Claims Management (Phase 10.1)
 export * from './claims.js';
 
