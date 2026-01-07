@@ -1,0 +1,33 @@
+# CodeQL Configuration
+# See https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning
+
+# Specify paths to exclude from analysis
+paths-ignore:
+  - '**/*.test.js'
+  - '**/*.test.ts'
+  - '**/*.spec.js'
+  - '**/*.spec.ts'
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/build/**'
+  - '**/coverage/**'
+  - '**/.next/**'
+  - '**/migrations/**'
+  - '**/scripts/**'
+
+# Enable query packs
+packs:
+  - codeql/javascript-queries:CodeqlSecurityExtensions
+  - codeql/python-queries:CodeqlSecurityExtensions
+
+# Query suite configuration
+query-filters:
+  - exclude:
+      id: js/unused-local-variable
+  - exclude:
+      id: py/unused-local-variable
+
+# Additional queries for security
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
