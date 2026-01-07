@@ -28,7 +28,7 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import copilotRouter from './routes/copilot.js';
+import attributionRouter from './routes/attribution.js';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
@@ -82,7 +82,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/copilot', copilotRouter);
+  app.use('/api/v1/attribution', attributionRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -105,7 +105,7 @@ export function createApp(): express.Express {
   app.use('/api/community', communityRouter);
   app.use('/api/broker-education', brokerEducationRouter);
   app.use('/api/claims', claimsRouter);
-  app.use('/api/copilot', copilotRouter);
+  app.use('/api/attribution', attributionRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });

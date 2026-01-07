@@ -1527,5 +1527,8 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Broker Education & Competency
-export * from './broker-education.js';
+// Broker Scale
+export * from './broker-scale.js';
+
+// Attribution (Phase 12.4)
+export * from './attribution.js';

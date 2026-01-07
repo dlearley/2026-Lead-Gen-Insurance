@@ -36,8 +36,7 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { BehaviorAnalyticsService } from './services/behavior-analytics.js';
-import { createBehaviorAnalyticsRoutes } from './routes/behavior.routes.js';
+import { createAttributionRoutes } from './routes/attribution.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -114,8 +113,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup orchestration routes
-  app.use('/api/v1', orchestrationRoutes);
+  // Setup attribution routes
+  app.use('/api/v1/attribution', createAttributionRoutes(prisma));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
