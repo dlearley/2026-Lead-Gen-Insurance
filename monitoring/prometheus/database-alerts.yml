@@ -1,0 +1,233 @@
+groups:
+  - name: database_connection_alerts
+    interval: 30s
+    rules:
+      - alert: HighConnectionPoolUtilization
+        expr: |
+          (
+            (database_connections_active / database_connections_active + database_connections_idle) * 100
+          ) > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection pool utilization"
+          description: "Connection pool utilization is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+      - alert: CriticalConnectionPoolUtilization
+        expr: |
+          (
+            (database_connections_active / database_connections_active + database_connections_idle) * 100
+          ) > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical database connection pool utilization"
+          description: "Connection pool utilization is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+      - alert: HighConnectionWaitTime
+        expr: histogram_quantile(0.95, rate(database_query_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection wait time"
+          description: "P95 query duration is {{ $value }}s on instance {{ $labels.instance }}"
+
+  - name: database_performance_alerts
+    interval: 30s
+    rules:
+      - alert: HighSlowQueryRate
+        expr: |
+          rate(database_slow_queries_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High slow query rate"
+          description: "{{ $value | humanize }} slow queries per second on instance {{ $labels.instance }}"
+
+      - alert: CriticalSlowQueryRate
+        expr: |
+          rate(database_slow_queries_total[5m]) > 50
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical slow query rate"
+          description: "{{ $value | humanize }} slow queries per second on instance {{ $labels.instance }}"
+
+      - alert: HighQueryErrorRate
+        expr: |
+          rate(database_query_errors_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database query error rate"
+          description: "{{ $value | humanize }} query errors per second on instance {{ $labels.instance }}"
+
+      - alert: LowCacheHitRatio
+        expr: |
+          database_cache_hit_ratio < 80
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Low database cache hit ratio"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+      - alert: HighTransactionRollbackRate
+        expr: |
+          (
+            rate(database_transactions_rolledback_total[5m]) /
+            (rate(database_transactions_committed_total[5m]) + rate(database_transactions_rolledback_total[5m]))
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High transaction rollback rate"
+          description: "Transaction rollback rate is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+  - name: database_replication_alerts
+    interval: 30s
+    rules:
+      - alert: HighReplicationLag
+        expr: |
+          database_replication_lag_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database replication lag"
+          description: "Replication lag is {{ $value }}s on instance {{ $labels.instance }}"
+
+      - alert: CriticalReplicationLag
+        expr: |
+          database_replication_lag_seconds > 30
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical database replication lag"
+          description: "Replication lag is {{ $value }}s on instance {{ $labels.instance }}"
+
+  - name: database_storage_alerts
+    interval: 30s
+    rules:
+      - alert: LowDiskSpace
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql"} / 
+           node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"}) * 100 < 20
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Low database disk space"
+          description: "Disk space available is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: CriticalDiskSpace
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql"} / 
+           node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical database disk space"
+          description: "Disk space available is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: HighTableBloat
+        expr: |
+          database_table_bloat_percentage > 30
+        for: 1h
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High table bloat detected"
+          description: "Table {{ $labels.table }} has {{ $value | humanizePercentage }} bloat"
+
+  - name: database_lock_alerts
+    interval: 30s
+    rules:
+      - alert: HighLockWaitCount
+        expr: |
+          database_locks_waiting > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High number of waiting locks"
+          description: "{{ $value }} locks are waiting on instance {{ $labels.instance }}"
+
+      - alert: CriticalLockWaitCount
+        expr: |
+          database_locks_waiting > 50
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical number of waiting locks"
+          description: "{{ $value }} locks are waiting on instance {{ $labels.instance }}"
+
+      - alert: HighDeadlockRate
+        expr: |
+          rate(database_deadlocks_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database deadlock rate"
+          description: "{{ $value | humanize }} deadlocks per second on instance {{ $labels.instance }}"
+
+  - name: database_backup_alerts
+    interval: 5m
+    rules:
+      - alert: BackupFailed
+        expr: |
+          database_backup_success == 0
+        for: 1h
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database backup failed"
+          description: "Last database backup was unsuccessful"
+
+      - alert: BackupTooOld
+        expr: |
+          time() - database_backup_last_success_timestamp > 86400
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database backup is too old"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+
+      - alert: BackupSizeAnomaly
+        expr: |
+          abs(database_backup_size_bytes - avg_over_time(database_backup_size_bytes[7d])) / avg_over_time(database_backup_size_bytes[7d]) > 0.5
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database backup size anomaly detected"
+          description: "Backup size is {{ $value | humanizePercentage }} different from 7-day average"
