@@ -34,8 +34,7 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
-import { createPerformanceRoutes } from './routes/performance.routes.js';
-import { CacheManager, createCacheManager } from '@insurance-lead-gen/core';
+import { createEducationRoutes } from './routes/education.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -92,8 +91,8 @@ const start = async (): Promise<void> => {
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
 
-  // Setup performance optimization routes
-  app.use('/api/v1/performance', createPerformanceRoutes(prisma, cacheManager));
+  // Setup education routes
+  app.use('/api/v1/education', createEducationRoutes());
 
   // Health check endpoint
   app.get('/health', (req, res) => {

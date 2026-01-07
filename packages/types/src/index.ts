@@ -835,6 +835,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Global Expansion Types
-export * from './global.js';
-export * from './i18n.js';
+// Education & Training (Phase 12.3)
+export * from './education.js';

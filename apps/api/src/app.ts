@@ -26,7 +26,8 @@ import biRouter from './routes/bi.js';
 import vipRouter from './routes/vip.js';
 import communityRouter from './routes/community.js';
 import claimsRouter from './routes/claims.js';
-import complianceRouter from './routes/compliance.js';
+import brokerToolsRouter from './routes/broker-tools.js';
+import educationRouter from './routes/education.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -76,7 +77,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/vip', vipRouter);
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/claims', claimsRouter);
-  app.use('/api/v1/compliance', complianceRouter);
+  app.use('/api/v1/education', educationRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
@@ -98,7 +99,7 @@ export function createApp(): express.Express {
   app.use('/api/vip', vipRouter);
   app.use('/api/community', communityRouter);
   app.use('/api/claims', claimsRouter);
-  app.use('/api/compliance', complianceRouter);
+  app.use('/api/education', educationRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
