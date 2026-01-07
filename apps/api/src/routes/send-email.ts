@@ -3,13 +3,16 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, sendEmailSchema } from '../utils/validation.js';
+import { createEndpointRateLimiter } from '../middleware/user-rate-limit.js';
 import { store, generateId, sanitizeHtml } from '../storage/in-memory.js';
 import type { Email } from '@insurance-lead-gen/types';
 import { logger } from '@insurance-lead-gen/core';
 
 const router = Router({ mergeParams: true });
 
-router.post('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+const sendEmailLimiter = createEndpointRateLimiter(10, 60 * 60 * 1000);
+
+router.post('/', authMiddleware, sendEmailLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { leadId } = req.params;
     const user = req.user!;

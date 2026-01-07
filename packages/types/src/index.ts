@@ -105,8 +105,7 @@ export interface OrganizationFilterParams {
 // USER TYPES
 // ========================================
 
-export type UserRole = 'user' | 'agent' | 'manager' | 'admin' | 'super_admin' | 'viewer';
-export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'revoked';
+export * from './auth.js';
 
 export interface User {
   id: string;

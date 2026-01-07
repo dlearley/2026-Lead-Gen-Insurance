@@ -1,26 +1,29 @@
 import type { Request, Response, NextFunction } from 'express';
-import { auditLogService, buildAuditContext } from '../services/audit.js';
-
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-}
+import { UserPayload, UserRole, Permission } from '@insurance-lead-gen/types';
+import { authService, AuthService, logger } from '@insurance-lead-gen/core';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: AuthenticatedUser;
+      user?: UserPayload;
     }
   }
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // Allow bypass for health check and certain public routes
+  if (req.path === '/health' || req.path === '/favicon.ico') {
+    next();
+    return;
+  }
+
+  // Support development/test bypass
   if (process.env.NODE_ENV === 'test' || process.env.DISABLE_AUTH === 'true') {
     req.user = {
       id: '00000000-0000-0000-0000-000000000001',
       email: 'dev@example.com',
-      role: 'ADMIN',
+      roles: ['admin'],
+      permissions: ['admin:all'],
     };
     next();
     return;
@@ -46,46 +49,16 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   try {
     const token = authHeader.substring(7);
-
-    if (token === 'dev-token') {
-      req.user = {
-        id: '00000000-0000-0000-0000-000000000001',
-        email: 'dev@example.com',
-        role: 'ADMIN',
-      };
-      next();
-      return;
-    }
-
-    void auditLogService
-      .logCritical({
-        ...buildAuditContext(req),
-        action: 'auth_invalid_token',
-        resourceType: 'auth',
-        status: 'failure',
-        errorMessage: 'Invalid token',
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        res.status(401).json({ error: 'Unauthorized - Invalid token' });
-      });
-  } catch {
-    void auditLogService
-      .logCritical({
-        ...buildAuditContext(req),
-        action: 'auth_invalid_token',
-        resourceType: 'auth',
-        status: 'failure',
-        errorMessage: 'Invalid token',
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        res.status(401).json({ error: 'Unauthorized - Invalid token' });
-      });
+    const decoded = await authService.verifyAccessToken(token);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    logger.error('Authentication failed', { error });
+    res.status(401).json({ error: 'Unauthorized - Invalid or expired token' });
   }
-}
+};
 
-export function requireRole(allowedRoles: AuthenticatedUser['role'][]) {
+export const requireRole = (role: UserRole) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       void auditLogService
@@ -103,23 +76,45 @@ export function requireRole(allowedRoles: AuthenticatedUser['role'][]) {
       return;
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      void auditLogService
-        .logCritical({
-          ...buildAuditContext(req),
-          action: 'authorization_denied',
-          resourceType: 'authorization',
-          status: 'failure',
-          errorMessage: 'Insufficient permissions',
-          newValues: { requiredRoles: allowedRoles, userRole: req.user.role },
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          res.status(403).json({ error: 'Forbidden - Insufficient permissions' });
-        });
+    if (!AuthService.hasRole(req.user.roles, role)) {
+      res.status(403).json({ error: 'Forbidden - Insufficient role' });
       return;
     }
 
     next();
   };
-}
+};
+
+export const requirePermission = (permission: Permission) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (!AuthService.hasPermission(req.user.roles, permission)) {
+      res.status(403).json({ error: 'Forbidden - Insufficient permissions' });
+      return;
+    }
+
+    next();
+  };
+};
+
+// RBAC Matrix / Helper for multiple roles
+export const requireAnyRole = (roles: UserRole[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const hasAny = roles.some(role => AuthService.hasRole(req.user!.roles, role));
+    if (!hasAny) {
+      res.status(403).json({ error: 'Forbidden - Insufficient permissions' });
+      return;
+    }
+
+    next();
+  };
+};
