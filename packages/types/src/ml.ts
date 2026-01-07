@@ -1,12 +1,23 @@
 /**
  * Machine Learning Types (Phase 16.3.3 - Predictive)
- * 
+ *
  * TypeScript definitions for ML model training, serving, and metadata
  */
 
-export type ModelType = 'churn' | 'conversion' | 'lead_score' | 'agent_performance' | 'pricing_optimization';
+export type ModelType =
+  | 'churn'
+  | 'conversion'
+  | 'lead_score'
+  | 'agent_performance'
+  | 'pricing_optimization';
 
-export type ModelStatus = 'training' | 'trained' | 'validating' | 'production' | 'archived' | 'failed';
+export type ModelStatus =
+  | 'training'
+  | 'trained'
+  | 'validating'
+  | 'production'
+  | 'archived'
+  | 'failed';
 
 export interface ModelConfig {
   modelType: ModelType;
@@ -165,21 +176,21 @@ export interface TrainingRequest {
   customConfig?: Partial<ModelConfig>;
 }
 
-export interface A/BTest {
+export interface ABTest {
   testId: string;
   name: string;
   description?: string;
   modelType: ModelType;
   controlModelId: string;
   treatmentModelId: string;
-  trafficSplit: number;  // 0-1, percentage to treatment
+  trafficSplit: number; // 0-1, percentage to treatment
   status: 'draft' | 'running' | 'paused' | 'completed';
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-  successMetric: string;  // e.g., 'conversion_rate', 'churn_rate'
+  successMetric: string; // e.g., 'conversion_rate', 'churn_rate'
   minimumSampleSize?: number;
-  confidenceLevel?: number;  // e.g., 0.95
+  confidenceLevel?: number; // e.g., 0.95
   results?: {
     controlMetrics: ModelMetrics;
     treatmentMetrics: ModelMetrics;
@@ -200,9 +211,9 @@ export interface ModelPerformanceMonitor {
   predictionDistribution?: {
     mean: number;
     std: number;
-    histogram: Array<{bin: string; count: number}>;
+    histogram: Array<{ bin: string; count: number }>;
   };
-  actualsMatchRate?: number;  // Percentage of predictions with actual outcomes
+  actualsMatchRate?: number; // Percentage of predictions with actual outcomes
   accuracy?: number;
   precision?: number;
   recall?: number;
@@ -222,7 +233,7 @@ export interface ModelRetrainingTrigger {
     minExamplesSinceLastTrain?: number;
     performanceDropThreshold?: number;
     dataDriftThreshold?: number;
-    schedule?: string;  // cron expression
+    schedule?: string; // cron expression
   };
   lastTriggeredAt?: string;
   nextScheduledAt?: string;
@@ -369,7 +380,7 @@ export interface ModelDeployment {
   canaryConfig?: {
     enabled: boolean;
     trafficRampUp: 'gradual' | 'immediate';
-    evaluationWindow: string;  // e.g., '1h', '24h'
+    evaluationWindow: string; // e.g., '1h', '24h'
     autoPromote: boolean;
     successCriteria: Record<string, number>;
   };
@@ -386,5 +397,5 @@ export interface ModelServingMetrics {
   p99LatencyMs: number;
   lastRequestAt?: string;
   errorRate: number;
-  throughput: number;  // requests per second
+  throughput: number; // requests per second
 }

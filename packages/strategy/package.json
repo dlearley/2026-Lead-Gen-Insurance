@@ -1,5 +1,5 @@
 {
-  "name": "@leadgen/strategy",
+  "name": "@insurance-lead-gen/strategy",
   "version": "1.0.0",
   "description": "Market consolidation and industry leadership strategy engines",
   "main": "dist/index.js",
@@ -13,8 +13,8 @@
   "dependencies": {
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
-    "@leadgen/types": "workspace:*",
-    "@leadgen/core": "workspace:*"
+    "@insurance-lead-gen/types": "workspace:*",
+    "@insurance-lead-gen/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
