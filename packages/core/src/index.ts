@@ -13,5 +13,12 @@ export * from './routes/index.js';
 // Security exports
 export * from './security/index.js';
 
-// Underwriting & Recommendations exports
-export * from './services/index.js';
+// Claims Intelligence & Fraud Detection Services - Phase 27.4
+export { FraudDetectionService } from './services/fraud-detection.service.js';
+export { ClaimsOutcomePredictionService } from './services/claims-outcome-prediction.service.js';
+export { AnomalyDetectionService } from './services/anomaly-detection.service.js';
+export { SettlementOptimizationService } from './services/settlement-optimization.service.js';
+export { ClaimsAutomationService } from './services/claims-automation.service.js';
+export { FraudNetworkAnalysisService } from './services/fraud-network-analysis.service.js';
+export { ClaimsAnalyticsService } from './services/claims-analytics.service.js';
+export { InvestigationRecommendationService } from './services/investigation-recommendation.service.js';

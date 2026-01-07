@@ -28,7 +28,13 @@ import communityRouter from './routes/community.js';
 import communityNetworkRouter from './routes/community-network.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
-import intentSignalsRouter from './routes/intent-signals.js';
+import fraudRouter from './routes/fraud.js';
+import claimsOutcomeRouter from './routes/claims-outcome.js';
+import anomaliesRouter from './routes/anomalies.js';
+import settlementsRouter from './routes/settlements.js';
+import automationRouter from './routes/automation.js';
+import investigationsRouter from './routes/investigations.js';
+import claimsAnalyticsRouter from './routes/claims-analytics.js';
 import { UPLOADS_DIR } from './utils/files.js';
 
 export function createApp(): express.Express {
@@ -81,6 +87,15 @@ export function createApp(): express.Express {
   app.use('/api/v1/claims', claimsRouter);
   app.use('/api/v1/intent', intentSignalsRouter);
 
+  // Phase 27.4: Claims Intelligence & Fraud Detection
+  app.use('/api/v1/fraud', fraudRouter);
+  app.use('/api/v1/outcomes', claimsOutcomeRouter);
+  app.use('/api/v1/anomalies', anomaliesRouter);
+  app.use('/api/v1/settlements', settlementsRouter);
+  app.use('/api/v1/automation', automationRouter);
+  app.use('/api/v1/investigations', investigationsRouter);
+  app.use('/api/v1/claims/analytics', claimsAnalyticsRouter);
+
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
   app.use('/api/leads/:leadId/activity', activityRouter);
@@ -103,6 +118,15 @@ export function createApp(): express.Express {
   app.use('/api/community-network', communityNetworkRouter);
   app.use('/api/claims', claimsRouter);
   app.use('/api/marketplace', marketplaceRouter);
+
+  // Phase 27.4: Claims Intelligence & Fraud Detection
+  app.use('/api/fraud', fraudRouter);
+  app.use('/api/outcomes', claimsOutcomeRouter);
+  app.use('/api/anomalies', anomaliesRouter);
+  app.use('/api/settlements', settlementsRouter);
+  app.use('/api/automation', automationRouter);
+  app.use('/api/investigations', investigationsRouter);
+  app.use('/api/claims/analytics', claimsAnalyticsRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
