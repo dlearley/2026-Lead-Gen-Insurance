@@ -1715,5 +1715,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Regulatory reporting (Phase 25.1F)
-export * from './regulatory-reporting.types.js';
+// Agent Configuration & Customization
+export * from './agent-config.js';
