@@ -588,516 +588,481 @@ model MessageReaction {
   @@unique([messageId, userId, emoji])
 }
 
-model MessageAttachment {
-  id String @id @default(cuid())
-  messageId String
-  
-  fileName String
-  fileUrl String
-  fileSize Int
-  mimeType String
-  
-  createdAt DateTime @default(now())
-  
-  message Message @relation(fields: [messageId], references: [id])
+enum PartnershipStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  TERMINATED
+  RENEWAL_NEEDED
 }
 
-model UserPresence {
-  id String @id @default(cuid())
-  userId String @unique
-  organizationId String
-  
-  status UserPresenceStatus
-  lastSeen DateTime @default(now())
-  
-  updatedAt DateTime @updatedAt
+// ========================================
+// CUSTOMER SUCCESS MODELS
+// ========================================
+
+// Customer model - represents a broker/agency customer (converted from Lead)
+model Customer {
+  id                    String               @id @default(uuid())
+  leadId                String?              @unique
+  name                  String
+  companyName           String?
+  email                 String
+  phone                 String?
+  industry              String?
+  businessType          String?
+  employeeCount         Int?
+  annualRevenue         Float?
+  website               String?
+  billingAddress        String?
+  billingCity           String?
+  billingState          String?
+  billingZipCode        String?
+  billingCountry        String?
+  tier                  CustomerTier        @default(SMALL_BUSINESS)
+  status                CustomerStatus       @default(ACTIVE)
+  contractStartDate     DateTime
+  contractEndDate       DateTime?
+  annualContractValue   Float                @default(0.0)
+  customerSince         DateTime             @default(now())
+
+  // Metrics
+  totalPolicies         Int                  @default(0)
+  activePolicies        Int                  @default(0)
+  lifetimeValue         Float                @default(0.0)
+  healthScore           Int                  @default(0)
+  churnRiskLevel        ChurnRiskLevel       @default(LOW)
+
+  // Engagement
+  lastContactDate       DateTime?
+  nextRenewalDate       DateTime?
+  preferredContactMethod String?
+  tags                  String[]
+  metadata              Json?
+
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relationships
+  successProfile        CustomerSuccessProfile?
+  successPlans          SuccessPlan[]
+  healthScores          HealthScore[]
+  businessReviews       BusinessReview[]
+  advocacyActivities    AdvocacyActivity[]
+  successMetrics        CustomerSuccessMetrics[]
+  policies              Policy[]
+
+  // Indexes
+  @@index([email])
+  @@index([tier])
+  @@index([status])
+  @@index([healthScore])
+  @@index([churnRiskLevel])
+  @@index([customerSince])
 }
 
-// Video & Voice
-model Call {
-  id String @id @default(cuid())
-  organizationId String
-  
-  initiatorId String
-  status CallStatus
-  
-  callType CallType
-  mediaType MediaType
-  
-  roomId String? // for meeting rooms
-  
-  startedAt DateTime?
-  endedAt DateTime?
-  duration Int? // seconds
-  
-  recordingId String?
-  transcription String?
-  
-  createdAt DateTime @default(now())
-  
-  participants CallParticipant[]
-  recording CallRecording?
+// CustomerSuccessProfile - detailed customer success profile
+model CustomerSuccessProfile {
+  id                    String               @id @default(uuid())
+  customerId            String               @unique
+
+  // CSM Assignment
+  csmId                 String?
+  csmName               String?
+  csmEmail              String?
+  executiveSponsorId    String?
+  executiveSponsorName  String?
+  executiveSponsorEmail String?
+  technicalContactId    String?
+  technicalContactName  String?
+  technicalContactEmail String?
+
+  // Business Objectives
+  primaryObjective      String?
+  secondaryObjectives   String[]
+  successCriteria       Json?                // Success criteria as JSON object
+
+  // Value Metrics (Baseline and Targets)
+  baselineMetrics       Json?
+  targetMetrics         Json?
+  currentMetrics        Json?
+
+  // Onboarding
+  onboardingStartDate   DateTime?
+  onboardingEndDate     DateTime?
+  onboardingStatus      OnboardingStatus     @default(NOT_STARTED)
+  goLiveDate            DateTime?
+  timeToValue           Int?                 // Days to first value
+
+  // Integration
+  integrationsEnabled   String[]
+  dataMigrationStatus   DataMigrationStatus  @default(NOT_STARTED)
+
+  // Training
+  usersTrained          Int                  @default(0)
+  totalUsers            Int                  @default(0)
+  trainingCompleted     Boolean              @default(false)
+  trainingDate          DateTime?
+
+  // Adoption
+  adoptionRate          Float                @default(0.0)
+  featureAdoption       Json?                // Feature adoption data
+  loginFrequency        String?              // Daily, Weekly, etc.
+
+  // Satisfaction
+  latestNPS             Int?
+  latestCSAT            Float?
+  latestCES             Int?
+  npsHistory            Json?
+  csatHistory           Json?
+  complaintCount        Int                  @default(0)
+
+  // Financial
+  expansionRevenue      Float                @default(0.0)
+  expansionProbability  Float?              // 0-1
+
+  // Notes
+  csmNotes              String?
+  riskNotes             String?
+  opportunityNotes      String?
+
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relationships
+  customer              Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([csmId])
+  @@index([onboardingStatus])
 }
 
-model CallParticipant {
-  id String @id @default(cuid())
-  callId String
-  userId String
-  
-  joinedAt DateTime
-  leftAt DateTime?
-  
-  mediaEnabled Json // { audio: bool, video: bool }
-  
-  call Call @relation(fields: [callId], references: [id])
+// SuccessPlan - customer success plans with milestones
+model SuccessPlan {
+  id                    String               @id @default(uuid())
+  customerId            String
+  title                 String
+  description           String?
+  planType              SuccessPlanType      @default(ONBOARDING)
+  status                SuccessPlanStatus    @default(ACTIVE)
+
+  // Timeline
+  startDate             DateTime
+  endDate               DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Success Criteria
+  businessObjectives    String[]
+  successMetrics        Json?                // KPIs and targets
+  baselineValue         Json?
+
+  // Stakeholders
+  stakeholders          Json?                // Array of stakeholder objects
+
+  // Milestones
+  milestones            SuccessPlanMilestone[]
+
+  // Notes
+  notes                 String?
+
+  // Relationships
+  customer              Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([status])
+  @@index([startDate])
 }
 
-model CallRecording {
-  id String @id @default(cuid())
-  callId String @unique
-  
-  fileUrl String
-  fileSize Int
-  duration Int
-  
-  storageProvider String // s3, gcs, etc
-  
-  createdAt DateTime @default(now())
-  
-  call Call @relation(fields: [callId], references: [id])
+// SuccessPlanMilestone - milestones within success plans
+model SuccessPlanMilestone {
+  id                    String               @id @default(uuid())
+  successPlanId         String
+  title                 String
+  description           String?
+  dueDate               DateTime
+  completedDate         DateTime?
+  status                MilestoneStatus      @default(PENDING)
+  owner                 String?
+  priority              MilestonePriority    @default(MEDIUM)
+  deliverables          String[]
+
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relationships
+  successPlan           SuccessPlan          @relation(fields: [successPlanId], references: [id], onDelete: Cascade)
+
+  @@index([successPlanId])
+  @@index([status])
+  @@index([dueDate])
 }
 
-model MeetingRoom {
-  id String @id @default(cuid())
-  organizationId String
-  
-  name String
-  description String?
-  
-  roomUrl String @unique
-  password String?
-  
-  capacity Int?
-  
-  isActive Boolean @default(true)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  schedules MeetingSchedule[]
+// HealthScore - historical health score tracking
+model HealthScore {
+  id                    String               @id @default(uuid())
+  customerId            String
+  score                 Int                  // 0-100
+  healthLevel           HealthLevel
+
+  // Component Scores
+  engagementScore       Int                  @default(0)
+  successScore          Int                  @default(0)
+  satisfactionScore     Int                  @default(0)
+  financialScore        Int                  @default(0)
+
+  // Metadata
+  factors               Json?                // Factors affecting score
+  notes                 String?
+  trend                 HealthTrend          @default(STABLE)
+
+  recordedAt            DateTime             @default(now())
+  recordedBy            String?
+
+  // Relationships
+  customer              Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([score])
+  @@index([healthLevel])
+  @@index([recordedAt])
+  @@unique([customerId, recordedAt])
 }
 
-model MeetingSchedule {
-  id String @id @default(cuid())
-  roomId String
-  
-  title String
-  description String?
-  
-  startTime DateTime
-  endTime DateTime
-  
-  organizers String[]
-  participants String[]
-  
-  createdAt DateTime @default(now())
-  
-  room MeetingRoom @relation(fields: [roomId], references: [id])
+// BusinessReview - business review meetings and outcomes
+model BusinessReview {
+  id                    String               @id @default(uuid())
+  customerId            String
+  reviewType            BusinessReviewType
+  reviewDate            DateTime
+  attendeeNames         String[]
+  attendeeTitles        String[]
+
+  // Review Content
+  agenda                String[]
+  achievements          String[]
+  challenges            String[]
+  metricsReview         Json?
+  goalsProgress         Json?
+
+  // Decisions & Actions
+  decisions             String[]
+  actionItems           Json?                // Array of action item objects
+  nextSteps             String[]
+
+  // Satisfaction
+  overallRating         Int?                 // 1-5
+  customerFeedback      String?
+
+  // Documentation
+  presentationUrl       String?
+  notes                 String?
+  followUpDate          DateTime?
+
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relationships
+  customer              Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([reviewType])
+  @@index([reviewDate])
 }
 
-// Case Management
-model Case {
-  id String @id @default(cuid())
-  organizationId String
-  
-  caseNumber String @unique
-  title String
-  description String?
-  
-  status CaseStatus
-  priority CasePriority
-  
-  assignedToId String?
-  createdById String
-  
-  leadId String? // related lead
-  
-  tags String[]
-  customFields Json
-  
-  dueDate DateTime?
-  closedAt DateTime?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  activities CaseActivity[]
-  notes CaseNote[]
-  documents CaseDocument[]
-  relationships CaseRelationship[]
+// AdvocacyActivity - customer advocacy and reference activities
+model AdvocacyActivity {
+  id                    String               @id @default(uuid())
+  customerId            String
+  activityType          AdvocacyType
+  title                 String
+  description           String?
+
+  // Activity Details
+  status                AdvocacyStatus       @default(PENDING)
+  date                  DateTime?
+  contactPerson         String?
+  contactEmail          String?
+
+  // Outcomes
+  outcome               String?
+  value                 String?              // Quantified impact
+
+  // Related Content
+  caseStudyUrl          String?
+  testimonialUrl        String?
+  referenceNotes        String?
+
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relationships
+  customer              Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([activityType])
+  @@index([status])
 }
 
-model CaseActivity {
-  id String @id @default(cuid())
-  caseId String
-  
-  activityType String // message, call, document, status_change, assignment
-  activityId String? // reference to related record
-  
-  description String
-  userId String
-  
-  createdAt DateTime @default(now())
-  
-  case Case @relation(fields: [caseId], references: [id])
-  
-  @@index([caseId, createdAt])
+// CustomerSuccessMetrics - aggregated metrics for reporting
+model CustomerSuccessMetrics {
+  id                    String               @id @default(uuid())
+  customerId            String
+  period                String               // YYYY-MM format
+  periodType            PeriodType           @default(MONTHLY)
+
+  // Business Metrics
+  leadVolume            Int                  @default(0)
+  conversionRate        Float                @default(0.0)
+  revenueGenerated      Float                @default(0.0)
+  costSavings           Float                @default(0.0)
+  timeSavings           Int?                 // Hours
+
+  // Adoption Metrics
+  activeUsers           Int                  @default(0)
+  totalUsers            Int                  @default(0)
+  loginFrequency        Float                @default(0.0)
+  featureUsage          Json?                // Feature usage breakdown
+
+  // Satisfaction Metrics
+  nps                   Int?
+  csat                  Float?
+  ces                   Int?
+
+  // Support Metrics
+  supportTickets        Int                  @default(0)
+  ticketResolutionTime  Int?                 // Average in hours
+  firstResponseTime     Int?                 // Average in hours
+
+  calculatedAt          DateTime             @default(now())
+
+  // Relationships
+  customer              Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([period])
+  @@index([periodType])
+  @@unique([customerId, period, periodType])
 }
 
-model CaseNote {
-  id String @id @default(cuid())
-  caseId String
-  authorId String
-  
-  content String
-  editedAt DateTime?
-  
-  isInternal Boolean @default(true)
-  
-  createdAt DateTime @default(now())
-  
-  case Case @relation(fields: [caseId], references: [id])
+// ========================================
+// CUSTOMER SUCCESS ENUMS
+// ========================================
+
+enum CustomerTier {
+  ENTERPRISE
+  MID_MARKET
+  SMALL_BUSINESS
+  TRIAL
 }
 
-model CaseDocument {
-  id String @id @default(cuid())
-  caseId String
-  documentId String
-  
-  documentType String // application, supporting, contract, etc
-  
-  addedAt DateTime @default(now())
-  
-  case Case @relation(fields: [caseId], references: [id])
+enum CustomerStatus {
+  ACTIVE
+  ONBOARDING
+  AT_RISK
+  CHURNED
+  PAUSED
 }
 
-model CaseRelationship {
-  id String @id @default(cuid())
-  caseId String
-  relatedCaseId String
-  
-  relationshipType CaseRelationshipType
-  
-  createdAt DateTime @default(now())
-}
-
-model CaseTemplate {
-  id String @id @default(cuid())
-  organizationId String
-  
-  name String
-  description String?
-  category String
-  
-  defaultStatus CaseStatus
-  defaultPriority CasePriority
-  
-  tags String[]
-  customFields Json
-  
-  isActive Boolean @default(true)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Document Collaboration
-model Document {
-  id String @id @default(cuid())
-  organizationId String
-  
-  title String
-  mimeType String
-  
-  ownerId String
-  
-  isPublished Boolean @default(false)
-  isArchived Boolean @default(false)
-  
-  fileSize Int
-  pageCount Int? // for PDFs
-  
-  storageUrl String
-  
-  tags String[]
-  customMetadata Json
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  versions DocumentVersion[]
-  permissions DocumentPermission[]
-  comments DocumentComment[]
-}
-
-model DocumentVersion {
-  id String @id @default(cuid())
-  documentId String
-  
-  versionNumber Int
-  fileUrl String
-  fileSize Int
-  
-  createdBy String
-  createdAt DateTime @default(now())
-  
-  changeSummary String?
-  
-  document Document @relation(fields: [documentId], references: [id])
-}
-
-model DocumentPermission {
-  id String @id @default(cuid())
-  documentId String
-  userId String
-  
-  permission DocumentPermission
-  grantedAt DateTime @default(now())
-  grantedBy String
-  
-  expiresAt DateTime?
-  
-  document Document @relation(fields: [documentId], references: [id])
-  
-  @@unique([documentId, userId])
-}
-
-model DocumentComment {
-  id String @id @default(cuid())
-  documentId String
-  authorId String
-  
-  content String
-  pageNumber Int? // for PDFs
-  highlights Json? // text selection coordinates
-  
-  resolvedAt DateTime?
-  resolvedBy String?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  document Document @relation(fields: [documentId], references: [id])
-}
-
-// Integrations
-model Integration {
-  id String @id @default(cuid())
-  organizationId String
-  
-  integrationType IntegrationType
-  
-  isActive Boolean @default(true)
-  isAuthenticated Boolean @default(false)
-  
-  credentials Json // encrypted
-  webhookUrl String?
-  webhookSecret String?
-  
-  syncEnabled Boolean @default(false)
-  lastSyncAt DateTime?
-  
-  config Json // integration-specific config
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model IntegrationSync {
-  id String @id @default(cuid())
-  integrationId String
-  
-  syncType String // leads, deals, contacts, activities
-  direction String // one_way, two_way
-  
-  syncedRecords Int @default(0)
-  failedRecords Int @default(0)
-  
-  lastRun DateTime
-  nextRun DateTime?
-  
-  status String // pending, running, success, failed
-  errorMessage String?
-  
-  createdAt DateTime @default(now())
-}
-
-model IntegrationMapping {
-  id String @id @default(cuid())
-  integrationId String
-  
-  sourceField String // field in external system
-  targetField String // field in our system
-  transformationRules Json?
-  
-  isActive Boolean @default(true)
-  
-  Integration Int @id @default(cuid())
-}
-
-model IntegrationWebhook {
-  id String @id @default(cuid())
-  integrationId String
-  
-  event String // lead.created, deal.updated, etc
-  
-  isActive Boolean @default(true)
-  
-  createdAt DateTime @default(now())
-}
-
-// Notifications
-model Notification {
-  id String @id @default(cuid())
-  organizationId String
-  userId String
-  
-  type NotificationType
-  title String
-  message String
-  actionUrl String?
-  
-  readAt DateTime?
-  
-  createdAt DateTime @default(now())
-  
-  @@index([userId, readAt])
-}
-
-model NotificationPreference {
-  id String @id @default(cuid())
-  userId String @unique
-  organizationId String
-  
-  pushEnabled Boolean @default(true)
-  emailEnabled Boolean @default(true)
-  
-  messageNotifications MessageNotificationPreference
-  callNotifications Boolean @default(true)
-  caseNotifications Boolean @default(true)
-  documentNotifications Boolean @default(true)
-  
-  quietHoursStart String? // HH:mm
-  quietHoursEnd String?
-  quietHoursEnabled Boolean @default(false)
-  
-  updatedAt DateTime @updatedAt
-}
-
-model PushToken {
-  id String @id @default(cuid())
-  userId String
-  organizationId String
-  
-  token String
-  platform String // ios, android, web
-  deviceName String?
-  
-  isActive Boolean @default(true)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@unique([userId, token, platform])
-}
-
-enum ConversationType {
-  DIRECT
-  GROUP
-  CASE
-}
-
-enum MessageContentType {
-  TEXT
-  SYSTEM
-  FILE
-}
-
-enum UserPresenceStatus {
-  ONLINE
-  AWAY
-  OFFLINE
-  DND
-}
-
-enum CallStatus {
-  INITIATED
-  RINGING
-  CONNECTED
-  ENDED
-  FAILED
-}
-
-enum CallType {
-  ONE_ON_ONE
-  GROUP
-}
-
-enum MediaType {
-  AUDIO
-  VIDEO
-}
-
-enum CaseStatus {
-  NEW
-  IN_PROGRESS
-  ON_HOLD
-  COMPLETED
-  CLOSED
-}
-
-enum CasePriority {
+enum ChurnRiskLevel {
   LOW
   MEDIUM
   HIGH
   CRITICAL
 }
 
-enum CaseRelationshipType {
-  PARENT
-  CHILD
-  RELATED
-  DUPLICATE
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  CANCELLED
 }
 
-enum DocumentPermission {
-  VIEW
-  COMMENT
-  EDIT
-  OWNER
+enum DataMigrationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }
 
-enum IntegrationType {
-  SALESFORCE
-  HUBSPOT
-  PIPEDRIVE
-  SLACK
-  TEAMS
-  OUTLOOK
-  GOOGLE_CALENDAR
-  QUICKBOOKS
-  XERO
+enum SuccessPlanType {
+  ONBOARDING
+  QUARTERLY
+  ANNUAL
+  EXPANSION
+  RECOVERY
 }
 
-enum NotificationType {
-  MESSAGE
-  CALL
-  CASE
-  DOCUMENT
+enum SuccessPlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
 }
 
-enum MessageNotificationPreference {
-  ALL
-  MENTIONS
-  NONE
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum MilestonePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum HealthLevel {
+  POOR      // 0-39
+  FAIR      // 40-59
+  GOOD      // 60-79
+  EXCELLENT // 80-100
+}
+
+enum HealthTrend {
+  IMPROVING
+  STABLE
+  DECLINING
+  UNKNOWN
+}
+
+enum BusinessReviewType {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  EXECUTIVE
+  STRATEGIC
+}
+
+enum AdvocacyType {
+  CASE_STUDY
+  TESTIMONIAL
+  REFERENCE_CALL
+  SPEAKER_EVENT
+  PRESS_RELEASE
+  WEBINAR
+  USER_GROUP
+  ADVISORY_BOARD
+}
+
+enum AdvocacyStatus {
+  PENDING
+  REQUESTED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  CANCELLED
+}
+
+enum PeriodType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
 }

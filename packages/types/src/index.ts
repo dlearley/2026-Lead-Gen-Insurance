@@ -1686,6 +1686,9 @@ export interface ClaimLifecycleConfig {
 // Onboarding & Success Metrics
 export * from './onboarding.js';
 
+// Customer Success Types
+export * from './customer-success.js';
+
 // Report Types
 export * from './reports.js';
 
