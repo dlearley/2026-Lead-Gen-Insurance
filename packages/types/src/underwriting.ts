@@ -598,3 +598,20 @@ export interface PaginatedResponse<T> {
     hasPrevious: boolean;
   };
 }
+
+export type UnderwritingRequested = {
+  underwritingId: string;
+  agentId: string;
+  leadId: string;
+  requestedAt: Date;
+}
+
+export type UnderwritingCompleted = {
+  underwritingId: string;
+  agentId: string;
+  leadId: string;
+  completedAt: Date;
+  decision: UnderwritingDecision;
+  recommendedCoverage: RecommendedCoverage[];
+  exceptions: Exception[];
+}

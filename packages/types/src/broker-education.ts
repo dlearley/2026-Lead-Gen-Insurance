@@ -187,14 +187,14 @@ export interface CreateQuestionDto {
 
 export interface AssessmentAttempt {
   id: string;
-  assessmentId;
+  assessmentId: string;
   agentId: string;
   attemptNumber: number;
   score: number;
   passed: boolean;
   startedAt: Date;
   completedAt?: Date;
-  answers: Json;
+  answers: JSON;
 }
 
 export interface CreateAssessmentAttemptDto {

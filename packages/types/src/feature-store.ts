@@ -11,7 +11,6 @@ export type EntityType = 'lead' | 'agent' | 'policy' | 'customer' | 'carrier' | 
 
 export interface FeatureMetadata {
   id?: string;
-  name: string;
   description: string;
   featureType: FeatureType;
   entityType: EntityType;
@@ -281,7 +280,7 @@ export interface FeatureEngineeringResult {
   };
   dataQualityReport: DataQualityReport;
   outputLocation?: string;  // For large datasets
-  schema: FeatureSchema;
+  schema: FeatureSet;
 }
 
 export interface DataQualityReport {

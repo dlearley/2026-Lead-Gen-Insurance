@@ -1,4 +1,4 @@
-import type { UnderwritingResult } from './underwriting.js';
+import type { UnderwritingRule } from './underwriting.js';
 
 export const EVENT_SUBJECTS = {
   LeadReceived: 'lead.received',
@@ -45,7 +45,7 @@ export interface LeadCreatePayload {
 }
 
 export type LeadReceivedEvent = EventEnvelope<
-  typeof EVENT_SUBJECTS.LeadReceived,
+  typeof EVENT_SUBJECTS.lead.received,
   {
     leadId: string;
     lead: LeadCreatePayload;
@@ -53,14 +53,14 @@ export type LeadReceivedEvent = EventEnvelope<
 >;
 
 export type LeadProcessedEvent = EventEnvelope<
-  typeof EVENT_SUBJECTS.LeadProcessed,
+  typeof EVENT_SUBJECTS.lead.processed,
   {
     leadId: string;
   }
 >;
 
 export type UnderwritingRequestedEvent = EventEnvelope<
-  typeof EVENT_SUBJECTS.UnderwritingRequested,
+  LeadReceived,
   {
     leadId: string;
     policyId?: string;
@@ -69,7 +69,7 @@ export type UnderwritingRequestedEvent = EventEnvelope<
 >;
 
 export type UnderwritingCompletedEvent = EventEnvelope<
-  typeof EVENT_SUBJECTS.UnderwritingCompleted,
+  LeadProcessed,
   {
     leadId: string;
     policyId?: string;

@@ -133,8 +133,6 @@ export interface CourseEnrollment {
 
 export interface ModuleProgress {
   id: string;
-  enrollmentId: string;
-  moduleId: string;
   status: ProgressStatus;
   progress: number; // 0-100
   timeSpent: number; // Time spent in minutes

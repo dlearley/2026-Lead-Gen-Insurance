@@ -1,6 +1,4 @@
-// @ts-ignore - Temporarily ignore all exports during merge cleanup
-
-// Types re-exports - skipping problematic files for now
+// Types re-exports - all types are defined in individual files
 
 export * from './auth.js';
 export * from './observability.js';
@@ -16,3 +14,4 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 export * from './copilot.js';
+export * from './claims.js';
