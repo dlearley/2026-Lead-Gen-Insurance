@@ -8,8 +8,12 @@ export const EVENT_SUBJECTS = {
   AgentGet: 'agent.get',
   AgentsMatch: 'agents.match',
   RoutingConfigUpdate: 'routing.config.update',
-  UnderwritingRequested: 'underwriting.requested',
-  UnderwritingCompleted: 'underwriting.completed',
+
+  RegulatoryReportGenerated: 'regulatory.report.generated',
+  RegulatoryReportSubmitted: 'regulatory.report.submitted',
+  RegulatoryBreachReported: 'regulatory.breach.reported',
+  RegulatoryDeadlineReminderSent: 'regulatory.deadline.reminder_sent',
+  RegulatoryCommunicationLogged: 'regulatory.communication.logged',
 } as const;
 
 export type EventSubject = (typeof EVENT_SUBJECTS)[keyof typeof EVENT_SUBJECTS];

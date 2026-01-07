@@ -153,6 +153,88 @@ async function main(): Promise<void> {
     ],
   });
 
+  // Seed regulatory templates (Phase 25.1F)
+  await prisma.regulatoryReportTemplate.upsert({
+    where: { templateName: 'Federal-AnnualCompliance-v1' },
+    update: {
+      status: 'Active',
+    },
+    create: {
+      templateName: 'Federal-AnnualCompliance-v1',
+      jurisdiction: 'Federal',
+      reportType: 'AnnualCompliance',
+      description: 'Baseline annual compliance report template',
+      sections: JSON.stringify([
+        { title: 'Executive Summary', required: true },
+        { title: 'Key Metrics', required: true },
+        { title: 'Findings & Remediation', required: true },
+      ]),
+      requiredMetrics: ['leadsCreated', 'eventsCreated'],
+      formatRequirements: 'PDF',
+      frequency: 'Annual',
+      dueDate: '90 days after period end',
+      regulatoryBody: 'Federal',
+      contactInfo: 'compliance@regulator.gov',
+      submissionURL: 'https://regulator.example/portal',
+      submissionEmail: 'submissions@regulator.example',
+      status: 'Active',
+    },
+  });
+
+  await prisma.regulatoryReportTemplate.upsert({
+    where: { templateName: 'CA-IncidentReport-v1' },
+    update: { status: 'Active' },
+    create: {
+      templateName: 'CA-IncidentReport-v1',
+      jurisdiction: 'CA',
+      reportType: 'IncidentReport',
+      description: 'California incident reporting template',
+      sections: JSON.stringify([
+        { title: 'Incident Summary', required: true },
+        { title: 'Affected Individuals', required: true },
+        { title: 'Notifications', required: true },
+      ]),
+      requiredMetrics: ['violations'],
+      formatRequirements: 'PDF',
+      frequency: 'OnDemand',
+      dueDate: 'Within 60 days of discovery',
+      regulatoryBody: 'State of California',
+      contactInfo: 'privacy@oag.ca.gov',
+      submissionURL: 'https://oag.ca.gov/privacy',
+      submissionEmail: 'privacy@oag.ca.gov',
+      status: 'Active',
+    },
+  });
+
+  // Seed current-year deadlines
+  const year = new Date().getUTCFullYear();
+  const annualDue = new Date(Date.UTC(year, 2, 31));
+  await prisma.regulatoryDeadline.upsert({
+    where: { deadlineId: `Federal-AnnualCompliance-${year}` },
+    update: {
+      dueDate: annualDue,
+      reminderDates: [
+        new Date(Date.UTC(year, 2, 1)),
+        new Date(Date.UTC(year, 2, 24)),
+      ],
+      status: 'Upcoming',
+    },
+    create: {
+      deadlineId: `Federal-AnnualCompliance-${year}`,
+      reportType: 'AnnualCompliance',
+      jurisdiction: 'Federal',
+      description: `Annual compliance report due for ${year}`,
+      dueDate: annualDue,
+      reminderDates: [
+        new Date(Date.UTC(year, 2, 1)),
+        new Date(Date.UTC(year, 2, 24)),
+      ],
+      isRecurring: true,
+      recurrencePattern: 'Annual',
+      status: 'Upcoming',
+    },
+  });
+
   console.log('Database seed completed successfully');
 }
 

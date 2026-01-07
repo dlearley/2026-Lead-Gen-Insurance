@@ -17,6 +17,7 @@ import sendEmailRouter from './routes/send-email.js';
 import analyticsRouter from './routes/analytics.js';
 import policiesRouter from './routes/policies.js';
 import reportsRouter from './routes/reports.js';
+import regulatoryReportingRouter from './routes/regulatory-reporting.routes.js';
 import alertsRouter from './routes/alerts.js';
 import scoringRouter from './routes/scoring.js';
 import leadScoringMLRouter from './routes/lead-scoring-ml.js';
@@ -71,6 +72,9 @@ export function createApp(): express.Express {
     });
   });
 
+  // Regulatory reporting routes are mounted at the API root so they can coexist with existing report routes.
+  app.use('/api/v1', regulatoryReportingRouter);
+
   app.use('/api/v1/leads', leadsRouter);
   app.use('/api/v1/leads/:leadId/notes', notesRouter);
   app.use('/api/v1/leads/:leadId/activity', activityRouter);
@@ -98,6 +102,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
   app.use('/api/v1', complianceAuditRouter);
+
+  app.use('/api', regulatoryReportingRouter);
 
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:leadId/notes', notesRouter);
