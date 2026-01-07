@@ -1,129 +1,189 @@
 global:
-  resolve_timeout: 5m
-  # Configure SMTP for email notifications (update with your settings)
-  # smtp_smarthost: 'smtp.gmail.com:587'
-  # smtp_from: 'alerts@insurance-lead-gen.com'
-  # smtp_auth_username: 'your-email@gmail.com'
-  # smtp_auth_password: 'your-app-password'
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@insurance-lead-gen.com'
+  slack_api_url_file: '/etc/alertmanager/slack_webhook_url'
 
-# Templates for notifications
 templates:
-  - '/etc/alertmanager/*.tmpl'
+  - '/etc/alertmanager/templates/*.tmpl'
 
-# Route configuration
+# Inhibition rules - suppress lower severity alerts when higher severity alerts fire
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: [alertname, instance]
+
+# Routes - determine which receiver should handle alerts
 route:
   group_by: ['alertname', 'cluster', 'service']
   group_wait: 10s
   group_interval: 10s
-  repeat_interval: 12h
+  repeat_interval: 30m
   receiver: 'default'
-  
   routes:
-    # Critical alerts - immediate notification
+    # Critical Database Alerts - immediate paging
+    - match_re:
+        alertname: (PostgresDown|RedisDown)
+      receiver: 'pagerduty-critical'
+      group_wait: 0s
+      group_interval: 10s
+      repeat_interval: 5m
+      
+    # Critical Application Alerts - immediate paging
     - match:
         severity: critical
-      receiver: 'critical-alerts'
-      group_wait: 10s
+      receiver: 'pagerduty-critical'
+      group_wait: 0s
+      group_interval: 30s
+      repeat_interval: 5m
+      
+    # Warning Database Alerts - Slack notifications
+    - match_re:
+        alertname: (HighDatabaseConnections|HighRedisMemoryUsage)
+      receiver: 'slack-database'
+      group_wait: 5m
+      group_interval: 5m
+      repeat_interval: 30m
+      
+    # Application Performance Alerts - Slack notifications
+    - match_re:
+        alertname: (HighAPIErrorRate|SlowAPIResponseTime|HighQueueDepth)
+      receiver: 'slack-application'
+      group_wait: 2m
+      group_interval: 5m
+      repeat_interval: 20m
+      
+    # AI Model Alerts - ML team notifications
+    - match_re:
+        alertname: (HighAIModelLatency|HighAIAPICost|AIModelErrors)
+      receiver: 'slack-ml-team'
+      group_wait: 5m
+      group_interval: 10m
       repeat_interval: 1h
-    
-    # Warning alerts - less urgent
+      
+    # System Resource Alerts - DevOps notifications
+    - match_re:
+        alertname: (HighCPUUsage|HighMemoryUsage|HighDiskUsage)
+      receiver: 'slack-devops'
+      group_wait: 5m
+      group_interval: 10m
+      repeat_interval: 1h
+      
+    # Warning alerts - general Slack channel
     - match:
         severity: warning
-      receiver: 'warning-alerts'
-      group_wait: 30s
-      repeat_interval: 4h
-    
-    # Database alerts
-    - match_re:
-        alertname: '(PostgresDown|RedisDown|HighDatabaseConnections)'
-      receiver: 'database-team'
-    
-    # Application alerts
-    - match_re:
-        alertname: '(HighAPIErrorRate|SlowAPIResponseTime|HighQueueDepth)'
-      receiver: 'dev-team'
-    
-    # AI/ML alerts
-    - match_re:
-        alertname: '(HighAIModelLatency|HighAIAPICost|AIModelErrors)'
-      receiver: 'ml-team'
+      receiver: 'slack-general'
+      group_wait: 5m
+      group_interval: 10m
+      repeat_interval: 30m
 
-# Inhibition rules - prevent alert spam
-inhibit_rules:
-  # If a service is down, don't alert on high latency
-  - source_match:
-      severity: 'critical'
-    target_match:
-      severity: 'warning'
-    equal: ['alertname', 'service']
-
-# Receivers define where alerts go
+# Receivers - define how and where alerts are sent
 receivers:
-  # Default receiver (logs to console)
   - name: 'default'
     webhook_configs:
-      - url: 'http://localhost:5001/webhook'
+      - url: 'http://data-service:3001/api/v1/alert-webhook'
         send_resolved: true
+        http_config:
+          basic_auth:
+            username: 'alertmanager'
+            password_file: '/etc/alertmanager/webhook_password'
 
-  # Critical alerts - multiple channels
-  - name: 'critical-alerts'
-    # Slack webhook (update with your webhook URL)
-    # slack_configs:
-    #   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
-    #     channel: '#critical-alerts'
-    #     title: 'Critical Alert: {{ .GroupLabels.alertname }}'
-    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-    #     send_resolved: true
-    
-    # Email (uncomment and configure)
-    # email_configs:
-    #   - to: 'oncall@insurance-lead-gen.com'
-    #     headers:
-    #       Subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
-    
-    # PagerDuty (uncomment and configure)
-    # pagerduty_configs:
-    #   - routing_key: 'YOUR_PAGERDUTY_INTEGRATION_KEY'
-    #     description: '{{ .GroupLabels.alertname }}'
-    
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - routing_key_file: '/etc/alertmanager/pagerduty_key'
+        description: '{{ template "pagerduty.default.description" . }}'
+        client: '{{ template "pagerduty.default.client" . }}'
+        client_url: '{{ template "pagerduty.default.clientURL" . }}'
+        severity: '{{ if eq .GroupLabels.severity "critical" }}critical{{ else }}warning{{ end }}'
+        class: '{{ .GroupLabels.alertname }}'
+        component: '{{ .GroupLabels.service }}'
+        group: '{{ .GroupLabels.cluster }}'
+        details:
+          cluster: '{{ .GroupLabels.cluster }}'
+          service: '{{ .GroupLabels.service }}'
+          alertname: '{{ .GroupLabels.alertname }}'
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: '🔥 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Instance:* {{ .GroupLabels.instance }}
+          *Description:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
     webhook_configs:
-      - url: 'http://localhost:5001/webhook/critical'
+      - url: 'http://data-service:3001/api/v1/alert-webhook'
         send_resolved: true
+        http_config:
+          basic_auth:
+            username: 'alertmanager'
+            password_file: '/etc/alertmanager/webhook_password'
 
-  # Warning alerts
-  - name: 'warning-alerts'
-    # Slack webhook
-    # slack_configs:
-    #   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
-    #     channel: '#alerts'
-    #     title: 'Warning: {{ .GroupLabels.alertname }}'
-    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-    
-    webhook_configs:
-      - url: 'http://localhost:5001/webhook/warning'
-        send_resolved: true
+  - name: 'slack-database'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: '🗄️ {{ .GroupLabels.alertname }}'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Instance:* {{ .GroupLabels.instance }}
+          *Description:* {{ .Annotations.description }}
+          *Action Required:* Check database connections and resource usage
 
-  # Database team alerts
-  - name: 'database-team'
-    # email_configs:
-    #   - to: 'database-team@insurance-lead-gen.com'
-    webhook_configs:
-      - url: 'http://localhost:5001/webhook/database'
-        send_resolved: true
+  - name: 'slack-application'
+    slack_configs:
+      - channel: '#application-alerts'
+        title: '🚨 {{ .GroupLabels.alertname }}'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Instance:* {{ .GroupLabels.instance }}
+          *Description:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
 
-  # Dev team alerts
-  - name: 'dev-team'
-    # slack_configs:
-    #   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
-    #     channel: '#dev-alerts'
-    webhook_configs:
-      - url: 'http://localhost:5001/webhook/dev'
-        send_resolved: true
+  - name: 'slack-ml-team'
+    slack_configs:
+      - channel: '#ml-alerts'
+        title: '🤖 {{ .GroupLabels.alertname }}'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Description:* {{ .Annotations.description }}
+          *Impact:* AI model performance degradation
+          *Action:* Check model status and API usage
 
-  # ML team alerts
-  - name: 'ml-team'
-    # email_configs:
-    #   - to: 'ml-team@insurance-lead-gen.com'
-    webhook_configs:
-      - url: 'http://localhost:5001/webhook/ml'
-        send_resolved: true
+  - name: 'slack-devops'
+    slack_configs:
+      - channel: '#devops-alerts'
+        title: '⚠️ {{ .GroupLabels.alertname }}'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Instance:* {{ .GroupLabels.instance }}
+          *Description:* {{ .Annotations.description }}
+          *Resource:* {{ .Labels.resource }}
+
+  - name: 'slack-general'
+    slack_configs:
+      - channel: '#general-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Severity:* {{ .GroupLabels.severity }}
+          *Description:* {{ .Annotations.description }}
+
+# Time intervals - control how long alerts wait at each stage
+time_intervals:
+  - name: business_hours
+    time_intervals:
+      - times:
+          - start_time: '09:00'
+            end_time: '17:00'
+        weekdays: ['monday:friday']
+        
+  - name: weekends
+    time_intervals:
+      - weekdays: ['saturday', 'sunday']
+        
+  - name: emergency_maintenance
+    time_intervals:
+      - times:
+          - start_time: '00:00'
+            end_time: '23:59'
+        days_of_month: ['1', '15']
