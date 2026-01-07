@@ -205,219 +205,588 @@ model CarrierPerformanceMetric {
   @@unique([carrierId, year, month])
 }
 
-// DataConsent model - tracks user consent for data processing (GDPR/CCPA)
-model DataConsent {
-  id              String           @id @default(uuid())
-  leadId          String?
-  email           String?
-  consentType     ConsentType
-  consentGiven     Boolean          @default(false)
-  consentText      String
-  ipAddress       String?
-  userAgent       String?
-  version         Int              @default(1)
-  withdrawnAt     DateTime?
-  expiresAt       DateTime?
-  metadata        Json?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+// Financial Products
+model FinancialProduct {
+  id                    String              @id @default(uuid())
+  organizationId        String?
+  productName           String
+  productType           ProductType
+  providerId            String
+  description           String?
+  category              String
+  subcategory           String?
+  status                ProductStatus       @default(ACTIVE)
+  minInvestment         Decimal?            @db.Decimal(15, 2)
+  maxInvestment         Decimal?            @db.Decimal(15, 2)
+  fees                  Json?
+  terms                 Json?
+  regulatoryClassification Json?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
-  // Indexes
-  @@index([leadId])
-  @@index([email])
-  @@index([consentType])
-  @@index([consentGiven])
-  @@index([createdAt])
-  @@index([withdrawnAt])
-}
-
-// DataDeletionRequest model - handles right to be forgotten requests (GDPR Article 17)
-model DataDeletionRequest {
-  id                String               @id @default(uuid())
-  leadId            String?
-  email             String?
-  requestType       DeletionRequestType
-  status            DeletionRequestStatus @default(PENDING)
-  requestedBy       String
-  requestedByEmail  String?
-  ipAddress         String?
-  reason            String?
-  verifiedAt        DateTime?
-  processedAt       DateTime?
-  completedAt       DateTime?
-  rejectedReason    String?
-  retentionExpiry   DateTime?
-  metadata          Json?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-
-  // Relationships
-  auditLogs         ComplianceAuditLog[]
-
-  // Indexes
-  @@index([leadId])
-  @@index([email])
+  @@index([organizationId])
+  @@index([providerId])
+  @@index([productType])
   @@index([status])
   @@index([createdAt])
-  @@index([requestedBy])
+  @@map("financial_products")
 }
 
-// ComplianceAuditLog model - comprehensive audit trail for compliance
-model ComplianceAuditLog {
-  id                String               @id @default(uuid())
-  entityType        EntityType
-  entityId          String
-  actionType        ActionType
-  performedBy       String?
-  performedByRole   String?
-  ipAddress         String?
-  userAgent         String?
-  oldValue          Json?
-  newValue          Json?
-  sensitiveFields   String[]
-  requestId         String?
-  sessionId         String?
-  deletionRequestId String?
-  metadata          Json?
-  createdAt         DateTime             @default(now())
+model ProductVariant {
+  id              String   @id @default(uuid())
+  productId       String
+  variantName     String
+  variantCode     String?
+  tierLevel       Int?
+  features        Json?
+  pricing         Json?
+  requirements    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  // Relationships
-  deletionRequest    DataDeletionRequest? @relation(fields: [deletionRequestId], references: [id], onDelete: SetNull)
+  @@index([productId])
+  @@index([tierLevel])
+  @@map("product_variants")
+}
 
-  // Indexes
+// Financial Advisors
+model FinancialAdvisor {
+  id                  String           @id @default(uuid())
+  organizationId      String?
+  userId              String?
+  licenseNumber       String           @unique
+  licenseType         String[]
+  specializations     String[]
+  credentials         Json?
+  maxClients          Int              @default(50)
+  currentClients      Int              @default(0)
+  aum                 Decimal?         @db.Decimal(15, 2)
+  status              AdvisorStatus    @default(ACTIVE)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("financial_advisors")
+}
+
+// Financial Planning
+model FinancialPlan {
+  id                 String        @id @default(uuid())
+  customerId         String
+  advisorId          String?
+  planType           String?
+  status             PlanStatus    @default(DRAFT)
+  creationDate       DateTime?
+  lastReviewDate     DateTime?
+  nextReviewDate     DateTime?
+  planDocumentUrl    String?
+  recommendations    Json?
+  goals              Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([customerId])
+  @@index([advisorId])
+  @@index([status])
+  @@index([creationDate])
+  @@index([nextReviewDate])
+  @@map("financial_plans")
+}
+
+model FinancialGoal {
+  id                 String       @id @default(uuid())
+  customerId         String
+  goalType           String?
+  goalDescription    String?
+  targetAmount       Decimal?     @db.Decimal(15, 2)
+  targetDate         DateTime?
+  currentProgress    Decimal?     @db.Decimal(15, 2) @default(0)
+  priorityLevel      Int          @default(3)
+  status             GoalStatus   @default(NOT_STARTED)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([targetDate])
+  @@index([priorityLevel])
+  @@map("financial_goals")
+}
+
+// Wealth Management
+model CustomerAccount {
+  id                    String   @id @default(uuid())
+  customerId            String
+  accountName           String?
+  accountType           String?
+  externalAccountId     String?
+  institutionName       String?
+  balance               Decimal? @default(0) @db.Decimal(15, 2)
+  currency              String   @default("USD")
+  isAggregated          Boolean  @default(false)
+  aggregationSource     String?
+  lastSyncedAt          DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([externalAccountId])
+  @@index([isAggregated])
+  @@index([lastSyncedAt])
+  @@map("customer_accounts")
+}
+
+model Portfolio {
+  id                 String         @id @default(uuid())
+  customerId         String
+  portfolioName      String?
+  portfolioType      PortfolioType?
+  status             PortfolioStatus @default(ACTIVE)
+  totalValue         Decimal?       @default(0) @db.Decimal(15, 2)
+  cashPosition       Decimal?       @default(0) @db.Decimal(15, 2)
+  targetAllocation   Json?
+  actualAllocation   Json?
+  performanceYtd     Decimal?       @default(0) @db.Decimal(10, 4)
+  performance1yr     Decimal?       @default(0) @db.Decimal(10, 4)
+  riskScore          Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([customerId])
+  @@index([portfolioType])
+  @@index([status])
+  @@index([riskScore])
+  @@index([createdAt])
+  @@map("portfolios")
+}
+
+model PortfolioHolding {
+  id                 String   @id @default(uuid())
+  portfolioId        String
+  securityId         String?
+  symbol             String?
+  quantity           Decimal? @db.Decimal(15, 4)
+  costBasis          Decimal? @default(0) @db.Decimal(15, 2)
+  currentValue       Decimal? @default(0) @db.Decimal(15, 2)
+  purchaseDate       DateTime?
+  unrealizedGainLoss Decimal? @default(0) @db.Decimal(15, 2)
+  allocationPercentage Decimal? @default(0) @db.Decimal(5, 4)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([portfolioId])
+  @@index([symbol])
+  @@index([securityId])
+  @@map("portfolio_holdings")
+}
+
+// Open Banking & Data
+model LinkedAccount {
+  id                     String   @id @default(uuid())
+  customerId             String
+  externalAccountId      String?
+  externalInstitutionId  String?
+  institutionName        String?
+  accountType            String?
+  accountNumberMasked    String?
+  routingNumber          String?
+  balance                Decimal? @default(0) @db.Decimal(15, 2)
+  currency               String   @default("USD")
+  isActive               Boolean  @default(true)
+  lastSyncedAt           DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([externalAccountId])
+  @@index([isActive])
+  @@index([lastSyncedAt])
+  @@map("linked_accounts")
+}
+
+model FinancialTransaction {
+  id                  String   @id @default(uuid())
+  customerId          String
+  accountId           String?
+  transactionDate     DateTime
+  transactionType     String?
+  category            String?
+  amount              Decimal  @db.Decimal(15, 2)
+  merchant            String?
+  description         String?
+  transactionIdExternal String?
+  createdAt           DateTime @default(now())
+
+  @@index([customerId])
+  @@index([accountId])
+  @@index([transactionDate])
+  @@index([category])
+  @@index([transactionIdExternal])
+  @@map("financial_transactions")
+}
+
+model SpendingAnalytics {
+  id                  String   @id @default(uuid())
+  customerId          String
+  periodMonth         DateTime
+  totalSpending       Decimal? @default(0) @db.Decimal(15, 2)
+  categoryBreakdown   Json?
+  incomeTotal         Decimal? @default(0) @db.Decimal(15, 2)
+  savingsRate         Decimal? @default(0) @db.Decimal(5, 4)
+  debtPayments        Decimal? @default(0) @db.Decimal(15, 2)
+  createdAt           DateTime @default(now())
+
+  @@index([customerId])
+  @@index([periodMonth])
+  @@unique([customerId, periodMonth])
+  @@map("spending_analytics")
+}
+
+// Product Applications
+model ProductApplication {
+  id                 String           @id @default(uuid())
+  customerId         String
+  productId          String?
+  variantId          String?
+  advisorId          String?
+  applicationDate    DateTime         @default(now())
+  status             ApplicationStatus @default(DRAFT)
+  applicationData    Json?
+  documents          Json?
+  approvedDate       DateTime?
+  enrollmentDate     DateTime?
+  decisionReason     String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([advisorId])
+  @@index([status])
+  @@index([applicationDate])
+  @@index([approvedDate])
+  @@map("product_applications")
+}
+
+model CustomerProduct {
+  id                String              @id @default(uuid())
+  customerId        String
+  productId         String?
+  variantId         String?
+  enrollmentDate    DateTime?
+  accountNumber     String?
+  status            CustomerProductStatus @default(ACTIVE)
+  balance           Decimal?            @default(0) @db.Decimal(15, 2)
+  currentValue      Decimal?            @default(0) @db.Decimal(15, 2)
+  performance       Decimal?            @default(0) @db.Decimal(10, 4)
+  lastStatementDate DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([status])
+  @@index([enrollmentDate])
+  @@map("customer_products")
+}
+
+// Recommendations
+model ProductRecommendation {
+  id                  String   @id @default(uuid())
+  customerId          String
+  productId           String?
+  recommendationType  String?
+  confidenceScore     Decimal? @default(0) @db.Decimal(5, 4)
+  reason              String?
+  recommendedDate     DateTime @default(now())
+  viewed              Boolean  @default(false)
+  clicked             Boolean  @default(false)
+  applied             Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([confidenceScore])
+  @@index([recommendedDate])
+  @@index([viewed])
+  @@index([clicked])
+  @@index([applied])
+  @@map("product_recommendations")
+}
+
+// Financial Wellness
+model WellnessProgram {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  programName     String
+  description     String?
+  programType     String?
+  targetSegments  Json?
+  status          WellnessStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("wellness_programs")
+}
+
+model WellnessEnrollment {
+  id                String          @id @default(uuid())
+  customerId        String
+  programId         String
+  enrollmentDate    DateTime        @default(now())
+  completionStatus  Decimal?        @default(0) @db.Decimal(5, 4)
+  score             Int?
+  status            WellnessStatus  @default(ACTIVE)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([programId])
+  @@index([status])
+  @@index([enrollmentDate])
+  @@map("wellness_enrollments")
+}
+
+model WellnessActivity {
+  id                 String   @id @default(uuid())
+  enrollmentId       String
+  activityType       String?
+  activityName       String?
+  completedDate      DateTime?
+  pointsEarned       Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  @@index([enrollmentId])
+  @@index([completedDate])
+  @@map("wellness_activities")
+}
+
+// Compliance
+model ComplianceDocument {
+  id                  String   @id @default(uuid())
+  organizationId      String?
+  documentType        String?
+  documentVersion     Int      @default(1)
+  effectiveDate       DateTime?
+  documentUrl         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([documentType])
+  @@index([effectiveDate])
+  @@index([documentVersion])
+  @@map("compliance_documents")
+}
+
+model AuditLog {
+  id                  String   @id @default(uuid())
+  organizationId      String?
+  userId              String?
+  actionType          String?
+  entityType          String?
+  entityId            String?
+  changes             Json?
+  timestamp           DateTime @default(now())
+  ipAddress           String?
+  createdAt           DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([actionType])
   @@index([entityType])
   @@index([entityId])
-  @@index([actionType])
-  @@index([performedBy])
-  @@index([createdAt])
-  @@index([deletionRequestId])
-  @@index([requestId])
+  @@index([timestamp])
+  @@index([ipAddress])
+  @@map("audit_logs")
 }
 
-// ComplianceReport model - generated regulatory reports
-model ComplianceReport {
-  id                  String              @id @default(uuid())
-  reportType          ReportType
-  reportFormat        ReportFormat
-  status              ReportStatus        @default(PENDING)
-  title               String
-  description         String?
-  generatedBy         String
-  periodStart         DateTime?
-  periodEnd           DateTime?
-  filters             Json?
-  metrics             Json?
-  fileUrl             String?
-  fileSize            Int?
-  recordCount         Int?
-  encryptionKey       String?
-  checksum            String?
-  retentionExpiresAt  DateTime?
-  publishedAt         DateTime?
-  metadata            Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+// Partnerships
+model FinancialPartner {
+  id                  String          @id @default(uuid())
+  organizationId      String?
+  partnerName         String
+  partnerType         String?
+  status              PartnerStatus   @default(ACTIVE)
+  agreementDate       DateTime?
+  terms               Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  // Indexes
-  @@index([reportType])
+  @@index([organizationId])
+  @@index([partnerType])
   @@index([status])
-  @@index([generatedBy])
-  @@index([periodStart])
-  @@index([periodEnd])
-  @@index([createdAt])
-  @@index([publishedAt])
+  @@index([agreementDate])
+  @@map("financial_partners")
 }
 
-// DataRetentionPolicy model - define and enforce retention policies
-model DataRetentionPolicy {
-  id              String                @id @default(uuid())
-  entityType      EntityType
-  retentionPeriod Int                   // retention period in days
-  action          RetentionAction       @default(DELETE)
-  condition       String?
-  isActive        Boolean               @default(true)
-  priority        Int                   @default(0)
-  lastRunAt      DateTime?
-  nextRunAt      DateTime?
-  recordsProcessed Int                  @default(0)
-  recordsDeleted Int                   @default(0)
-  createdBy       String?
-  metadata        Json?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+model CommissionTracking {
+  id                   String          @id @default(uuid())
+  partnerId            String
+  productId            String?
+  customerId           String?
+  applicationId        String?
+  commissionAmount     Decimal?        @default(0) @db.Decimal(15, 2)
+  commissionPercentage Decimal?        @default(0) @db.Decimal(5, 4)
+  status               CommissionStatus @default(PENDING)
+  paymentDate          DateTime?
+  createdAt            DateTime        @default(now())
 
-  // Indexes
-  @@index([entityType])
-  @@index([isActive])
-  @@index([nextRunAt])
-  @@index([priority])
-}
-
-// ComplianceViolation model - track violations and remediation
-model ComplianceViolation {
-  id                  String              @id @default(uuid())
-  violationType       ViolationType
-  severity            ViolationSeverity
-  status              ViolationStatus     @default(OPEN)
-  description         String
-  entityId            String?
-  entityType          EntityType?
-  detectedBy          String?
-  detectionMethod     String?
-  affectedRecords     Int?
-  riskScore           Float?
-  remediationAction   String?
-  remediationStatus   RemediationStatus  @default(NOT_STARTED)
-  remediatedAt        DateTime?
-  remediatedBy        String?
-  notes               String?
-  reportedTo          String?
-  reportDate          DateTime?
-  metadata            Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-
-  // Indexes
-  @@index([violationType])
-  @@index([severity])
+  @@index([partnerId])
+  @@index([productId])
+  @@index([customerId])
   @@index([status])
-  @@index([entityType])
-  @@index([detectedBy])
-  @@index([createdAt])
-  @@index([riskScore])
+  @@index([paymentDate])
+  @@map("commission_tracking")
 }
 
-// DataSubjectRequest model - general data subject rights requests
-model DataSubjectRequest {
-  id                String                @id @default(uuid())
-  leadId            String?
-  email             String
-  requestType       DataSubjectRequestType
-  status            DataSubjectRequestStatus @default(PENDING)
-  verificationData  Json?
-  identityVerified  Boolean               @default(false)
-  verifiedAt        DateTime?
-  processedAt       DateTime?
-  completedAt       DateTime?
-  requestData       Json?
-  responseData      Json?
-  rejectionReason   String?
-  ipAddress         String?
-  requestedBy       String
-  metadata          Json?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  firstName       String?
+  lastName        String?
+  phone           String?
+  status          UserStatus @default(ACTIVE)
+  role            UserRole   @default(CUSTOMER)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  // Indexes
-  @@index([leadId])
   @@index([email])
-  @@index([requestType])
   @@index([status])
+  @@index([role])
   @@index([createdAt])
-  @@index([identityVerified])
 }
 
-// Enums for type safety
+model Organization {
+  id              String    @id @default(uuid())
+  name            String
+  type            String?
+  status          OrgStatus @default(ACTIVE)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([name])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Financial Analytics
+model FinancialAnalytics {
+  id                     String   @id @default(uuid())
+  customerId             String   @unique
+  analysisDate           DateTime @default(now())
+  netWorth               Decimal? @default(0) @db.Decimal(15, 2)
+  assetAllocation        Json?
+  debtToIncomeRatio      Decimal? @default(0) @db.Decimal(5, 4)
+  savingsRate            Decimal? @default(0) @db.Decimal(5, 4)
+  financialHealthScore   Int?
+  riskProfile            String?
+  createdAt              DateTime @default(now())
+
+  @@index([customerId])
+  @@index([analysisDate])
+  @@index([financialHealthScore])
+  @@index([riskProfile])
+  @@map("financial_analytics")
+}
+
+// Enums for Financial Services
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum UserRole {
+  CUSTOMER
+  ADVISOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrgStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ProductType {
+  BANKING
+  INVESTMENT
+  INSURANCE
+  RETIREMENT
+  WEALTH
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum AdvisorStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PlanStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  ON_TRACK
+  AT_RISK
+  COMPLETED
+}
+
+enum PortfolioType {
+  MODEL
+  ROBO
+  DIRECT
+  MANAGED
+}
+
+enum PortfolioStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DECLINED
+  ENROLLED
+}
+
+enum CustomerProductStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+enum WellnessStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+}
+
+// Original Enums
 enum LeadStatus {
   RECEIVED
   PROCESSING
@@ -458,653 +827,13 @@ enum PartnershipStatus {
   RENEWAL_NEEDED
 }
 
-// ============================================================================
-// PHASE 30: PARTNER ECOSYSTEM & INTEGRATIONS
-// ============================================================================
-
-// Partner model - stores information about third-party partners
-model Partner {
-  id              String          @id @default(uuid())
-  organizationId  String?
-  partnerName     String
-  description     String?
-  partnerType     PartnerType
-  website         String?
-  logoUrl         String?
-  status          PartnerStatus   @default(PENDING)
-  tier            PartnerTier     @default(BASIC)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  // Relationships
-  contacts        PartnerContact[]
-  agreements      PartnerAgreement[]
-  applications    PartnerApplication[]
-  apiKeys         ApiKey[]
-  oauthClients    OAuthClient[]
-  integrations    Integration[]
-  usage           PartnerUsage[]
-  pricing         PartnerPricing[]
-  invoices        PartnerInvoice[]
-  payouts         PartnerPayout[]
-  tickets         SupportTicket[]
-
-  @@index([partnerName])
-  @@index([partnerType])
-  @@index([status])
-  @@index([tier])
-  @@index([createdAt])
-}
-
-// PartnerContact model - stores contact information for partners
-model PartnerContact {
-  id          String   @id @default(uuid())
-  partnerId   String
-  contactName String
-  email       String
-  phone       String?
-  role        String?
-  isPrimary   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relationships
-  partner     Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId])
-  @@index([email])
-}
-
-// PartnerAgreement model - stores legal agreements with partners
-model PartnerAgreement {
-  id              String            @id @default(uuid())
-  partnerId       String
-  agreementType   String
-  signedDate      DateTime?
-  effectiveDate   DateTime
-  expirationDate  DateTime?
-  terms           Json?
-  documentUrl     String?
-  status          AgreementStatus   @default(DRAFT)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  // Relationships
-  partner         Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId])
-  @@index([status])
-  @@index([effectiveDate])
-}
-
-// PartnerApplication model - stores partner applications/integrations
-model PartnerApplication {
-  id              String              @id @default(uuid())
-  partnerId       String
-  appName         String
-  description     String?
-  appVersion      String              @default("1.0.0")
-  status          ApplicationStatus   @default(DRAFT)
-  permissions     Json?               // Array of permission scopes
-  dataAccess      Json?               // Data access requirements
-  securityInfo    Json?               // Security practices and certifications
-  approvalStatus  String?
-  submittedDate   DateTime?
-  approvedDate    DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  // Relationships
-  partner         Partner             @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  apiKeys         ApiKey[]
-  oauthClients    OAuthClient[]
-  integrations    Integration[]
-  tickets         SupportTicket[]
-  listings        MarketplaceListing[]
-
-  @@index([partnerId])
-  @@index([status])
-  @@index([appName])
-}
-
-// ApiKey model - stores API keys for partner authentication
-model ApiKey {
-  id            String      @id @default(uuid())
-  partnerId     String
-  appId         String?
-  keyValue      String      @unique // Hashed API key
-  keyPrefix     String      // First 8 chars for identification
-  scopes        Json?       // Array of permission scopes
-  rateLimit     Int         @default(1000) // Requests per hour
-  lastUsedAt    DateTime?
-  expiresAt     DateTime?
-  status        ApiKeyStatus @default(ACTIVE)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  // Relationships
-  partner       Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  application   PartnerApplication? @relation(fields: [appId], references: [id], onDelete: Cascade)
-  integrations  Integration[]
-
-  @@index([partnerId])
-  @@index([appId])
-  @@index([keyPrefix])
-  @@index([status])
-  @@index([expiresAt])
-}
-
-// OAuthClient model - stores OAuth 2.0 clients
-model OAuthClient {
-  id                    String   @id @default(uuid())
-  partnerId             String
-  appId                 String
-  clientId              String   @unique
-  clientSecret          String   // Hashed client secret
-  redirectUris          String[] // Allowed redirect URIs
-  allowedFlows          String[] // authorization_code, client_credentials, refresh_token
-  tokenLifetime         Int      @default(3600) // Seconds
-  refreshTokenLifetime  Int      @default(2592000) // 30 days
-  status                OAuthClientStatus @default(ACTIVE)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // Relationships
-  partner               Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  application           PartnerApplication @relation(fields: [appId], references: [id], onDelete: Cascade)
-  tokens                OAuthToken[]
-
-  @@index([partnerId])
-  @@index([appId])
-  @@index([clientId])
-}
-
-// OAuthToken model - stores issued OAuth tokens
-model OAuthToken {
-  id              String    @id @default(uuid())
-  clientId        String
-  userId          String?
-  tokenType       String    @default("Bearer")
-  accessToken     String    @unique
-  refreshToken    String?   @unique
-  scopes          Json?     // Array of granted scopes
-  expiresAt       DateTime
-  refreshExpiresAt DateTime?
-  revoked         Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-
-  // Relationships
-  client          OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@index([clientId])
-  @@index([accessToken])
-  @@index([refreshToken])
-  @@index([expiresAt])
-  @@index([revoked])
-}
-
-// Integration model - stores active partner integrations
-model Integration {
-  id              String            @id @default(uuid())
-  partnerId       String
-  appId           String
-  organizationId  String?
-  integrationName String
-  integrationType String
-  status          IntegrationStatus @default(INACTIVE)
-  lastHealthCheck DateTime?
-  healthStatus    String?
-  config          Json?
-  apiKeyId        String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  // Relationships
-  partner         Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  application     PartnerApplication @relation(fields: [appId], references: [id], onDelete: Cascade)
-  apiKey          ApiKey?           @relation(fields: [apiKeyId], references: [id])
-  mappings        IntegrationMapping[]
-  webhooks        WebhookEndpoint[]
-  metrics         IntegrationMetric[]
-  errors          IntegrationError[]
-
-  @@index([partnerId])
-  @@index([appId])
-  @@index([organizationId])
-  @@index([status])
-  @@index([integrationType])
-}
-
-// IntegrationMapping model - stores field mappings for integrations
-model IntegrationMapping {
-  id              String   @id @default(uuid())
-  integrationId   String
-  sourceField     String
-  targetField     String
-  transformation  Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@index([integrationId])
-}
-
-// EventType model - catalog of available event types
-model EventType {
-  id              String   @id @default(uuid())
-  eventName       String   @unique
-  description     String?
-  eventCategory   String
-  payloadSchema   Json?
-  version         Int      @default(1)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  events          PlatformEvent[]
-
-  @@index([eventName])
-  @@index([eventCategory])
-}
-
-// PlatformEvent model - stores platform events for event sourcing
-model PlatformEvent {
-  id            String    @id @default(uuid())
-  eventTypeId   String
-  organizationId String?
-  entityType    String
-  entityId      String
-  payload       Json
-  createdAt     DateTime  @default(now())
-
-  // Relationships
-  eventType     EventType @relation(fields: [eventTypeId], references: [id])
-  deliveries    WebhookDelivery[]
-
-  @@index([eventTypeId])
-  @@index([organizationId])
-  @@index([entityType])
-  @@index([entityId])
-  @@index([createdAt])
-}
-
-// WebhookEndpoint model - stores webhook endpoints
-model WebhookEndpoint {
-  id                String    @id @default(uuid())
-  integrationId     String
-  endpointUrl       String
-  webhookSecret     String    // HMAC secret for signature verification
-  subscribedEvents  Json      // Array of event names
-  active            Boolean   @default(true)
-  testMode          Boolean   @default(false)
-  lastTestedAt      DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relationships
-  integration       Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  deliveries        WebhookDelivery[]
-
-  @@index([integrationId])
-  @@index([active])
-}
-
-// WebhookDelivery model - tracks webhook delivery attempts
-model WebhookDelivery {
-  id              String    @id @default(uuid())
-  webhookId       String
-  eventId         String
-  payload         Json
-  attemptNumber   Int       @default(1)
-  status          WebhookDeliveryStatus @default(PENDING)
-  responseStatus  Int?
-  responseBody    String?
-  nextRetryAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  // Relationships
-  webhook         WebhookEndpoint @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-  event           PlatformEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId])
-  @@index([eventId])
-  @@index([status])
-  @@index([nextRetryAt])
-}
-
-// PartnerUsage model - tracks partner usage metrics
-model PartnerUsage {
-  id          String   @id @default(uuid())
-  partnerId   String
-  appId       String?
-  usageDate   DateTime
-  metricName  String
-  metricValue BigInt
-  unit        String
-  createdAt   DateTime @default(now())
-
-  // Relationships
-  partner     Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId])
-  @@index([appId])
-  @@index([usageDate])
-  @@index([metricName])
-}
-
-// PartnerPricing model - stores partner pricing models
-model PartnerPricing {
-  id                      String   @id @default(uuid())
-  partnerId               String
-  pricingModel            PricingModel
-  revenueSharePercentage  Float?
-  flatFeeMonthly          Float?
-  flatFeeAnnual           Float?
-  usageTiers              Json?    // Array of usage tier objects
-  currency                String   @default("USD")
-  effectiveDate           DateTime
-  expirationDate          DateTime?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  // Relationships
-  partner                 Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId])
-  @@index([effectiveDate])
-}
-
-// PartnerInvoice model - stores partner invoices
-model PartnerInvoice {
-  id                  String        @id @default(uuid())
-  partnerId           String
-  billingPeriodStart  DateTime
-  billingPeriodEnd    DateTime
-  usage               Json?
-  subtotal            Float
-  taxes               Float         @default(0)
-  totalAmount         Float
-  status              InvoiceStatus @default(DRAFT)
-  dueDate             DateTime
-  paymentDate         DateTime?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  // Relationships
-  partner             Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId])
-  @@index([status])
-  @@index([dueDate])
-  @@index([billingPeriodStart])
-}
-
-// PartnerPayout model - stores partner payouts
-model PartnerPayout {
-  id                  String       @id @default(uuid())
-  partnerId           String
-  payoutPeriodStart   DateTime
-  payoutPeriodEnd     DateTime
-  totalRevenue        Float
-  revenueShareAmount  Float
-  deductions          Float        @default(0)
-  netPayout           Float
-  status              PayoutStatus @default(PENDING)
-  paymentMethodId     String?
-  paidDate            DateTime?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-
-  // Relationships
-  partner             Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId])
-  @@index([status])
-  @@index([payoutPeriodStart])
-}
-
-// IntegrationMetric model - stores integration performance metrics
-model IntegrationMetric {
-  id                  String   @id @default(uuid())
-  integrationId       String
-  timestamp           DateTime
-  apiCalls            Int      @default(0)
-  errorCount          Int      @default(0)
-  avgResponseTime     Int      @default(0) // Milliseconds
-  uptimePercentage    Float    @default(100)
-  dataProcessedBytes  BigInt   @default(0)
-  createdAt           DateTime @default(now())
-
-  // Relationships
-  integration         Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@index([integrationId])
-  @@index([timestamp])
-}
-
-// IntegrationError model - tracks integration errors
-model IntegrationError {
-  id              String   @id @default(uuid())
-  integrationId   String
-  errorCode       String
-  errorMessage    String
-  stackTrace      String?
-  requestDetails  Json?
-  responseDetails Json?
-  occurrenceCount Int      @default(1)
-  firstOccurrence DateTime @default(now())
-  lastOccurrence  DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@index([integrationId])
-  @@index([errorCode])
-  @@index([lastOccurrence])
-}
-
-// SupportTicket model - stores partner support tickets
-model SupportTicket {
-  id          String         @id @default(uuid())
-  partnerId   String
-  appId       String?
-  title       String
-  description String
-  priority    TicketPriority @default(MEDIUM)
-  status      TicketStatus   @default(OPEN)
-  category    String?
-  assignedToId String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  // Relationships
-  partner     Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  application PartnerApplication? @relation(fields: [appId], references: [id])
-  comments    TicketComment[]
-
-  @@index([partnerId])
-  @@index([appId])
-  @@index([status])
-  @@index([priority])
-  @@index([createdAt])
-}
-
-// TicketComment model - stores support ticket comments
-model TicketComment {
-  id          String   @id @default(uuid())
-  ticketId    String
-  commenterId String
-  comment     String
-  attachments Json?
-  createdAt   DateTime @default(now())
-
-  // Relationships
-  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@index([ticketId])
-  @@index([createdAt])
-}
-
-// MarketplaceListing model - stores marketplace integration listings
-model MarketplaceListing {
-  id                  String        @id @default(uuid())
-  appId               String
-  listingTitle        String
-  listingDescription  String
-  shortDescription    String?
-  categories          Json          // Array of category strings
-  features            Json?         // Array of feature strings
-  documentationUrl    String?
-  supportUrl          String?
-  pricingInfo         String?
-  averageRating       Float         @default(0)
-  reviewCount         Int           @default(0)
-  downloads           Int           @default(0)
-  status              ListingStatus @default(DRAFT)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  // Relationships
-  application         PartnerApplication @relation(fields: [appId], references: [id], onDelete: Cascade)
-  reviews             MarketplaceReview[]
-
-  @@index([appId])
-  @@index([status])
-  @@index([averageRating])
-  @@index([downloads])
-}
-
-// MarketplaceReview model - stores marketplace reviews
-model MarketplaceReview {
-  id            String   @id @default(uuid())
-  listingId     String
-  reviewerId    String
-  rating        Int
-  reviewText    String?
-  helpfulCount  Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relationships
-  listing       MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@index([listingId])
-  @@index([rating])
-  @@index([createdAt])
-}
-
-// ============================================================================
-// PHASE 30 ENUMS
-// ============================================================================
-
-enum PartnerType {
-  TECHNOLOGY      // SaaS platforms, software providers
-  SERVICE         // Integration services, consulting
-  DATA            // Data providers, enrichment services
-  CHANNEL         // Resellers, referral partners
-  STRATEGIC       // Co-marketing, OEM partners
-  VERIFICATION    // Compliance, security, industry partners
-}
-
 enum PartnerStatus {
   ACTIVE
   INACTIVE
-  SUSPENDED
+}
+
+enum CommissionStatus {
   PENDING
-}
-
-enum PartnerTier {
-  BASIC
-  PREMIUM
-  ENTERPRISE
-}
-
-enum AgreementStatus {
-  DRAFT
-  SIGNED
-  EXPIRED
-  TERMINATED
-}
-
-enum ApplicationStatus {
-  DRAFT
-  SUBMITTED
-  APPROVED
-  REJECTED
-  PUBLISHED
-  SUSPENDED
-  DEPRECATED
-}
-
-enum ApiKeyStatus {
-  ACTIVE
-  ROTATED
-  REVOKED
-  EXPIRED
-}
-
-enum OAuthClientStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum IntegrationStatus {
-  ACTIVE
-  INACTIVE
-  ERROR
-  MAINTENANCE
-}
-
-enum WebhookDeliveryStatus {
-  PENDING
-  DELIVERED
-  FAILED
-}
-
-enum PricingModel {
-  REVENUE_SHARE
-  FLAT_FEE
-  USAGE_BASED
-  HYBRID
-}
-
-enum InvoiceStatus {
-  DRAFT
-  SENT
+  EARNED
   PAID
-  OVERDUE
-}
-
-enum PayoutStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  PENDING
-  RESOLVED
-  CLOSED
-}
-
-enum ListingStatus {
-  DRAFT
-  PUBLISHED
-  REMOVED
-  ARCHIVED
 }

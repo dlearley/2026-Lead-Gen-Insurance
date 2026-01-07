@@ -1502,5 +1502,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Partner Ecosystem (Phase 30)
-export * from './partner.js';
+// Financial Services
+export * from './financial-services.js';
