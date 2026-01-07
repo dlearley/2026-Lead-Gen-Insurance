@@ -25,6 +25,7 @@
     "db:migrate": "turbo db:migrate",
     "db:studio": "turbo db:studio",
     "db:seed": "turbo db:seed",
+    "generate:sdks": "./scripts/generate-sdks.sh",
     "format": "prettier --write \"**/*.{js,ts,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{js,ts,json,md,yml,yaml}\"",
     "smoke:test": "cd scripts/smoke-tests && jest",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@commitlint/cli": "^18.6.0",
     "@commitlint/config-conventional": "^18.6.0",
+    "@openapitools/openapi-generator-cli": "^2.26.0",
     "@prisma/client": "5.8.0",
     "@types/jest": "^29.5.11",
     "@types/node": "^20.11.0",
