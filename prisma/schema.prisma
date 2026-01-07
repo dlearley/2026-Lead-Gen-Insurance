@@ -296,6 +296,9 @@ model LeadAssignment {
   @@index([status])
   @@index([organizationId])
   @@index([assignedAt])
+  @@index([agentId, status])
+  @@index([leadId, status])
+  @@index([status, assignedAt])
 }
 
 // Event model - event sourcing for all system events
@@ -321,6 +324,9 @@ model Event {
   @@index([entityId])
   @@index([organizationId])
   @@index([timestamp])
+  @@index([entityType, entityId, timestamp])
+  @@index([source, timestamp])
+  @@index([type, timestamp])
 }
 
 // Carrier model - stores insurance carrier information and partnership details
@@ -367,6 +373,8 @@ model Carrier {
   @@index([isActive])
   @@index([organizationId])
   @@index([createdAt])
+  @@index([isActive, partnershipStatus])
+  @@index([partnershipTier, performanceScore])
 }
 
 // CarrierPerformanceMetric model - tracks carrier performance over time
@@ -395,126 +403,16 @@ model CarrierPerformanceMetric {
   @@index([year])
   @@index([month])
   @@index([createdAt])
-  @@unique([carrierId, organizationId, year, month])
+  @@unique([carrierId, year, month])
 }
 
 // LeadAssignment model - tracks lead to agent assignments
-model LeadAssignment {
-  id            String      @id @default(uuid())
-  leadId        String
-  agentId       String
-  assignedAt    DateTime   @default(now())
-  status        AssignmentStatus @default(PENDING)
-  acceptedAt    DateTime?
-  notes         String?
-
-  // Relationships
-  lead          Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  agent         Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([leadId])
-  @@index([agentId])
-  @@index([status])
-  @@index([assignedAt])
-  @@index([status, assignedAt])
-  @@index([agentId, status])
-  @@index([leadId, status])
-}
 
 // Event model - event sourcing for all system events
-model Event {
-  id          String    @id @default(uuid())
-  type        String
-  source      String
-  entityType  String
-  entityId    String
-  data        Json
-  timestamp   DateTime @default(now())
-  metadata    Json?
-
-  // Relationships
-  lead        Lead?     @relation(fields: [entityId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([type])
-  @@index([source])
-  @@index([entityType])
-  @@index([entityId])
-  @@index([timestamp])
-  @@index([entityType, entityId, timestamp])
-  @@index([type, timestamp])
-  @@index([source, timestamp])
-}
 
 // Carrier model - stores insurance carrier information and partnership details
-model Carrier {
-  id                  String     @id @default(uuid())
-  name                String
-  description         String?
-  website             String?
-  contactEmail        String
-  contactPhone        String
-  address             String?
-  city                String?
-  state               String?
-  zipCode             String?
-  country             String?
-  partnershipTier     PartnershipTier @default(BASIC)
-  partnershipStatus   PartnershipStatus @default(ACTIVE)
-  contractStartDate   DateTime
-  contractEndDate     DateTime?
-  commissionRate      Float      @default(0.0)
-  isActive            Boolean    @default(true)
-  integrationEnabled  Boolean    @default(false)
-  apiEndpoint         String?
-  apiKey              String?
-  performanceScore    Float      @default(0.0)
-  conversionRate      Float      @default(0.0)
-  averageResponseTime Float      @default(0.0)
-  totalLeadsReceived  Int        @default(0)
-  totalLeadsConverted Int        @default(0)
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-
-  // Relationships
-  performanceMetrics CarrierPerformanceMetric[]
-
-  // Indexes
-  @@index([name])
-  @@index([partnershipStatus])
-  @@index([partnershipTier])
-  @@index([isActive])
-  @@index([createdAt])
-  @@index([isActive, partnershipStatus])
-  @@index([partnershipTier, performanceScore])
-}
 
 // CarrierPerformanceMetric model - tracks carrier performance over time
-model CarrierPerformanceMetric {
-  id                    String     @id @default(uuid())
-  carrierId             String
-  month                 Int
-  year                  Int
-  leadsReceived         Int        @default(0)
-  leadsConverted        Int        @default(0)
-  conversionRate        Float      @default(0.0)
-  averageResponseTime   Float      @default(0.0)
-  averageQuoteValue     Float      @default(0.0)
-  customerSatisfaction  Float      @default(0.0)
-  onTimeDeliveryRate    Float      @default(0.0)
-  createdAt             DateTime   @default(now())
-
-  // Relationships
-  carrier               Carrier    @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-
-  // Indexes
-  @@index([carrierId])
-  @@index([year])
-  @@index([month])
-  @@index([createdAt])
-  @@unique([carrierId, year, month])
-}
 
 // Messaging Models
 model Conversation {
