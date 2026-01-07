@@ -835,8 +835,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// ========================================
-// INSURANCE COMPLIANCE TYPES
-// ========================================
-
-export * from './insurance-compliance.types.js';
+// Competitive Intelligence
+export * from './competitive-intelligence.js';

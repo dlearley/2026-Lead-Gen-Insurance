@@ -223,244 +223,408 @@ enum PartnershipStatus {
   TERMINATED
   RENEWAL_NEEDED
 }
-// Insurance License Management
-model InsuranceLicense {
-  id                String      @id @default(cuid())
-  agentId           String
-  licenseNumber     String
-  licenseType       String      // "Property", "Casualty", "Health", "Life", "Variable", "Universal", "Title"
-  states            String[]    // Array of states where licensed
-  lines             String[]    // Lines of authority (e.g., ["Auto", "Home", "Life"])
-  issuanceDate      DateTime
-  expiryDate        DateTime
-  status            String      @default("Active") // "Active", "Suspended", "Revoked", "Expired", "Pending"
-  verificationDate  DateTime?
-  verificationSource String?    // e.g., "NIPR", "StateBoard", "Manual"
-  producerNumber    String?
-  appointmentStatus String?     // "Appointed", "Terminated", "Pending"
-  backgroundCheck   String      // "Passed", "Failed", "Pending", "Waived"
-  fingerprintedDate DateTime?
-  complianceIssues  String[]    // Array of known compliance issues
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@unique([agentId, licenseNumber])
+
+// Competitor model - tracks competitor information and intelligence
+model Competitor {
+  id                    String              @id @default(uuid())
+  name                  String
+  website               String?
+  industry              String?
+  tier                  CompetitorTier      @default(SECONDARY)
+  category              CompetitorCategory  @default(INDIRECT)
+  description           String?
+  headquarters          String?
+  foundedYear           Int?
+  employeeCount         Int?
+  fundingTotal          Float?
+  lastFundingDate       DateTime?
+  marketShare           Float?
+  annualRevenue         Float?
+  isActive              Boolean             @default(true)
+  threatScore           Float              @default(0.0)
+  opportunityScore      Float              @default(0.0)
+  monitoringLevel       MonitoringLevel    @default(STANDARD)
+  lastWebsiteScan       DateTime?
+  lastNewsScan          DateTime?
+  lastPricingCheck      DateTime?
+  notes                 String?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  // Relationships
+  activities            CompetitorActivity[]
+  pricingHistory        PricingData[]
+  winLosses             WinLoss[]
+  marketShares          MarketShare[]
+  alerts                CompetitiveAlert[]
+  insights              CompetitiveInsight[]
+  battleCards           BattleCard[]
+
+  // Indexes
+  @@index([name])
+  @@index([tier])
+  @@index([category])
+  @@index([isActive])
+  @@index([threatScore])
+  @@index([createdAt])
+}
+
+// CompetitorActivity model - tracks competitor activities and events
+model CompetitorActivity {
+  id                    String              @id @default(uuid())
+  competitorId          String
+  activityType          ActivityType
+  title                 String
+  description           String?
+  url                   String?
+  source                String
+  detectedAt            DateTime            @default(now())
+  severity              AlertSeverity       @default(LOW)
+  impact                ActivityImpact?
+  notes                 String?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor          @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([activityType])
+  @@index([detectedAt])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+// WinLoss model - tracks competitive win/loss data
+model WinLoss {
+  id                    String              @id @default(uuid())
+  competitorId          String?
+  dealId                String?
+  dealAmount            Float?
+  outcome               WinLossOutcome
+  primaryReason         WinLossReason?
+  secondaryReason       WinLossReason?
+  salesRep              String?
+  salesRepId            String?
+  customerCompany       String?
+  industry             String?
+  vertical              String?
+  dealDurationDays      Int?
+  buyingCriteria        String[]
+  decisionCriteria      String?
+  competitorStrengths   String[]
+  competitorWeaknesses  String[]
+  ourStrengths         String[]
+  ourWeaknesses         String[]
+  pricingFactor         String?
+  relationshipFactor    String?
+  timingFactor          String?
+  customerFeedback      String?
+  lessonsLearned        String?
+  actionItems           String[]
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor?         @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([outcome])
+  @@index([vertical])
+  @@index([industry])
+  @@index([createdAt])
+}
+
+// PricingData model - tracks competitor pricing information
+model PricingData {
+  id                    String              @id @default(uuid())
+  competitorId          String
+  productName           String?
+  tier                  String?
+  planName              String?
+  monthlyPrice          Float?
+  annualPrice           Float?
+  currency              String              @default("USD")
+  billingFrequency      String?
+  features              String[]
+  limitations           String[]
+  discountAvailable     Boolean             @default(false)
+  maxDiscount           Float?
+  volumeDiscount        Boolean             @default(false)
+  freeTierAvailable     Boolean             @default(false)
+  freeTierLimits        String?
+  trialDays             Int?
+  notes                 String?
+  detectedAt            DateTime            @default(now())
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor          @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([detectedAt])
+  @@index([createdAt])
+}
+
+// MarketShare model - tracks market share data
+model MarketShare {
+  id                    String              @id @default(uuid())
+  competitorId          String?
+  market                String
+  vertical              String?
+  period                String
+  periodStart           DateTime
+  periodEnd             DateTime
+  customerCount         Int?
+  estimatedRevenue      Float?
+  marketShare           Float?
+  growthRate            Float?
+  customerAcquisition   Int?
+  customerChurn        Int?
+  dataConfidence        Float?
+  dataSource            String?
+  notes                 String?
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor?         @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([market])
+  @@index([vertical])
+  @@index([period])
+  @@index([createdAt])
+  @@unique([competitorId, market, period])
+}
+
+// CompetitiveAlert model - manages competitive intelligence alerts
+model CompetitiveAlert {
+  id                    String              @id @default(uuid())
+  competitorId          String?
+  activityId            String?
+  alertType             AlertType
+  severity              AlertSeverity       @default(MEDIUM)
+  title                 String
+  description           String?
+  recommendation         String?
+  targetAudience        String[]
+  status                AlertStatus         @default(ACTIVE)
+  acknowledgedAt        DateTime?
+  acknowledgedBy        String?
+  actionTaken           String?
+  resolvedAt            DateTime?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor?         @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([alertType])
+  @@index([severity])
   @@index([status])
-  @@index([expiryDate])
+  @@index([createdAt])
 }
 
-// Carrier Appointment & Authority
-model CarrierAppointment {
-  id                String      @id @default(cuid())
-  agentId           String
-  carrierId         String      // Reference to insurance carrier
-  carrierName       String      // Carrier name for audit
-  appointmentDate   DateTime
-  terminationDate   DateTime?
-  authorizedLines   String[]    // Lines authorized by carrier (may be subset of license)
-  appointmentStatus String      @default("Active") // "Active", "Suspended", "Terminated", "Inactive"
-  commissionSplit   String?     // JSON with commission structure
-  contractUrl       String?     // URL to appointment contract
-  complianceStatus  String      // "Compliant", "NonCompliant", "UnderReview"
-  violations        String[]    // Array of violation descriptions
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@unique([agentId, carrierId])
-  @@index([appointmentStatus])
+// CompetitiveInsight model - stores generated insights and analysis
+model CompetitiveInsight {
+  id                    String              @id @default(uuid())
+  competitorId          String?
+  insightType           InsightType
+  title                 String
+  description           String?
+  keyPoints             String[]
+  dataSources           String[]
+  confidence            Float?
+  impact                ImpactLevel
+  priority              Priority
+  actionable            Boolean             @default(true)
+  recommendations       String[]
+  targetTeam            String[]
+  relatedInsights       String[]
+  expiresAt             DateTime?
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor?         @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([insightType])
+  @@index([priority])
+  @@index([createdAt])
 }
 
-// Product Compliance Rules
-model InsuranceProductRule {
-  id                String      @id @default(cuid())
-  productType       String      // "Auto", "Home", "Health", "Life", "Umbrella", etc.
-  jurisdiction      String      // State code (CA, NY, TX) or "Federal"
-  ruleType          String      // "MinPremium", "MaxDeductible", "RequiredDisclosure", "AgeLimit", "MedicalUnderwriting"
-  ruleDescription   String
-  ruleCondition     String      // JSON schema or expression for rule evaluation
-  severity          String      // "Critical", "High", "Medium", "Low"
-  effectiveDate     DateTime
-  expiryDate        DateTime?
-  status            String      @default("Active") // "Active", "Draft", "Archived"
-  sourceReference   String?     // e.g., "Insurance Commissioner Bulletin", "Statute Section"
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@unique([productType, jurisdiction, ruleType])
+// BattleCard model - sales battle cards for competitors
+model BattleCard {
+  id                    String              @id @default(uuid())
+  competitorId          String
+  title                 String
+  competitorName        String
+  tagline               String?
+  overview              String?
+  strengths             String[]
+  weaknesses            String[]
+  typicalObjections     String[]
+  objectionResponses    Json?
+  winStrategies         String[]
+  talkingPoints         String[]
+  proofPoints           String[]
+  dealSizeRange         String?
+  typicalSalesCycle     String?
+  keyDecisionMakers     String[]
+  pricingPosition       String?
+  targetCustomers       String[]
+  verticalFocus         String[]
+  recentMoves           String[]
+  actionItems           String[]
+  lastUpdated           DateTime            @default(now())
+  createdAt             DateTime            @default(now())
+
+  // Relationships
+  competitor            Competitor          @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([competitorId])
+  @@index([createdAt])
 }
 
-// Fair Lending Compliance Rules (ECOA, FHA, etc.)
-model FairLendingRule {
-  id                String      @id @default(cuid())
-  ruleType          String      // "ECOA", "FHA", "CRA", "FCRA", "StateLaw", "InsuranceRegulation"
-  regulation        String      // e.g., "ECOA Section 701", "FHA Section 3605"
-  description       String      // Full description of the regulation
-  prohibitedFactors String[]    // Array of prohibited factors (race, color, religion, sex, national origin, etc.)
-  jurisdiction      String      // "Federal" or state code
-  affectedProducts  String[]    // Products affected by this rule
-  complianceActions String[]    // Required compliance actions
-  testingMethod     String?     // How to test compliance
-  penalties         String?     // Potential penalties
-  effectiveDate     DateTime
-  status            String      @default("Active")
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+// Enums for competitive intelligence
+enum CompetitorTier {
+  PRIMARY
+  SECONDARY
+  EMERGING
+  ADJACENT
 }
 
-// Disparate Impact Testing & Monitoring
-model DisparateImpactMonitor {
-  id                String      @id @default(cuid())
-  monitoringPeriod  String      // YYYY-MM (month) or YYYY-Q# (quarter) or YYYY (annual)
-  protectedClass    String      // "Race", "Color", "Religion", "Sex", "NationalOrigin", "Age", "Disability"
-  product           String      // Product type monitored
-  totalApplications Int
-  approvedByClass   String      // JSON with approval counts by class
-  deniedByClass     String      // JSON with denial counts by class
-  approvalRateByClass String    // JSON with approval rate % by class
-  disparateImpact   Boolean     // Calculated disparate impact (80% rule)
-  disparityRatio    Float       // Actual approval rate difference
-  flagged           Boolean     @default(false)
-  reviewedDate      DateTime?
-  reviewNotes       String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@unique([monitoringPeriod, protectedClass, product])
+enum CompetitorCategory {
+  DIRECT
+  INDIRECT
+  ALTERNATIVE
 }
 
-// Quote & Premium Compliance
-model QuoteCompliance {
-  id                String      @id @default(cuid())
-  quoteId           String
-  productType       String
-  state             String
-  appliedRules      String[]    // Rules that were applied to this quote
-  violations        String[]    // Violations detected
-  premiumBefore     Float       // Premium before adjustments
-  premiumAfter      Float       // Premium after compliance adjustments
-  adjustments       String      // JSON with adjustment details
-  complianceStatus  String      // "Compliant", "NonCompliant", "ManualReview"
-  reviewedBy        String?
-  reviewNotes       String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@index([quoteId])
-  @@index([complianceStatus])
+enum MonitoringLevel {
+  INTENSIVE
+  STANDARD
+  LIGHT
 }
 
-// Required Disclosures
-model RequiredDisclosure {
-  id                String      @id @default(cuid())
-  jurisdiction      String      // State code or "Federal"
-  productType       String      // "Auto", "Home", "Health", "Life", etc.
-  disclosureType    String      // "RateDisclosure", "UnderwritingFactors", "CancellationPolicy", "AppealsProcess", "GLBA", "CCPA"
-  disclosureText    String      // Full disclosure text
-  format            String      // "Email", "PDF", "WebPage", "Paper", "Verbal"
-  timing            String      // When disclosure must be made (e.g., "Before Quote", "Before Binding", "Upon Request")
-  isRequired        Boolean     @default(true)
-  isSensitive       Boolean     @default(false) // Requires special tracking
-  effectiveDate     DateTime
-  expiryDate        DateTime?
-  status            String      @default("Active")
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@unique([jurisdiction, productType, disclosureType])
+enum ActivityType {
+  FEATURE_LAUNCH
+  PRICING_CHANGE
+  FUNDING_ANNOUNCEMENT
+  HIRING_EXPANSION
+  PARTNERSHIP_ANNOUNCEMENT
+  PRODUCT_UPDATE
+  MARKETING_CAMPAIGN
+  PRESS_RELEASE
+  NEWS_MENTION
+  CUSTOMER_WIN
+  EXECUTIVE_CHANGE
+  ACQUISITION
+  MARKET_ENTRY
+  LEGAL_ACTION
+  WEBSITE_UPDATE
+  SOCIAL_MEDIA_ACTIVITY
 }
 
-// Disclosure Delivery Tracking
-model DisclosureDelivery {
-  id                String      @id @default(cuid())
-  leadId            String
-  disclosureId      String
-  disclosureType    String
-  productType       String
-  state             String
-  deliveryMethod    String      // "Email", "WebPage", "PDF", "Paper"
-  deliveryDate      DateTime    @default(now())
-  deliveredAt       DateTime?
-  readDate          DateTime?   // When lead viewed disclosure
-  acknowledged      Boolean     @default(false)
-  acknowledgmentDate DateTime?
-  proof             String?     // URL to delivery proof (signed document, read receipt, etc.)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@index([leadId])
-  @@index([deliveryDate])
-  @@index([acknowledged])
+enum AlertSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
 }
 
-// Underwriting & Declination Rules
-model UnderwritingRule {
-  id                String      @id @default(cuid())
-  productType       String
-  state             String
-  ruleDescription   String
-  ruleExpression    String      // JSON schema or DSL for rule evaluation
-  action            String      // "Approve", "Decline", "ManualReview", "RequestInfo", "CounterOffer"
-  reasoning         String      // Why rule triggers this action
-  auditTrail        Boolean     @default(true)
-  requiresManual    Boolean     @default(false) // Requires human review
-  effectiveDate     DateTime
-  expiryDate        DateTime?
-  status            String      @default("Active")
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+enum ActivityImpact {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
 }
 
-// Agent Compliance History
-model AgentComplianceRecord {
-  id                String      @id @default(cuid())
-  agentId           String
-  eventType         String      // "Complaint", "Investigation", "Sanction", "Training", "Audit", "Violation"
-  severity          String      // "Critical", "High", "Medium", "Low"
-  description       String
-  source            String?     // "RegulatoryComplaint", "InternalAudit", "CustomerComplaint", "ExternalReview"
-  state             String?     // Which state it occurred in
-  dateOccurred      DateTime
-  dateResolved      DateTime?
-  resolution        String?
-  status            String      // "Open", "Resolved", "Suspended", "Terminated"
-  attachments       String[]    // URLs to supporting documents
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  @@index([agentId])
-  @@index([eventType])
-  @@index([status])
+enum WinLossOutcome {
+  WON
+  LOST
+  TIED
+  NO_DECISION
 }
 
-// Anti-Discrimination Rules
-model AntiDiscriminationRule {
-  id                String      @id @default(cuid())
-  regulation        String      // "ECOA", "FHA", "ADA", "StateLaw"
-  jurisdiction      String      // State code or "Federal"
-  prohibitedFactors String[]    // Prohibited discrimination factors
-  applicableProducts String[]   // Which products this applies to
-  checkMethod       String      // How to check for discrimination
-  actionRequired    String      // Action if discrimination detected
-  effectiveDate     DateTime
-  status            String      @default("Active")
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+enum WinLossReason {
+  PRICE
+  FEATURES
+  RELATIONSHIP
+  TIMING
+  PRODUCT_MARKET_FIT
+  INTEGRATION
+  SUPPORT
+  BRAND_RECOGNITION
+  TECHNICAL_CAPABILITIES
+  IMPLEMENTATION_SPEED
+  CUSTOMER_SERVICE
+  CONTRACT_TERMS
+  SECURITY
+  COMPLIANCE
+  PERFORMANCE
+  SCALABILITY
+  EASE_OF_USE
+  CUSTOMIZATION
+  PARTNERSHIP
+  GEOGRAPHIC_PRESENCE
 }
 
-// Insurance Statutes & Regulations Repository
-model InsuranceRegulation {
-  id                String      @id @default(cuid())
-  jurisdiction      String      // State code or "Federal"
-  regulationType    String      // "UnfairPractice", "DiscriminationProhibition", "DisclosureRequirement", "RateRegulation", "ReserveRequirement"
-  statute           String      // Statute name/number
-  description       String
-  fullText          String?     // Full regulation text (optional)
-  effectiveDate     DateTime
-  expiryDate        DateTime?
-  penalties         String?     // Potential penalties
-  enforcingAgency   String      // "Insurance Commissioner", "Attorney General", etc.
-  contactInfo       String?     // Contact info for enforcing agency
-  lastReviewedDate  DateTime
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+enum AlertType {
+  NEW_FEATURE
+  PRICING_DROP
+  PRICING_INCREASE
+  MAJOR_FUNDING
+  AGGRESSIVE_EXPANSION
+  NEW_VERTICAL_ENTRY
+  PARTNERSHIP_ANNOUNCEMENT
+  CUSTOMER_WIN_ANNOUNCEMENT
+  EXECUTIVE_CHANGE
+  MARKET_SHARE_SHIFT
+  WIN_LOSS_PATTERN
+  FEATURE_GAP
+  COMPETITIVE_WEAKNESS
+  MARKET_OPPORTUNITY
+  THREAT_ASSESSMENT
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+enum InsightType {
+  MARKET_MOVEMENT
+  WIN_LOSS_PATTERN
+  FEATURE_GAP_ANALYSIS
+  PRICING_STRATEGY
+  GO_TO_MARKET
+  VERTICAL_OPPORTUNITY
+  COMPETITIVE_THREAT
+  SWOT_ANALYSIS
+  CUSTOMER_SENTIMENT
+  TREND_ANALYSIS
+}
+
+enum ImpactLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Priority {
+  IMMEDIATE
+  HIGH
+  MEDIUM
+  LOW
 }

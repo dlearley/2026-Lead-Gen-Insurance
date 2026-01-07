@@ -34,6 +34,8 @@ import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { CompetitiveIntelligenceService } from './services/competitive-intelligence.service.js';
+import { createCompetitiveIntelligenceRoutes } from './routes/competitive-intelligence.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -88,6 +90,10 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup competitive intelligence routes
+  const ciService = new CompetitiveIntelligenceService(prisma);
+  app.use('/api/v1/competitive-intelligence', createCompetitiveIntelligenceRoutes(ciService));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
