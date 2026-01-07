@@ -1,262 +1,184 @@
 {
   "dashboard": {
-    "id": null,
-    "title": "System Health Dashboard",
-    "tags": ["system", "health", "infrastructure"],
+    "title": "System Health & Infrastructure",
+    "tags": ["system", "infrastructure", "health"],
     "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "30s",
     "panels": [
       {
         "id": 1,
-        "title": "CPU Usage %",
+        "title": "Service Uptime",
         "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
         "targets": [
           {
-            "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
-            "legendFormat": "{{instance}}"
+            "expr": "up{job=~\"api-service|data-service|orchestrator\"}",
+            "legendFormat": "{{job}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
         "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
+          "colorMode": "background",
+          "graphMode": "none",
           "reduceOptions": {
             "values": false,
             "calcs": ["lastNotNull"],
             "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 70},
-                {"color": "red", "value": 85}
-              ]
-            }
           }
         }
       },
       {
         "id": 2,
-        "title": "Memory Usage %",
-        "type": "stat",
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 4, "y": 0 },
         "targets": [
           {
-            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
-            "legendFormat": "{{instance}}"
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{route}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 75},
-                {"color": "red", "value": 90}
-              ]
-            }
-          }
-        }
+        "yaxes": [{ "format": "reqps" }]
       },
       {
         "id": 3,
-        "title": "Disk Usage %",
-        "type": "stat",
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 12, "y": 0 },
         "targets": [
           {
-            "expr": "(1 - (node_filesystem_avail_bytes{fstype!=\"tmpfs\"} / node_filesystem_size_bytes{fstype!=\"tmpfs\"})) * 100",
-            "legendFormat": "{{mountpoint}}"
+            "expr": "rate(http_errors_total[5m])",
+            "legendFormat": "{{method}} {{route}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 80},
-                {"color": "red", "value": 95}
-              ]
-            }
-          }
-        }
+        "yaxes": [{ "format": "ops" }]
       },
       {
         "id": 4,
-        "title": "Network I/O",
+        "title": "P95 Response Time",
         "type": "graph",
+        "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
         "targets": [
           {
-            "expr": "rate(node_network_receive_bytes_total[5m])",
-            "legendFormat": "{{device}} - RX"
-          },
-          {
-            "expr": "rate(node_network_transmit_bytes_total[5m])",
-            "legendFormat": "{{device}} - TX"
+            "expr": "histogram_quantile(0.95, rate(http_response_time_seconds_bucket[5m]))",
+            "legendFormat": "{{route}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-        "yAxes": [
-          {
-            "label": "Bytes/sec",
-            "min": 0
-          }
-        ]
+        "yaxes": [{ "format": "s" }]
       },
       {
         "id": 5,
-        "title": "Active Services",
-        "type": "stat",
+        "title": "Database Connections",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
         "targets": [
           {
-            "expr": "sum(up{job=~\"api|data-service|orchestrator\"})",
-            "legendFormat": "Total Active"
+            "expr": "database_connections{state=\"active\"}",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "database_connections{state=\"idle\"}",
+            "legendFormat": "Idle"
+          },
+          {
+            "expr": "database_connections{state=\"total\"}",
+            "legendFormat": "Total"
           }
         ],
-        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
-        "options": {
-          "colorMode": "background",
-          "graphMode": "none",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "red", "value": null},
-                {"color": "yellow", "value": 1},
-                {"color": "green", "value": 3}
-              ]
-            }
-          }
-        }
+        "yaxes": [{ "format": "short" }]
       },
       {
         "id": 6,
-        "title": "Container Restarts",
+        "title": "Database Query Rate",
         "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 4 },
         "targets": [
           {
-            "expr": "increase(container_restart_count[1h])",
-            "legendFormat": "{{name}}"
+            "expr": "rate(database_queries_total[5m])",
+            "legendFormat": "{{operation}} {{table}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 18, "x": 6, "y": 16}
+        "yaxes": [{ "format": "ops" }]
       },
       {
         "id": 7,
-        "title": "Logs Volume (1h)",
-        "type": "stat",
+        "title": "Slow Queries",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
         "targets": [
           {
-            "expr": "sum(rate(container_log_lines_total[1h])) * 3600",
-            "legendFormat": "logs/hour"
+            "expr": "rate(database_slow_queries_total[5m])",
+            "legendFormat": "{{operation}} {{table}}"
           }
         ],
-        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 20},
-        "options": {
-          "colorMode": "value",
-          "graphMode": "none",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        }
+        "yaxes": [{ "format": "ops" }]
       },
       {
         "id": 8,
-        "title": "Observability Cost Ratio",
-        "type": "stat",
+        "title": "Queue Depth",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 8 },
         "targets": [
           {
-            "expr": "(sum(rate(container_cpu_usage_seconds_total{container=~\"prometheus|grafana|loki|jaeger|tempo\"}[5m])) / sum(rate(container_cpu_usage_seconds_total[5m]))) * 100",
-            "legendFormat": "Observability CPU %"
+            "expr": "queue_depth",
+            "legendFormat": "{{queue_name}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
-        "options": {
-          "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percent",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 3},
-                {"color": "red", "value": 5}
-              ]
-            }
-          }
-        }
+        "yaxes": [{ "format": "short" }]
       },
       {
         "id": 9,
-        "title": "Cost Per Lead",
+        "title": "Job Processing Rate",
         "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_leads_processed_total[5m])) / (sum(rate(container_cpu_usage_seconds_total[5m])) * 0.01 + sum(rate(container_memory_working_set_bytes[5m]) / 1024 / 1024 / 1024 * 0.004) + sum(rate(insurechain_ai_calls_total[5m]) * 0.01))",
-            "legendFormat": "cost_per_lead"
+            "expr": "rate(queue_jobs_processed_total[5m])",
+            "legendFormat": "{{queue_name}} {{status}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
-        "yAxes": [
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 10,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 12 },
+        "targets": [
           {
-            "label": "Cost per Lead ($)",
-            "min": 0
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "{{instance}}"
           }
-        ]
+        ],
+        "yaxes": [{ "format": "percent" }]
+      },
+      {
+        "id": 11,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 12 },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "yaxes": [{ "format": "decmbytes" }]
+      },
+      {
+        "id": 12,
+        "title": "Active HTTP Requests",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 12 },
+        "targets": [
+          {
+            "expr": "http_active_requests",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "yaxes": [{ "format": "short" }]
       }
-    ],
-    "time": {
-      "from": "now-1h",
-      "to": "now"
-    },
-    "refresh": "30s",
-    "schemaVersion": 36,
-    "version": 1
+    ]
   }
 }

@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { logger, MetricsCollector, initializeTracing } from '@insurance-lead-gen/core';
+import { logger } from '@insurance-lead-gen/core';
+import { initializeObservability, createOtelLogger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
 
@@ -11,6 +12,22 @@ import { RankingService } from './services/ranking.service.js';
 import { RoutingService } from './services/routing.service.js';
 import { LeadRoutingWorkflow } from './services/lead-routing-workflow.js';
 import knowledgeBaseRoutes from './routes/knowledge-base.routes.js';
+
+// Initialize observability
+const obs = initializeObservability({
+  serviceName: 'orchestrator',
+  serviceVersion: '1.0.0',
+  environment: process.env.NODE_ENV || 'development',
+  tracingEnabled: true,
+  metricsEnabled: true,
+});
+
+// Create structured logger with trace context
+const structuredLogger = createOtelLogger({
+  serviceName: 'orchestrator',
+  environment: process.env.NODE_ENV || 'development',
+  level: process.env.LOG_LEVEL || 'info',
+});
 
 const config = getConfig();
 const PORT = config.ports.orchestrator;
@@ -21,6 +38,7 @@ initializeTracing({
 });
 
 const start = async (): Promise<void> => {
+  structuredLogger.info('Orchestrator service starting', { port: PORT });
   logger.info('Orchestrator service starting', { port: PORT });
 
   // Initialize Express app for health checks
@@ -70,6 +88,7 @@ const start = async (): Promise<void> => {
 
   // Start Express server
   const server = app.listen(PORT, () => {
+    structuredLogger.info(`Orchestrator service API listening on port ${PORT}`);
     logger.info(`Orchestrator service API listening on port ${PORT}`);
   });
 
@@ -105,13 +124,15 @@ const start = async (): Promise<void> => {
 
   // Start workflow
   routingWorkflow.start().catch((error) => {
+    structuredLogger.error('Lead routing workflow failed to start', { error });
     logger.error('Lead routing workflow failed to start', { error });
   });
 
   const shutdown = async (): Promise<void> => {
+    structuredLogger.info('Shutting down orchestrator service');
     logger.info('Shutting down orchestrator service');
 
-    clearInterval(campaignInterval);
+    await obs.shutdown();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await eventBus.close();
   };
@@ -122,15 +143,24 @@ const start = async (): Promise<void> => {
       .catch(() => process.exit(1));
   });
 
+  process.on('SIGINT', () => {
+    shutdown()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  });
+
+  structuredLogger.info(`Orchestrator service running`);
   logger.info(`Orchestrator service running`);
 };
 
 start().catch((error) => {
+  structuredLogger.error('Orchestrator failed to start', { error });
   logger.error('Orchestrator failed to start', { error });
   process.exit(1);
 });
 
 // Keep the process alive
 setInterval(() => {
+  structuredLogger.debug('Orchestrator service heartbeat');
   logger.debug('Orchestrator service heartbeat');
 }, 60000);

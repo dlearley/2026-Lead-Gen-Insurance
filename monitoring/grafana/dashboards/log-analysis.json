@@ -1,0 +1,295 @@
+{
+  "dashboard": {
+    "title": "Log Analysis & Anomaly Detection",
+    "tags": ["logs", "anomaly", "errors"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Log Volume (Logs/Min)",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(rate(loki_distributed_lines_total{job=~\"api-service|data-service|orchestrator\"}[5m])) by (job, level)",
+            "legendFormat": "{{job}} {{level}}"
+          }
+        ],
+        "yaxes": [{ "format": "lps" }]
+      },
+      {
+        "id": 2,
+        "title": "Error Rate (Errors/Min)",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(rate(loki_distributed_lines_total{level=\"error\"}[5m])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "yaxes": [{ "format": "eps" }]
+      },
+      {
+        "id": 3,
+        "title": "Total Logs (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total[24h]))",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Total Errors (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 4, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total{level=\"error\"}[24h]))",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Rate (%)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total{level=\"error\"}[24h])) / sum(increase(loki_distributed_lines_total[24h])) * 100",
+            "legendFormat": "Rate"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "percent"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Logs by Level",
+        "type": "piechart",
+        "gridPos": { "h": 4, "w": 4, "x": 12, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total[1h])) by (level)",
+            "legendFormat": "{{level}}"
+          }
+        ],
+        "options": {
+          "legend": { "displayMode": "table", "placement": "right" }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Logs by Service",
+        "type": "piechart",
+        "gridPos": { "h": 4, "w": 4, "x": 16, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total[1h])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "options": {
+          "legend": { "displayMode": "table", "placement": "right" }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Observability Cost Ratio",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 4, "x": 20, "y": 4 },
+        "targets": [
+          {
+            "expr": "observability_cost_ratio_percent",
+            "legendFormat": "Ratio"
+          }
+        ],
+        "options": {
+          "unit": "percent",
+          "max": 10
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 3 },
+                { "color": "red", "value": 5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Error Log Volume by Service",
+        "type": "bargauge",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total{level=\"error\"}[1h])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Warning Log Volume by Service",
+        "type": "bargauge",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(increase(loki_distributed_lines_total{level=\"warn\"}[1h])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal"
+        }
+      },
+      {
+        "id": 11,
+        "title": "Top Error Messages",
+        "type": "table",
+        "gridPos": { "h": 4, "w": 24, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "topk(10, sum(count_over_time({level=\"error\"}[1h])) by (service, message))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": { "Time": true },
+              "indexByName": { "service": 0, "message": 1, "Value": 2 },
+              "renameByName": {
+                "service": "Service",
+                "message": "Error Message",
+                "Value": "Count (1h)"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Slow Operations (>100ms)",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum(rate(database_slow_queries_total[5m])) by (operation, table)",
+            "legendFormat": "{{operation}} {{table}}"
+          },
+          {
+            "expr": "sum(rate(http_errors_total{status_code=~\"5..\"}[5m])) by (route)",
+            "legendFormat": "{{route}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
+      },
+      {
+        "id": 13,
+        "title": "Log Anomalies (Deviation from Baseline)",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "rate(loki_distributed_lines_total[5m]) / avg_over_time(rate(loki_distributed_lines_total[1h])[1h])",
+            "legendFormat": "{{service}} Ratio"
+          }
+        ],
+        "yaxes": [{ "format": "short" }],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 2 },
+                { "color": "red", "value": 5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "Observability Cost Breakdown",
+        "type": "piechart",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 20 },
+        "targets": [
+          {
+            "expr": "increase(observability_cost_traces_usd[24h])",
+            "legendFormat": "Traces"
+          },
+          {
+            "expr": "increase(observability_cost_logs_usd[24h])",
+            "legendFormat": "Logs"
+          },
+          {
+            "expr": "increase(observability_cost_metrics_usd[24h])",
+            "legendFormat": "Metrics"
+          }
+        ],
+        "options": {
+          "legend": { "displayMode": "table", "placement": "right" }
+        }
+      },
+      {
+        "id": 15,
+        "title": "Total Observability Cost (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 20 },
+        "targets": [
+          {
+            "expr": "increase(observability_cost_total_usd[24h])",
+            "legendFormat": "Cost"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "currencyUSD"
+        }
+      },
+      {
+        "id": 16,
+        "title": "Observability Cost Trend",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 20 },
+        "targets": [
+          {
+            "expr": "rate(observability_cost_total_usd[5m]) * 3600",
+            "legendFormat": "Cost $/hr"
+          }
+        ],
+        "yaxes": [{ "format": "currencyUSD" }]
+      }
+    ]
+  }
+}

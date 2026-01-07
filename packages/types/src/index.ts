@@ -1716,5 +1716,5 @@ export * from './retention.js';
 export * from './vip.js';
 export * from './community.js';
 
-// Communication Types
-export * from './communication.js';
+// Observability Types
+export * from './observability.js';

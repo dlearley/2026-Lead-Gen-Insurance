@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import type { Express } from 'express';
 import { logger } from '@insurance-lead-gen/core';
+import { initializeObservability, createOtelLogger } from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
 import { reportsRouter } from './routes/reports.routes.js';
 import { alertsRouter } from './routes/alerts.routes.js';
@@ -11,6 +12,22 @@ import integrationLogsRouter from './routes/integration-logs.routes.js';
 import { experimentsRouter } from './routes/experiments.routes.js';
 import { orchestrationRouter } from './routes/orchestration.routes.js';
 import { AlertService } from './services/alert-service.js';
+
+// Initialize observability
+const obs = initializeObservability({
+  serviceName: 'data-service',
+  serviceVersion: '1.0.0',
+  environment: process.env.NODE_ENV || 'development',
+  tracingEnabled: true,
+  metricsEnabled: true,
+});
+
+// Create structured logger with trace context
+const structuredLogger = createOtelLogger({
+  serviceName: 'data-service',
+  environment: process.env.NODE_ENV || 'development',
+  level: process.env.LOG_LEVEL || 'info',
+});
 
 const config = getConfig();
 const PORT = config.ports.dataService || 3001;
@@ -33,6 +50,11 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  structuredLogger.debug('Incoming request', {
+    method: req.method,
+    path: req.path,
+    query: req.query,
+  });
   logger.debug('Incoming request', {
     method: req.method,
     path: req.path,
@@ -59,6 +81,7 @@ app.use('/api/v1/experiments', experimentsRouter);
 app.use('/api/v1/orchestration', orchestrationRouter);
 
 app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
+  structuredLogger.error('Unhandled error', { error: err, path: req.path });
   logger.error('Unhandled error', { error: err, path: req.path });
   res.status(500).json({
     success: false,
@@ -71,6 +94,7 @@ const alertCheckInterval = setInterval(async () => {
   try {
     await alertService.checkMetrics();
   } catch (error) {
+    structuredLogger.error('Alert check failed', { error });
     logger.error('Alert check failed', { error });
   }
 }, 5 * 60 * 1000);
@@ -78,14 +102,17 @@ const alertCheckInterval = setInterval(async () => {
 export function startServer(): Promise<void> {
   return new Promise((resolve) => {
     app.listen(PORT, () => {
+      structuredLogger.info('Data service HTTP server started', { port: PORT });
       logger.info('Data service HTTP server started', { port: PORT });
       resolve();
     });
   });
 }
 
-export function stopServer(): void {
+export async function stopServer(): Promise<void> {
   clearInterval(alertCheckInterval);
+  await obs.shutdown();
+  structuredLogger.info('Data service HTTP server stopped');
   logger.info('Data service HTTP server stopped');
 }
 

@@ -1,16 +1,26 @@
-export { MetricsCollector, LeadMetrics, AIMetrics } from './metrics.js';
-export { TracingService, initializeTracing } from './tracing.js';
-export type { TracingConfig } from './tracing.js';
-export { 
-  PerformanceMonitor,
-  createPerformanceMonitor,
-  PerformanceMonitorConfig,
-  PerformanceAlert,
-  PerformanceAnomaly,
-  PerformanceTrend,
-  SystemResourceMetrics,
-  PerformanceDashboardData,
-  PerformanceSLO,
-  PerformanceSLOCompliance,
-  PerformanceMonitoringUtils
-} from './performance-monitor.js';
+/**
+ * Monitoring Module Exports
+ * 
+ * Centralized exports for all monitoring and observability features.
+ */
+
+// Main observability
+export * from './observability';
+
+// Tracing
+export * from './tracing';
+
+// Metrics
+export * from './metrics';
+
+// Enhanced metrics
+export * from './enhanced-metrics';
+
+// Winston + OpenTelemetry logging
+export * from './winston-otel';
+
+// Tracing decorators
+export * from './tracing-decorators';
+
+// Manual instrumentation helpers
+export * from './instrumentation';

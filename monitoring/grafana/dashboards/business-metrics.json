@@ -1,248 +1,253 @@
 {
   "dashboard": {
-    "id": null,
-    "title": "Business Metrics Dashboard",
-    "tags": ["business", "leads", "ai", "queue"],
+    "title": "Business Metrics - Leads & AI",
+    "tags": ["business", "leads", "ai"],
     "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "1m",
     "panels": [
       {
         "id": 1,
-        "title": "Leads Processed (5m)",
+        "title": "Leads Ingested (24h)",
         "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_leads_processed_total[5m])) * 300",
+            "expr": "increase(leads_ingested_total[24h])",
             "legendFormat": "Total"
           }
         ],
-        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
         "options": {
           "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
+          "graphMode": "area"
         }
       },
       {
         "id": 2,
-        "title": "AI Processing Rate (5m)",
+        "title": "Leads Qualified (24h)",
         "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_ai_processing_duration_seconds_count[5m]))",
-            "legendFormat": "calls/sec"
+            "expr": "increase(leads_qualified_total[24h])",
+            "legendFormat": "Total"
           }
         ],
-        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
         "options": {
           "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
+          "graphMode": "area"
         }
       },
       {
         "id": 3,
-        "title": "Queue Depth",
+        "title": "Leads Converted (24h)",
         "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
         "targets": [
           {
-            "expr": "sum(insurechain_queue_depth{queue=~\"lead-processing|ai-processing|notification\"})",
+            "expr": "increase(leads_converted_total[24h])",
             "legendFormat": "Total"
           }
         ],
-        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
         "options": {
           "colorMode": "value",
-          "graphMode": "area",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 1000},
-                {"color": "red", "value": 5000}
-              ]
-            }
-          }
+          "graphMode": "area"
         }
       },
       {
         "id": 4,
-        "title": "Error Rate %",
+        "title": "Conversion Rate",
         "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
         "targets": [
           {
-            "expr": "(sum(rate(insurechain_lead_processing_errors_total[5m])) / sum(rate(insurechain_leads_processed_total[5m]))) * 100",
-            "legendFormat": "error_rate"
+            "expr": "increase(leads_converted_total[24h]) / increase(leads_ingested_total[24h]) * 100",
+            "legendFormat": "Rate"
           }
         ],
-        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
         "options": {
-          "colorMode": "background",
-          "graphMode": "none",
-          "orientation": "auto",
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          }
-        },
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percent",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"color": "green", "value": null},
-                {"color": "yellow", "value": 1},
-                {"color": "red", "value": 5}
-              ]
-            }
-          }
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "percent"
         }
       },
       {
         "id": 5,
-        "title": "Lead Processing Timeline",
+        "title": "Lead Ingestion Rate",
         "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_leads_processed_total[5m])) by (status)",
-            "legendFormat": "{{status}}"
+            "expr": "rate(leads_ingested_total[5m])",
+            "legendFormat": "{{source}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+        "yaxes": [{ "format": "ops" }]
       },
       {
         "id": 6,
-        "title": "AI Processing Duration",
-        "type": "graph",
+        "title": "Lead Funnel",
+        "type": "bargauge",
+        "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(insurechain_ai_processing_duration_seconds_bucket[5m])) by (le))",
-            "legendFormat": "95th percentile"
+            "expr": "increase(leads_ingested_total[24h])",
+            "legendFormat": "Ingested"
           },
           {
-            "expr": "histogram_quantile(0.50, sum(rate(insurechain_ai_processing_duration_seconds_bucket[5m])) by (le))",
-            "legendFormat": "50th percentile"
+            "expr": "increase(leads_qualified_total[24h])",
+            "legendFormat": "Qualified"
+          },
+          {
+            "expr": "increase(leads_routed_total[24h])",
+            "legendFormat": "Routed"
+          },
+          {
+            "expr": "increase(leads_converted_total[24h])",
+            "legendFormat": "Converted"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
-        "yAxes": [
-          {
-            "label": "Duration (seconds)",
-            "min": 0
-          }
-        ]
+        "options": {
+          "orientation": "horizontal"
+        }
       },
       {
         "id": 7,
-        "title": "Queue Processing Rate",
+        "title": "Lead Processing Time",
         "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_queue_processed_total{queue=~\"lead-processing|ai-processing|notification\"}[5m])) by (queue)",
-            "legendFormat": "{{queue}}"
+            "expr": "histogram_quantile(0.50, rate(lead_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(lead_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(lead_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P99"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+        "yaxes": [{ "format": "s" }]
       },
       {
         "id": 8,
-        "title": "Database Query Performance",
-        "type": "graph",
+        "title": "Lead Score Distribution",
+        "type": "heatmap",
+        "gridPos": { "h": 4, "w": 12, "x": 8, "y": 4 },
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(insurechain_db_query_duration_seconds_bucket[5m])) by (le, operation))",
-            "legendFormat": "95th percentile - {{operation}}"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
-        "yAxes": [
-          {
-            "label": "Duration (seconds)",
-            "min": 0
+            "expr": "increase(lead_score_distribution_bucket[1h])",
+            "legendFormat": "{{insurance_type}}"
           }
         ]
       },
       {
         "id": 9,
-        "title": "Lead Quality Score Distribution",
-        "type": "heatmap",
+        "title": "AI Requests (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 8 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_lead_quality_score_bucket[5m])) by (le)",
-            "legendFormat": "{{le}}"
+            "expr": "increase(ai_requests_total[24h])",
+            "legendFormat": "Total"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
         "options": {
-          "calculate": false,
-          "color": {
-            "mode": "spectrum"
-          }
+          "colorMode": "value",
+          "graphMode": "area"
         }
       },
       {
         "id": 10,
-        "title": "AI Provider Latency Comparison",
-        "type": "graph",
+        "title": "AI Cost (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 4, "y": 8 },
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, sum(rate(insurechain_ai_provider_latency_seconds_bucket[5m])) by (le, provider))",
-            "legendFormat": "95th percentile - {{provider}}"
+            "expr": "increase(ai_costs_total[24h])",
+            "legendFormat": "Cost"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
-        "yAxes": [
-          {
-            "label": "Latency (seconds)",
-            "min": 0
-          }
-        ]
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "currencyUSD"
+        }
       },
       {
         "id": 11,
-        "title": "Cost Tracking",
-        "type": "graph",
+        "title": "AI Model Accuracy",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
         "targets": [
           {
-            "expr": "sum(rate(insurechain_ai_calls_total[5m]) * 0.01) by (provider, model)",
-            "legendFormat": "AI Cost - {{provider}}:{{model}}"
+            "expr": "ai_model_accuracy",
+            "legendFormat": "{{model}}"
           }
         ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
-        "yAxes": [
+        "options": {
+          "unit": "percent"
+        }
+      },
+      {
+        "id": 12,
+        "title": "AI Tokens (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+        "targets": [
           {
-            "label": "Cost ($/hour)",
-            "min": 0
+            "expr": "increase(ai_tokens_total[24h])",
+            "legendFormat": "Total"
           }
-        ]
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 13,
+        "title": "AI Latency (P95)",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(ai_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{model}} {{operation}}"
+          }
+        ],
+        "yaxes": [{ "format": "s" }]
+      },
+      {
+        "id": 14,
+        "title": "AI Cost Rate",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(ai_costs_total[5m]) * 3600",
+            "legendFormat": "{{model}} $/hr"
+          }
+        ],
+        "yaxes": [{ "format": "currencyUSD" }]
+      },
+      {
+        "id": 15,
+        "title": "AI Errors",
+        "type": "graph",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(ai_errors_total[5m])",
+            "legendFormat": "{{model}} {{error_type}}"
+          }
+        ],
+        "yaxes": [{ "format": "ops" }]
       }
-    ],
-    "time": {
-      "from": "now-6h",
-      "to": "now"
-    },
-    "refresh": "30s",
-    "schemaVersion": 36,
-    "version": 1
+    ]
   }
 }
