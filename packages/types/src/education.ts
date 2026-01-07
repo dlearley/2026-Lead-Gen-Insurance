@@ -125,7 +125,6 @@ export interface CourseEnrollment {
   passingScore?: number;
   enrolledAt: Date;
   startedAt?: Date;
-  completedAt?: Date;
   course?: Course;
   agent?: Agent;
   moduleProgresses?: ModuleProgress[];
