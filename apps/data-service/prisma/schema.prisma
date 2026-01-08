@@ -472,6 +472,7 @@ model Agent {
   courseEnrollments   CourseEnrollment[]
   pathEnrollments     PathEnrollment[]
   certifications      CourseCertification[]
+  territoryAssignments TerritoryAssignment[]
 
   @@index([email])
   @@index([isActive])
@@ -1538,4 +1539,74 @@ enum ExperimentStatus {
   COMPLETED
   ROLLED_BACK
   CANCELLED
+}
+
+// ========================================
+// TERRITORY MANAGEMENT
+// ========================================
+
+model Territory {
+  id                String               @id @default(uuid())
+  name              String
+  description       String?              @db.Text
+  type              TerritoryType        @default(GEOGRAPHIC)
+  parentTerritoryId String?
+  status            TerritoryStatus      @default(ACTIVE)
+  criteria          Json                 // TerritoryCriteria from types
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  // Relations
+  parent            Territory?           @relation("TerritoryHierarchy", fields: [parentTerritoryId], references: [id])
+  children          Territory[]          @relation("TerritoryHierarchy")
+  assignments       TerritoryAssignment[]
+
+  @@index([type])
+  @@index([status])
+  @@map("territories")
+}
+
+model TerritoryAssignment {
+  id            String         @id @default(uuid())
+  territoryId   String
+  agentId       String
+  role          AssignmentRole @default(PRIMARY)
+  priority      Int            @default(0)
+  effectiveFrom DateTime       @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  territory     Territory      @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  agent         Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([territoryId, agentId, role])
+  @@index([territoryId])
+  @@index([agentId])
+  @@index([isActive])
+  @@map("territory_assignments")
+}
+
+enum TerritoryType {
+  GEOGRAPHIC
+  ZIP_CODE
+  STATE
+  COUNTY
+  REGION
+  CUSTOM
+}
+
+enum TerritoryStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum AssignmentRole {
+  PRIMARY
+  SECONDARY
+  BACKUP
 }
