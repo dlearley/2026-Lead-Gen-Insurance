@@ -36,6 +36,7 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { createTerritoryRoutes } from './routes/territory.routes.js';
 import { leadMetrics } from './monitoring.js';
 
 const config = getConfig();
@@ -122,6 +123,9 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup territory routes
+  app.use('/api/v1/territories', createTerritoryRoutes());
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';
