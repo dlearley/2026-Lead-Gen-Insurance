@@ -16,3 +16,5 @@ export * from './community.js';
 export * from './copilot.js';
 export * from './claims.js';
 export * from './underwriting.js';
+export * from './business-data-ingestion.js';
+export * from './personalization.js';

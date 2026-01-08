@@ -34,6 +34,7 @@ import { createCampaignsRoutes } from './routes/campaigns.routes.js';
 import { createVIPRoutes } from './routes/vip.routes.js';
 import { createCommunityRoutes } from './routes/community.routes.js';
 import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
+import { businessDataIngestionRoutes } from './routes/business-data-ingestion.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import { leadMetrics } from './monitoring.js';
@@ -119,6 +120,9 @@ const start = async (): Promise<void> => {
 
   // Setup broker education routes
   app.use('/api/v1/broker-education', createBrokerEducationRoutes());
+
+  // Setup business data ingestion routes
+  app.use('/api/v1/business-data', businessDataIngestionRoutes);
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
