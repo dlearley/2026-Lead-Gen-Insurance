@@ -26,6 +26,17 @@ export interface EmailTemplateRecord {
   updatedAt: Date;
 }
 
+export interface LeadStatusHistoryRecord {
+  id: string;
+  leadId: string;
+  old_status?: string;
+  new_status: string;
+  changed_by_id?: string;
+  reason?: string;
+  created_at: Date;
+  changed_by_name?: string;
+}
+
 export interface InMemoryStore {
   users: Map<string, User>;
   leads: Map<string, Lead>;
@@ -41,6 +52,7 @@ export interface InMemoryStore {
   emailTemplates: Map<string, EmailTemplateRecord>;
   policies: Map<string, Policy>;
   underwritingCases: Map<string, UnderwritingCase>;
+  leadStatusHistory: Map<string, LeadStatusHistoryRecord>;
 }
 
 const now = () => new Date();
@@ -73,6 +85,7 @@ export const store: InMemoryStore = {
   onboardingFeedback: new Map(),
   policies: new Map(),
   underwritingCases: new Map(),
+  leadStatusHistory: new Map(),
   emailTemplates: new Map([
     [
       '00000000-0000-0000-0000-00000000a001',
@@ -117,4 +130,5 @@ export function resetStore(): void {
   store.onboardingFeedback.clear();
   store.policies.clear();
   store.underwritingCases.clear();
+  store.leadStatusHistory.clear();
 }
