@@ -178,6 +178,9 @@ interface UseLeadMutationsReturn {
   deleteLead: (id: string) => Promise<boolean>;
   updateStatus: (id: string, status: string, reason?: string) => Promise<Lead | null>;
   assignLead: (id: string, assigneeId: string, reason?: string) => Promise<Lead | null>;
+  bulkUpdateStatus: (leadIds: string[], status: string, reason?: string) => Promise<Lead[]>;
+  bulkAssignLeads: (leadIds: string[], assigneeId: string, reason?: string) => Promise<Lead[]>;
+  exportLeads: (leadIds?: string[]) => Promise<void>;
   isLoading: boolean;
   error: string | null;
 }
@@ -265,12 +268,84 @@ export function useLeadMutations(): UseLeadMutationsReturn {
     []
   );
 
+  const bulkUpdateStatus = useCallback(
+    async (leadIds: string[], status: string, reason?: string): Promise<Lead[]> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const promises = leadIds.map(id => 
+          leadService.updateStatus(id, status, reason)
+        );
+        
+        const results = await Promise.all(promises);
+        return results.filter(Boolean) as Lead[];
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update leads");
+        return [];
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const bulkAssignLeads = useCallback(
+    async (leadIds: string[], assigneeId: string, reason?: string): Promise<Lead[]> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const promises = leadIds.map(id => 
+          leadService.assign(id, assigneeId, reason)
+        );
+        
+        const results = await Promise.all(promises);
+        return results.filter(Boolean) as Lead[];
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to assign leads");
+        return [];
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const exportLeads = useCallback(async (leadIds?: string[]): Promise<void> => {
+    try {
+      setError(null);
+      
+      // Use the lead service to export leads
+      const exportData = await leadService.export(leadIds);
+      
+      // Create and download file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json'
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leads-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export leads");
+    }
+  }, []);
+
   return {
     createLead,
     updateLead,
     deleteLead,
     updateStatus,
     assignLead,
+    bulkUpdateStatus,
+    bulkAssignLeads,
+    exportLeads,
     isLoading,
     error,
   };

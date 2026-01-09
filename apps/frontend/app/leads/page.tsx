@@ -10,7 +10,7 @@ import { useLeads, useLeadDetail, useLeadMutations } from "@/hooks/use-leads";
 import { useLeadsStore, useFieldWorkStore } from "@/stores/leads.store";
 import type { Lead, LeadFilter } from "@/types/leads";
 import { Button } from "@/components/ui/Button";
-import { RefreshCw, Wifi, WifiOff, CloudOff } from "lucide-react";
+import { RefreshCw, Wifi, WifiOff, CloudOff, Zap } from "lucide-react";
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -173,6 +173,17 @@ export default function LeadsPage() {
               showFilters
               showViewToggle
             />
+          </div>
+
+          {/* Advanced Finder Floating Button */}
+          <div className="fixed bottom-6 right-6 z-40">
+            <Button
+              onClick={() => router.push("/leads/advanced-finder")}
+              className="h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
+              title="Open Advanced Finder (Power User Interface)"
+            >
+              <Zap className="h-6 w-6" />
+            </Button>
           </div>
 
           {lastSyncTime && (

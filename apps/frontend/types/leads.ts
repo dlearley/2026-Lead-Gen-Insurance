@@ -20,6 +20,7 @@ export interface Lead {
   id: string;
   firstName: string;
   lastName: string;
+  name: string; // Computed full name
   email?: string;
   phone?: string;
   company?: string;
@@ -36,6 +37,7 @@ export interface Lead {
   country?: string;
   latitude?: number;
   longitude?: number;
+  location?: string; // Computed location string
   source?: string;
   campaign?: string;
   assigneeId?: string;
@@ -44,6 +46,10 @@ export interface Lead {
   updatedAt: string;
   followUpDate?: string;
   lastContactedAt?: string;
+  score?: number; // Lead score for advanced filtering
+  isReturning?: boolean; // Returning customer flag
+  hasEmail?: boolean; // Computed from email field
+  hasPhone?: boolean; // Computed from phone field
 }
 
 export interface LeadCreate {
@@ -91,6 +97,14 @@ export interface LeadFilter {
   insuranceType?: InsuranceType;
   dateFrom?: string;
   dateTo?: string;
+  location?: string; // Location-based filtering
+  score?: {
+    min?: number;
+    max?: number;
+  };
+  hasEmail?: boolean; // Filter by email presence
+  hasPhone?: boolean; // Filter by phone presence
+  isReturning?: boolean; // Filter by returning customer status
 }
 
 export interface LeadListResponse {
