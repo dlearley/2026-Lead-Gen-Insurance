@@ -37,6 +37,8 @@ import { createBrokerEducationRoutes } from './routes/broker-education.routes.js
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import { leadMetrics } from './monitoring.js';
+import { TalkTrackGeneratorService } from './services/talk-track-generator.service.js';
+import { createTalkTrackRoutes } from './routes/talk-track.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -122,6 +124,10 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup talk track generator routes
+  const talkTrackService = new TalkTrackGeneratorService(prisma, {}); // AI service to be configured
+  app.use('/api/v1/talk-tracks', createTalkTrackRoutes(talkTrackService));
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';

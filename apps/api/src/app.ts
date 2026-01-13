@@ -30,6 +30,7 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
+import { talkTrackRouter } from './routes/talk-track.js';
 import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
@@ -193,6 +194,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
+  app.use('/api/v1/talk-tracks', talkTrackRouter);
+  app.use('/api/talk-tracks', talkTrackRouter);
   app.use('/api/v1/customer-success', customerSuccessRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes
