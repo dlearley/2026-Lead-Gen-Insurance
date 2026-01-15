@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { cn } from "@/utils/cn";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";

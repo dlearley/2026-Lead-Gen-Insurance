@@ -1,4 +1,3 @@
-import React from "react";
 import { cn } from "@/utils/cn";
 import { Button } from "@/components/ui/Button";
 import type { Lead } from "@/types/leads";

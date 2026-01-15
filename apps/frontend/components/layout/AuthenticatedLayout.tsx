@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { Breadcrumb } from "./Breadcrumb";
@@ -10,6 +10,7 @@ import { ProductTourOverlay } from "@/components/onboarding/ProductTourOverlay";
 import { useAuthStore } from "@/stores/auth.store";
 import { useOnboardingStore } from "@/stores/onboarding.store";
 import { normalizeOnboardingRole } from "@/lib/onboarding/tours";
+import { canAccessModule, getModuleForPath } from "@/lib/navigation/modules";
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -20,10 +21,21 @@ export function AuthenticatedLayout({ children, title }: AuthenticatedLayoutProp
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const pathname = usePathname();
+  const router = useRouter();
+
   const user = useAuthStore((s) => s.user);
   const role = useMemo(() => normalizeOnboardingRole(user?.role), [user?.role]);
 
   const { activeTour, startTour, tourCompletedAtByRole, tourSkippedAtByRole } = useOnboardingStore();
+
+  useEffect(() => {
+    if (!user) return;
+    const mod = getModuleForPath(pathname);
+    if (!mod) return;
+    if (!canAccessModule(role, mod)) {
+      router.replace("/unauthorized");
+    }
+  }, [user, role, pathname, router]);
 
   useEffect(() => {
     if (!user) return;

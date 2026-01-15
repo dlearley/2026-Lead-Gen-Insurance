@@ -1,23 +1,25 @@
-import { ButtonHTMLAttributes, forwardRef } from "react";
+import { ButtonHTMLAttributes, cloneElement, forwardRef, isValidElement } from "react";
 import { cn } from "@/utils/cn";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "danger" | "ghost";
+  variant?: "default" | "primary" | "secondary" | "outline" | "danger" | "ghost";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  asChild?: boolean;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
       className,
-      variant = "primary",
+      variant = "default",
       size = "md",
       isLoading = false,
       leftIcon,
       rightIcon,
+      asChild = false,
       children,
       disabled,
       ...props
@@ -26,6 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const baseClasses = "btn";
     const variantClasses = {
+      default: "btn-primary",
       primary: "btn-primary",
       secondary: "btn-secondary",
       outline: "btn-outline",
@@ -38,19 +41,24 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       lg: "btn-lg",
     };
 
+    const computedClassName = cn(
+      baseClasses,
+      variantClasses[variant],
+      sizeClasses[size],
+      disabled || isLoading ? "opacity-50 cursor-not-allowed" : "",
+      className
+    );
+
+    if (asChild && isValidElement(children)) {
+      const childClassName = (children.props as { className?: string }).className;
+      return cloneElement(children, {
+        className: cn(computedClassName, childClassName),
+        onClick: props.onClick,
+      });
+    }
+
     return (
-      <button
-        ref={ref}
-        className={cn(
-          baseClasses,
-          variantClasses[variant],
-          sizeClasses[size],
-          disabled || isLoading ? "opacity-50 cursor-not-allowed" : "",
-          className
-        )}
-        disabled={disabled || isLoading}
-        {...props}
-      >
+      <button ref={ref} className={computedClassName} disabled={disabled || isLoading} {...props}>
         {isLoading && <span className="animate-spin mr-2">⟳</span>}
         {!isLoading && leftIcon && <span className="mr-2">{leftIcon}</span>}
         {children}

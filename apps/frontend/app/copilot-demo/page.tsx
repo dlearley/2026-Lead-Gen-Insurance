@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CopilotWidget } from '@/components/copilot/CopilotWidget';
 import { Bot, User, Mail, Phone, MapPin, Calendar } from 'lucide-react';
 
