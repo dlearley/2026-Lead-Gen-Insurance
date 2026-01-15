@@ -123,6 +123,7 @@ export default function LeadsPage() {
                 onBack={handleBack}
                 onCall={() => handleCall(selectedLead)}
                 onEmail={() => handleEmail(selectedLead)}
+                onEdit={() => router.push(`/leads/${selectedLead.id}/edit`)}
                 onStatusChange={handleStatusChange}
                 loading={detailLoading}
               />

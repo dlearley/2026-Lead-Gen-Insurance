@@ -18,6 +18,10 @@ class UserService {
     return apiClient.get<User>(`/api/v1/users/${id}/`);
   }
 
+  async createUser(data: Partial<User> & { password?: string }): Promise<User> {
+    return apiClient.post<User>("/api/v1/users/", data);
+  }
+
   async updateUser(id: string, data: Partial<User>): Promise<User> {
     return apiClient.patch<User>(`/api/v1/users/${id}/`, data);
   }

@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -11,46 +14,61 @@ import { User, Mail, Building, Calendar } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { userService } from "@/services/user.service";
 
+const profileSchema = z.object({
+  firstName: z.string().min(1, "First name is required").max(100),
+  lastName: z.string().min(1, "Last name is required").max(100),
+});
+
+type ProfileValues = z.infer<typeof profileSchema>;
+
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    organizationId: "",
-  });
-  const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        email: user.email || "",
-        organizationId: user.organizationId || "",
-      });
-    }
-  }, [user]);
+  const initials = useMemo(() => {
+    const first = user?.firstName?.[0] || "";
+    const last = user?.lastName?.[0] || "";
+    return `${first}${last}`.toUpperCase();
+  }, [user?.firstName, user?.lastName]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+    },
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    reset({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+    });
+  }, [user, reset]);
+
+  const onSubmit = handleSubmit(async (values) => {
     setMessage(null);
 
     try {
       await userService.updateProfile({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
       });
       await refreshUser();
       setMessage({ type: "success", text: "Profile updated successfully!" });
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Failed to update profile" });
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to update profile",
+      });
     }
-  };
+  });
 
   return (
     <ProtectedRoute>
@@ -68,16 +86,16 @@ export default function ProfilePage() {
                 </Alert>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={onSubmit} className="space-y-6">
                 <div className="flex items-center space-x-4">
                   <div className="w-20 h-20 bg-primary-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                    {formData.firstName?.[0]}{formData.lastName?.[0]}
+                    {initials}
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-secondary-900">
-                      {formData.firstName} {formData.lastName}
+                      {user?.firstName} {user?.lastName}
                     </h3>
-                    <p className="text-sm text-secondary-600">{formData.email}</p>
+                    <p className="text-sm text-secondary-600">{user?.email}</p>
                   </div>
                 </div>
 
@@ -88,11 +106,10 @@ export default function ProfilePage() {
                       First Name
                     </label>
                     <Input
-                      value={formData.firstName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, firstName: e.target.value })
-                      }
-                      disabled={isLoading}
+                      id="firstName"
+                      error={errors.firstName?.message}
+                      disabled={isSubmitting}
+                      {...register("firstName")}
                     />
                   </div>
 
@@ -102,11 +119,10 @@ export default function ProfilePage() {
                       Last Name
                     </label>
                     <Input
-                      value={formData.lastName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, lastName: e.target.value })
-                      }
-                      disabled={isLoading}
+                      id="lastName"
+                      error={errors.lastName?.message}
+                      disabled={isSubmitting}
+                      {...register("lastName")}
                     />
                   </div>
                 </div>
@@ -116,11 +132,7 @@ export default function ProfilePage() {
                     <Mail className="h-4 w-4 mr-2" />
                     Email Address
                   </label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    disabled={true}
-                  />
+                  <Input id="email" type="email" value={user?.email || ""} disabled />
                   <p className="text-xs text-secondary-500">Contact support to change your email</p>
                 </div>
 
@@ -130,10 +142,7 @@ export default function ProfilePage() {
                       <Building className="h-4 w-4 mr-2" />
                       Organization ID
                     </label>
-                    <Input
-                      value={formData.organizationId}
-                      disabled={true}
-                    />
+                    <Input value={user.organizationId} disabled />
                   </div>
                 )}
 
@@ -144,7 +153,7 @@ export default function ProfilePage() {
                   </label>
                   <Input
                     value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : ""}
-                    disabled={true}
+                    disabled
                   />
                 </div>
 
@@ -153,21 +162,18 @@ export default function ProfilePage() {
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      if (user) {
-                        setFormData({
-                          firstName: user.firstName || "",
-                          lastName: user.lastName || "",
-                          email: user.email || "",
-                          organizationId: user.organizationId || "",
-                        });
-                      }
+                      if (!user) return;
+                      reset({
+                        firstName: user.firstName || "",
+                        lastName: user.lastName || "",
+                      });
                       setMessage(null);
                     }}
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" isLoading={isLoading}>
+                  <Button type="submit" isLoading={isSubmitting}>
                     Save Changes
                   </Button>
                 </div>
