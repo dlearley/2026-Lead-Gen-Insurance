@@ -11,6 +11,7 @@ import { RoutingService } from './services/routing.service.js';
 import { LeadRoutingWorkflow } from './services/lead-routing-workflow.js';
 import { UnderwritingService } from './underwriting/underwriting.service.js';
 import { UnderwritingWorkflow } from './services/underwriting-workflow.js';
+import routingRoutes from './routes/routing.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.orchestrator;
@@ -41,6 +42,9 @@ const start = async (): Promise<void> => {
       service: 'orchestrator',
     });
   });
+
+  // Routing API endpoints
+  app.use('/api/v1/routing', routingRoutes);
 
   const server = app.listen(PORT, () => {
     logger.info(`Orchestrator service API listening on port ${PORT}`);

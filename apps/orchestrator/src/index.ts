@@ -2,16 +2,25 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { logger } from '@insurance-lead-gen/core';
-import { initializeObservability, createOtelLogger } from '@insurance-lead-gen/core';
+import {
+  logger,
+  initializeObservability,
+  createOtelLogger,
+  MetricsCollector,
+  initializeTracing,
+  MultiChannelMessagingService,
+  LeadStateService,
+  CampaignOrchestrationService,
+} from '@insurance-lead-gen/core';
 import { getConfig } from '@insurance-lead-gen/config';
-import { EVENT_SUBJECTS, type LeadProcessedEvent } from '@insurance-lead-gen/types';
 
 import { NatsEventBus } from './nats/nats-event-bus.js';
 import { RankingService } from './services/ranking.service.js';
 import { RoutingService } from './services/routing.service.js';
 import { LeadRoutingWorkflow } from './services/lead-routing-workflow.js';
 import knowledgeBaseRoutes from './routes/knowledge-base.routes.js';
+import routingRoutes from './routes/routing.routes.js';
+import prisma from './db/prisma.js';
 
 // Initialize observability
 const obs = initializeObservability({
@@ -85,6 +94,9 @@ const start = async (): Promise<void> => {
 
   // Knowledge base routes
   app.use('/api/v1/knowledge-base', knowledgeBaseRoutes);
+  
+  // Routing routes
+  app.use('/api/v1/routing', routingRoutes);
 
   // Start Express server
   const server = app.listen(PORT, () => {
@@ -131,6 +143,9 @@ const start = async (): Promise<void> => {
   const shutdown = async (): Promise<void> => {
     structuredLogger.info('Shutting down orchestrator service');
     logger.info('Shutting down orchestrator service');
+
+    // Clear campaign processing interval
+    clearInterval(campaignInterval);
 
     await obs.shutdown();
     await new Promise<void>((resolve) => server.close(() => resolve()));
