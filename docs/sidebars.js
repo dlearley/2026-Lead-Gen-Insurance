@@ -128,13 +128,6 @@ module.exports = {
   devSidebar: {
     type: 'category',
     label: 'Development',
-    items: [
-      '../README',
-      '../ARCHITECTURE',
-      '../TECH_STACK',
-      '../DEVELOPMENT',
-      '../API',
-      '../MONITORING',
-    ],
+    items: ['README', 'ARCHITECTURE', 'TECH_STACK', 'DEVELOPMENT', 'API', 'MONITORING'],
   },
 };

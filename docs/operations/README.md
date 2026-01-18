@@ -4,11 +4,13 @@ This section contains all documents necessary for the day-to-day operation and m
 
 ## 📋 Runbooks
 Step-by-step guides for common operational tasks and troubleshooting.
+- [Runbooks Index](./runbooks/README.md)
 - [Lead Ingestion & Routing](./runbooks/lead-ingestion.md)
 - [Queue Management (BullMQ)](./runbooks/queue-management.md)
 - [Cache Management (Redis)](./runbooks/cache-management-redis.md)
 - [Vector Search (Qdrant)](./runbooks/vector-search-qdrant.md)
 - [File Storage (MinIO)](./runbooks/file-storage-minio.md)
+- [Database Operations (PostgreSQL)](./runbooks/database-operations.md)
 - [General Operational Runbooks](../RUNBOOKS.md)
 
 ## 📑 Standard Operating Procedures (SOPs)
@@ -25,4 +27,3 @@ Formalized processes for handling specific scenarios.
 
 ## 🚨 Emergency Contacts
 Refer to the [Escalation Procedures](./sops/escalation-procedures.md) for the contact matrix and on-call rotation.
- bitumen

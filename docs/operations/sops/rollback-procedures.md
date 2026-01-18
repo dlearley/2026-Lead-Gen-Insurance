@@ -71,4 +71,3 @@ Reverting Terraform or cluster-level changes.
   - The rollback is more risky than a hotfix (e.g., destructive DB changes).
   - The issue is external (3rd party API down).
   - The new version contains critical security patches that cannot be deferred.
- bitumen

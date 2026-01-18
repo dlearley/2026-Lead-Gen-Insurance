@@ -40,4 +40,3 @@ Managed via Helm `values.yaml` files located in the `deploy/helm/` directory.
 1. Add the key and its validation schema to `packages/config/src/index.ts`.
 2. Add the corresponding environment variable to `.env.example`.
 3. Update the Helm `values.yaml` and templates if the config needs to be configurable in production.
- bitumen

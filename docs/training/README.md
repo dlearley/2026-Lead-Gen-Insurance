@@ -22,4 +22,3 @@ This section contains materials designed to help new team members get up to spee
 Before being granted production access, all team members must complete the certification process.
 - [Training Checklist](./certification/training-checklist.md)
 - [Assessment Questionnaire](./certification/assessment-questionnaire.md)
- bitumen

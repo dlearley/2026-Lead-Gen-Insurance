@@ -22,4 +22,3 @@
 
 ---
 *Answers should be reviewed by a Senior Engineer or Team Lead during the certification process.*
- bitumen
