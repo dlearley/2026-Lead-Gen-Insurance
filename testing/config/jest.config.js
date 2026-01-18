@@ -1,0 +1,51 @@
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>'],
+  testMatch: ['**/*.test.ts'],
+  collectCoverageFrom: [
+    '**/*.ts',
+    '!**/*.test.ts',
+    '!**/node_modules/**',
+    '!**/dist/**',
+    '!**/coverage/**',
+    '!**/*.d.ts',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+  },
+  coverageDirectory: 'coverage',
+  coverageReporters: [
+    'text',
+    'text-summary',
+    'lcov',
+    'html',
+    'json-summary',
+  ],
+  maxWorkers: 4,
+  testTimeout: 30000,
+  verbose: true,
+  setupFilesAfterEnv: ['<rootDir>/setup.ts'],
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@testing/(.*)$': '<rootDir>/testing/$1',
+  },
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/coverage/',
+    '/e2e/',
+    '/integration/',
+  ],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/**/index.ts',
+  ],
+};
