@@ -4,7 +4,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { logger, MetricsCollector } from '@insurance-lead-gen/core';
+import { logger, MetricsCollector, createSecurityRateLimiter, rateLimitPresets, createInputSanitizer } from '@insurance-lead-gen/core';
+import { register } from 'prom-client';
+import { apiAnalyticsMiddleware } from './middleware/analytics.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
+import { createAuditMiddleware } from './middleware/audit.middleware.js';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -35,6 +39,14 @@ import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
 import rtcSignalingRouter from './routes/rtc-signaling.js';
+import privacyRouter from './routes/privacy.js';
+import auditLogsRouter from './routes/audit-logs.js';
+import customerSuccessRouter from './routes/customer-success.js';
+import onboardingRouter from './routes/onboarding.js';
+import gdprRouter from './routes/gdpr.js';
+import ccpaRouter from './routes/ccpa.js';
+import complianceRouter from './routes/compliance.js';
+import apiKeysRouter from './routes/api-keys.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -72,23 +84,9 @@ export function createApp(): express.Express {
   // Input Sanitization
   app.use(createInputSanitizer());
 
-  app.use(metricsCollector.middleware());
-
-  // Metrics middleware
   app.use(metrics.middleware());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
-
-  // Prometheus metrics endpoint
-  app.get('/metrics', async (req, res) => {
-    try {
-      res.set('Content-Type', register.contentType);
-      res.end(await register.metrics());
-    } catch (ex) {
-      logger.error('Error generating metrics', { error: ex });
-      res.status(500).end();
-    }
-  });
 
   // Health check endpoints
   app.get('/health', (req, res) => {
@@ -154,11 +152,6 @@ export function createApp(): express.Express {
   });
 
   app.get('/metrics', async (req, res) => {
-    res.setHeader('Content-Type', metricsCollector.getContentType());
-    res.end(await metricsCollector.getMetrics());
-  });
-
-  app.get('/metrics', async (req, res) => {
     try {
       res.set('Content-Type', metrics.getContentType());
       res.end(await metrics.getMetrics());
@@ -194,6 +187,11 @@ export function createApp(): express.Express {
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
   app.use('/api/v1/customer-success', customerSuccessRouter);
+  app.use('/api/v1/gdpr', gdprRouter);
+  app.use('/api/v1/ccpa', ccpaRouter);
+  app.use('/api/v1/compliance', complianceRouter);
+  app.use('/api/v1/api-keys', apiKeysRouter);
+  app.use('/api/v1/regulatory-reporting', regulatoryReportingRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes
   const optimizationAPI = new OptimizationAPI();
@@ -225,6 +223,11 @@ export function createApp(): express.Express {
   app.use('/api/broker-education', brokerEducationRouter);
   app.use('/api/claims', claimsRouter);
   app.use('/api/onboarding', onboardingRouter);
+  app.use('/api/gdpr', gdprRouter);
+  app.use('/api/ccpa', ccpaRouter);
+  app.use('/api/compliance', complianceRouter);
+  app.use('/api/api-keys', apiKeysRouter);
+  app.use('/api/regulatory-reporting', regulatoryReportingRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes (legacy)
   app.use('/api/optimization', optimizationAPI.getRouter());

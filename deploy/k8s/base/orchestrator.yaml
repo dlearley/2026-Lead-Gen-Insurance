@@ -12,8 +12,20 @@ spec:
       labels:
         app: orchestrator
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
       containers:
       - name: orchestrator
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
         image: insurance-lead-gen-orchestrator:latest
         ports:
         - containerPort: 3002

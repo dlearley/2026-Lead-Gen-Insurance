@@ -345,7 +345,7 @@ spec:
 
 ---
 # Network Policies for Orchestrator Service
-apiVersions.io/v1: networking.k8
+apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: orchestrator-service-network-policy
