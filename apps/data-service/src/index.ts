@@ -36,6 +36,7 @@ import { createCommunityRoutes } from './routes/community.routes.js';
 import { createBrokerEducationRoutes } from './routes/broker-education.routes.js';
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
+import { createPerformanceRoutes } from './routes/performance.routes.js';
 import { leadMetrics } from './monitoring.js';
 
 const config = getConfig();
@@ -122,6 +123,9 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup performance monitoring and optimization routes
+  app.use('/api/v1/performance', createPerformanceRoutes(prisma, cacheManager));
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';

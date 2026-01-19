@@ -1,11 +1,12 @@
 /**
  * Performance Optimization Routes
- * API endpoints for database optimization, caching, and capacity planning
+ * API endpoints for performance monitoring, analysis, and optimization
  */
 
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { CacheManager, logger } from '@insurance-lead-gen/core';
+import { PerformanceMonitoringService } from '../services/performance-monitoring.service.js';
 import { DatabaseOptimizerService } from '../services/database-optimizer.service.js';
 import { CacheWarmingService } from '../services/cache-warming.service.js';
 import { JobSchedulerService } from '../services/job-scheduler.service.js';
@@ -17,19 +18,98 @@ export function createPerformanceRoutes(
 ): Router {
   const router = Router();
 
+  const perfMonitor = new PerformanceMonitoringService(prisma, cache);
   const dbOptimizer = new DatabaseOptimizerService(prisma);
   const cacheWarming = new CacheWarmingService(prisma, cache);
   const jobScheduler = new JobSchedulerService();
   const capacityPlanning = new CapacityPlanningService(prisma);
 
+  // ============================================
+  // Performance Monitoring Endpoints
+  // ============================================
+
+  router.get('/metrics', async (req, res) => {
+    try {
+      const metrics = await perfMonitor.getPerformanceMetrics();
+      res.json(metrics);
+    } catch (error) {
+      logger.error('Failed to get performance metrics', { error });
+      res.status(500).json({ error: 'Failed to get performance metrics' });
+    }
+  });
+
+  router.get('/metrics/endpoints', async (req, res) => {
+    try {
+      const endpointMetrics = perfMonitor.getEndpointMetrics();
+      res.json(endpointMetrics);
+    } catch (error) {
+      logger.error('Failed to get endpoint metrics', { error });
+      res.status(500).json({ error: 'Failed to get endpoint metrics' });
+    }
+  });
+
+  router.get('/metrics/queries', async (req, res) => {
+    try {
+      const queryMetrics = perfMonitor.getQueryMetrics();
+      res.json(queryMetrics);
+    } catch (error) {
+      logger.error('Failed to get query metrics', { error });
+      res.status(500).json({ error: 'Failed to get query metrics' });
+    }
+  });
+
+  router.get('/alerts', async (req, res) => {
+    try {
+      const alerts = await perfMonitor.checkAlerts();
+      res.json(alerts);
+    } catch (error) {
+      logger.error('Failed to check performance alerts', { error });
+      res.status(500).json({ error: 'Failed to check alerts' });
+    }
+  });
+
+  router.get('/report', async (req, res) => {
+    try {
+      const period = (req.query.period as 'hour' | 'day' | 'week') || 'day';
+      const report = await perfMonitor.generateReport(period);
+      res.json(report);
+    } catch (error) {
+      logger.error('Failed to generate performance report', { error });
+      res.status(500).json({ error: 'Failed to generate report' });
+    }
+  });
+
+  router.post('/metrics/reset', async (req, res) => {
+    try {
+      perfMonitor.resetMetrics();
+      res.json({ success: true, message: 'Metrics reset' });
+    } catch (error) {
+      logger.error('Failed to reset metrics', { error });
+      res.status(500).json({ error: 'Failed to reset metrics' });
+    }
+  });
+
+  router.put('/alerts/thresholds', async (req, res) => {
+    try {
+      const thresholds = req.body;
+      perfMonitor.updateAlertThresholds(thresholds);
+      res.json({ success: true, message: 'Alert thresholds updated' });
+    } catch (error) {
+      logger.error('Failed to update alert thresholds', { error });
+      res.status(500).json({ error: 'Failed to update thresholds' });
+    }
+  });
+
+  // ============================================
+  // Database Optimization Endpoints
+  // ============================================
+
   router.post('/database/analyze-query', async (req, res) => {
     try {
       const { query } = req.body;
-
       if (!query) {
         return res.status(400).json({ error: 'Query is required' });
       }
-
       const result = await dbOptimizer.analyzeQuery(query);
       res.json(result);
     } catch (error) {
@@ -112,6 +192,10 @@ export function createPerformanceRoutes(
     }
   });
 
+  // ============================================
+  // Cache Management Endpoints
+  // ============================================
+
   router.post('/cache/warm', async (req, res) => {
     try {
       await cacheWarming.warmCriticalData();
@@ -152,6 +236,10 @@ export function createPerformanceRoutes(
       res.status(500).json({ error: 'Failed to get cache hit rate' });
     }
   });
+
+  // ============================================
+  // Job Queue Management Endpoints
+  // ============================================
 
   router.get('/jobs/metrics', async (req, res) => {
     try {
@@ -224,6 +312,10 @@ export function createPerformanceRoutes(
       res.status(500).json({ error: 'Failed to get dead letter jobs' });
     }
   });
+
+  // ============================================
+  // Capacity Planning Endpoints
+  // ============================================
 
   router.get('/capacity/dashboard', async (req, res) => {
     try {
