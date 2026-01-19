@@ -30,6 +30,7 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
+import monitoringCostRouter from './routes/monitoring-cost.js';
 import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
@@ -194,6 +195,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/broker-education', brokerEducationRouter);
   app.use('/api/v1/claims', claimsRouter);
   app.use('/api/v1/customer-success', customerSuccessRouter);
+  app.use('/api/v1/monitoring-cost', monitoringCostRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes
   const optimizationAPI = new OptimizationAPI();
@@ -225,6 +227,7 @@ export function createApp(): express.Express {
   app.use('/api/broker-education', brokerEducationRouter);
   app.use('/api/claims', claimsRouter);
   app.use('/api/onboarding', onboardingRouter);
+  app.use('/api/monitoring-cost', monitoringCostRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes (legacy)
   app.use('/api/optimization', optimizationAPI.getRouter());
