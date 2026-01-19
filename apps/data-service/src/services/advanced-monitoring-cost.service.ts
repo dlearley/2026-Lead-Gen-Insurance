@@ -9,9 +9,8 @@
  * - Anomaly detection
  */
 
-import { PrismaClient } from '@prisma/client';
 import { logger } from '@insurance-lead-gen/core';
-import {
+import type {
   CostMetric,
   CostCategory,
   OptimizationOpportunity,
@@ -25,7 +24,7 @@ import {
   AutoScalingEvent,
   CostAnomaly,
   InfrastructureRecommendation,
-  ObservabilityCost,
+  ObservabilityCostExtended,
   SLOTracking,
   CostForecast,
   CreateCostMetricDTO,
@@ -33,8 +32,6 @@ import {
   CostReportFilters,
   MonitoringQuery,
 } from '@insurance-lead-gen/types';
-
-const prisma = new PrismaClient();
 
 /**
  * Advanced Monitoring & Cost Optimization Service
@@ -573,7 +570,7 @@ export class AdvancedMonitoringCostService {
   /**
    * Get observability costs
    */
-  async getObservabilityCosts(): Promise<ObservabilityCost> {
+  async getObservabilityCosts(): Promise<ObservabilityCostExtended> {
     return await this.calculateObservabilityCosts();
   }
   
@@ -700,7 +697,7 @@ export class AdvancedMonitoringCostService {
     }
   }
   
-  private async calculateObservabilityCosts(): Promise<ObservabilityCost> {
+  private async calculateObservabilityCosts(): Promise<ObservabilityCostExtended> {
     let total = 0;
     let tracesCost = 0;
     let logsCost = 0;

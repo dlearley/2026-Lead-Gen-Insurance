@@ -344,9 +344,9 @@ export interface CloudProviderCost {
 }
 
 /**
- * Observability cost tracking
+ * Extended observability cost tracking with recommendations
  */
-export interface ObservabilityCost {
+export interface ObservabilityCostExtended {
   traces: {
     count: number;
     storage: number; // GB
