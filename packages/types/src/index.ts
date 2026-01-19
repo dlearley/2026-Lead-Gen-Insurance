@@ -1,6 +1,7 @@
 // Types re-exports - all types are defined in individual files
 
 export * from './auth.js';
+export * from './api-gateway.js';
 export * from './observability.js';
 export * from './education.js';
 export * from './onboarding.js';
