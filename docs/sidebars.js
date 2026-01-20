@@ -13,22 +13,14 @@ module.exports = {
   userSidebar: {
     type: 'category',
     label: 'User Guide',
-    items: [
-      'user/quickstart',
-      'user/features',
-      'user/troubleshooting',
-      'user/faq',
-    ],
+    items: ['user/quickstart', 'user/features', 'user/troubleshooting', 'user/faq'],
   },
 
   // Admin Sidebar
   adminSidebar: {
     type: 'category',
     label: 'Admin Guide',
-    items: [
-      'admin/system-config',
-      'admin/marketing-automation',
-    ],
+    items: ['admin/system-config', 'admin/marketing-automation'],
   },
 
   // API Sidebar
@@ -69,11 +61,7 @@ module.exports = {
       {
         type: 'category',
         label: 'Communication Integrations',
-        items: [
-          'integrations/email',
-          'integrations/sms',
-          'integrations/phone',
-        ],
+        items: ['integrations/email', 'integrations/sms', 'integrations/phone'],
       },
       {
         type: 'category',
@@ -88,11 +76,7 @@ module.exports = {
       {
         type: 'category',
         label: 'Analytics Integrations',
-        items: [
-          'integrations/google-analytics',
-          'integrations/mixpanel',
-          'integrations/hotjar',
-        ],
+        items: ['integrations/google-analytics', 'integrations/mixpanel', 'integrations/hotjar'],
       },
     ],
   },
@@ -128,13 +112,6 @@ module.exports = {
   devSidebar: {
     type: 'category',
     label: 'Development',
-    items: [
-      '../README',
-      '../ARCHITECTURE',
-      '../TECH_STACK',
-      '../DEVELOPMENT',
-      '../API',
-      '../MONITORING',
-    ],
+    items: ['README', 'ARCHITECTURE', 'TECH_STACK', 'DEVELOPMENT', 'API', 'MONITORING'],
   },
 };

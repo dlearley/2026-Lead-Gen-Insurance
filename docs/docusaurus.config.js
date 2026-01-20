@@ -1,6 +1,6 @@
 // @ts-check
 // `@type` import to ensure auto-type suggestions are available for docsConfig
-import {themes as prismThemes} from 'prism-react-renderer';
+const { themes: prismThemes } = require('prism-react-renderer');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -48,39 +48,12 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          path: '.',
+          routeBasePath: 'docs',
           sidebarPath: require.resolve('./sidebars.js'),
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl: 'https://github.com/insurance-leads-platform/docs/tree/main/',
-          version: {
-            current: {
-              label: 'Latest',
-              path: '/',
-            },
-            next: {
-              label: 'v2.0 (Beta)',
-              path: '/next',
-            },
-            1.9: {
-              label: 'v1.9.x',
-              path: '/1.9',
-            },
-            1.8: {
-              label: 'v1.8.x',
-              path: '/1.8',
-            },
-          },
-          lastVersion: '1.8',
-          versions: {
-            current: {
-              label: 'Latest',
-              path: '/',
-            },
-            next: {
-              label: 'v2.0 (Beta)',
-              path: '/next',
-            },
-          },
         },
         blog: {
           showReadingTime: true,
