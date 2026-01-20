@@ -38,6 +38,7 @@ import { businessDataIngestionRoutes } from './routes/business-data-ingestion.ro
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import { createTerritoryRoutes } from './routes/territory.routes.js';
+import { createPerformanceRoutes } from './routes/performance.routes.js';
 import { leadMetrics } from './monitoring.js';
 import notesRoutes from './routes/notes.routes.js';
 import activitiesRoutes from './routes/activities.routes.js';
@@ -148,6 +149,9 @@ const start = async (): Promise<void> => {
 
   // Setup support, SLA & incident routes (Phase 13.9)
   app.use('/api/v1/support', supportRoutes);
+
+  // Setup performance monitoring and optimization routes
+  app.use('/api/v1/performance', createPerformanceRoutes(prisma, cacheManager));
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';

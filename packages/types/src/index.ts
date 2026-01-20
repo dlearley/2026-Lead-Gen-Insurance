@@ -25,3 +25,4 @@ export * from './timeline.js';
 export * from './talk-track.js';
 export * from './support.js';
 export * from './ai-verticals.js';
+export * from './performance.js';
