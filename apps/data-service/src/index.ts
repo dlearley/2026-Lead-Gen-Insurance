@@ -37,6 +37,7 @@ import { createBrokerEducationRoutes } from './routes/broker-education.routes.js
 import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import { leadMetrics } from './monitoring.js';
+import supportRoutes from './routes/support.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -122,6 +123,9 @@ const start = async (): Promise<void> => {
 
   // Setup claims routes
   app.use('/api/v1/claims', createClaimsRoutes(claimRepository));
+
+  // Setup support, SLA & incident routes (Phase 13.9)
+  app.use('/api/v1/support', supportRoutes);
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';
