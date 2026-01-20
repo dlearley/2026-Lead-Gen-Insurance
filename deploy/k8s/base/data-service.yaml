@@ -12,8 +12,20 @@ spec:
       labels:
         app: data-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
       containers:
       - name: data-service
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
         image: insurance-lead-gen-data-service:latest
         ports:
         - containerPort: 3001

@@ -4,7 +4,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { logger, MetricsCollector } from '@insurance-lead-gen/core';
+import { logger, MetricsCollector, createSecurityRateLimiter, rateLimitPresets, createInputSanitizer } from '@insurance-lead-gen/core';
+import { register } from 'prom-client';
+import { apiAnalyticsMiddleware } from './middleware/analytics.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
+import { createAuditMiddleware } from './middleware/audit.middleware.js';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
@@ -181,17 +185,6 @@ export function createApp(): express.Express {
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
 
-  // Prometheus metrics endpoint
-  app.get('/metrics', async (req, res) => {
-    try {
-      res.set('Content-Type', register.contentType);
-      res.end(await register.metrics());
-    } catch (ex) {
-      logger.error('Error generating metrics', { error: ex });
-      res.status(500).end();
-    }
-  });
-
   // Health check endpoints
   app.get('/health', (req, res) => {
     if (healthService) {
@@ -253,11 +246,6 @@ export function createApp(): express.Express {
         responseTime: 0,
       });
     }
-  });
-
-  app.get('/metrics', async (req, res) => {
-    res.setHeader('Content-Type', metricsCollector.getContentType());
-    res.end(await metricsCollector.getMetrics());
   });
 
   app.get('/metrics', async (req, res) => {

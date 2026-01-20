@@ -38,8 +38,8 @@ export class AuthService {
     this.config = {
       accessTokenSecret,
       refreshTokenSecret,
-      accessTokenExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-      refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+      accessTokenExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '1h',
+      refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
       issuer: process.env.JWT_ISSUER || 'insurance-lead-gen',
       audience: process.env.JWT_AUDIENCE || 'insurance-lead-gen-api',
     };
