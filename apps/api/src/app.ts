@@ -30,11 +30,42 @@ import communityRouter from './routes/community.js';
 import brokerEducationRouter from './routes/broker-education.js';
 import claimsRouter from './routes/claims.js';
 import brokerToolsRouter from './routes/broker-tools.js';
+import privacyRouter from './routes/privacy.js';
+import auditLogsRouter from './routes/audit-logs.js';
+import customerSuccessRouter from './routes/customer-success.js';
+import onboardingRouter from './routes/onboarding.js';
+import gatewayRouter from './routes/gateway.js';
 import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
 import rtcSignalingRouter from './routes/rtc-signaling.js';
+import { 
+  apiGatewayMiddleware,
+  securityHeadersMiddleware,
+  corsMiddleware,
+  requestIdMiddleware,
+  requestValidationMiddleware,
+  requestTransformationMiddleware,
+  responseTransformationMiddleware,
+  circuitBreakerMiddleware
+} from './middleware/api-gateway.middleware.js';
+import { APIGatewayService } from '@insurance-lead-gen/core';
+import { createAuditMiddleware } from './middleware/audit.middleware.js';
+import { createSecurityRateLimiter, rateLimitPresets } from './middleware/security-rate-limiter.js';
+import { createInputSanitizer } from './middleware/security.js';
+import { register, collectDefaultMetrics } from 'prom-client';
+import { apiAnalyticsMiddleware } from './middleware/analytics.js';
+
+// Initialize default metrics
+collectDefaultMetrics();
+
+// Health Service Interface
+interface HealthService {
+  checkLiveness(): any;
+  checkReadiness(): Promise<any>;
+  checkHealth(): Promise<any>;
+}
 
 export function createApp(): express.Express {
   const app = express();
@@ -43,15 +74,81 @@ export function createApp(): express.Express {
   // Initialize health service (will be properly initialized when used)
   let healthService: HealthService | null = null;
 
-  app.use(helmet());
-  app.use(cors());
+  // API Gateway Configuration
+  const gatewayConfig = {
+    security: {
+      headers: {
+        hsts: { enabled: true, maxAge: 31536000, includeSubDomains: true, preload: true },
+        xssProtection: { enabled: true, mode: 'block' },
+        contentTypeOptions: { enabled: true },
+        frameOptions: { enabled: true, policy: 'SAMEORIGIN' },
+        referrerPolicy: { enabled: true, policy: 'strict-origin-when-cross-origin' }
+      },
+      cors: {
+        origin: process.env.NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') || false : true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-API-Key'],
+        exposedHeaders: ['X-Request-ID', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+        credentials: true,
+        maxAge: 86400,
+        preflightContinue: false,
+        optionsSuccessStatus: 204
+      }
+    },
+    rateLimits: {
+      global: { requests: 1000, windowMs: 60000, strategy: 'sliding' },
+      burstLimit: 50
+    },
+    validation: {
+      enabled: true,
+      strict: false,
+      schemas: [],
+      sanitizeInput: true
+    }
+  };
+
+  // Initialize API Gateway Service (placeholder - would be connected to actual service)
+  const gatewayService = new APIGatewayService(
+    // Redis connection would go here
+    null as any,
+    // Config would go here
+    {
+      id: 'api-gateway',
+      name: 'Insurance Lead Gen API Gateway',
+      version: '1.0.0',
+      environment: process.env.NODE_ENV as any,
+      enabled: true,
+      rateLimits: gatewayConfig.rateLimits,
+      security: gatewayConfig.security,
+      routing: { services: [], loadBalancer: {} as any, circuitBreaker: {} as any, requestTransformation: {} as any, responseTransformation: {} as any },
+      caching: { enabled: false, strategies: [], redis: {} as any, memory: {} as any },
+      monitoring: { enabled: true, metrics: {} as any, logging: {} as any, tracing: {} as any, alerting: {} as any },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    // Audit service would go here
+    null as any,
+    metrics
+  );
+
+  // Make gateway service available to routes
+  app.set('APIGatewayService', gatewayService);
+
+  // Basic middleware
+  app.use(helmet(gatewayConfig.security.headers));
+  app.use(corsMiddleware(gatewayConfig.security.cors));
   app.use(compression());
   app.use(cookieParser());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(apiAnalyticsMiddleware);
 
+  // API Gateway middleware stack
   app.use(requestIdMiddleware);
+  app.use(apiGatewayMiddleware(gatewayService));
+  app.use(requestValidationMiddleware(gatewayConfig.validation));
+  app.use(requestTransformationMiddleware());
+  app.use(responseTransformationMiddleware(gatewayService));
   app.use(
     createAuditMiddleware({
       excludePaths: ['/health', '/metrics', '/uploads'],
@@ -72,9 +169,8 @@ export function createApp(): express.Express {
   // Input Sanitization
   app.use(createInputSanitizer());
 
-  app.use(metricsCollector.middleware());
-
   // Metrics middleware
+  app.use(metricsCollector.middleware());
   app.use(metrics.middleware());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));
@@ -228,6 +324,10 @@ export function createApp(): express.Express {
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes (legacy)
   app.use('/api/optimization', optimizationAPI.getRouter());
+
+  // API Gateway routes
+  app.use('/api/v1/gateway', gatewayRouter);
+  app.use('/api/gateway', gatewayRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
