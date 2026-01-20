@@ -23,3 +23,4 @@ export * from './territory.js';
 export * from './deduplication.js';
 export * from './timeline.js';
 export * from './talk-track.js';
+export * from './support.js';

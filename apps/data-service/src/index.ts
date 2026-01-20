@@ -44,6 +44,7 @@ import activitiesRoutes from './routes/activities.routes.js';
 import timelineRoutes from './routes/timeline.routes.js';
 import { TalkTrackGeneratorService } from './services/talk-track-generator.service.js';
 import { createTalkTrackRoutes } from './routes/talk-track.routes.js';
+import supportRoutes from './routes/support.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -144,6 +145,9 @@ const start = async (): Promise<void> => {
   // Setup talk track generator routes
   const talkTrackService = new TalkTrackGeneratorService(prisma, {}); // AI service to be configured
   app.use('/api/v1/talk-tracks', createTalkTrackRoutes(talkTrackService));
+
+  // Setup support, SLA & incident routes (Phase 13.9)
+  app.use('/api/v1/support', supportRoutes);
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';

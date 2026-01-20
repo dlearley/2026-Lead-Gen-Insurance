@@ -40,6 +40,7 @@ import customerSuccessRouter from './routes/customer-success.js';
 import onboardingRouter from './routes/onboarding.js';
 import gatewayRouter from './routes/gateway.js';
 import { talkTrackRouter } from './routes/talk-track.js';
+import supportRouter from './routes/support.js';
 import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
@@ -300,6 +301,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/talk-tracks', talkTrackRouter);
   app.use('/api/talk-tracks', talkTrackRouter);
   app.use('/api/v1/customer-success', customerSuccessRouter);
+  app.use('/api/v1/support', supportRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes
   const optimizationAPI = new OptimizationAPI();
@@ -334,6 +336,7 @@ export function createApp(): express.Express {
   app.use('/api/claims', claimsRouter);
   app.use('/api/territories', territoryRouter);
   app.use('/api/onboarding', onboardingRouter);
+  app.use('/api/support', supportRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes (legacy)
   app.use('/api/optimization', optimizationAPI.getRouter());
