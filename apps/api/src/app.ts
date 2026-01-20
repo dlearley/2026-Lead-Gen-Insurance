@@ -8,6 +8,8 @@ import { logger, MetricsCollector } from '@insurance-lead-gen/core';
 import leadsRouter from './routes/leads.js';
 import notesRouter from './routes/notes.js';
 import activityRouter from './routes/activity.js';
+import notesProxyRouter from './routes/notes-proxy.routes.js';
+import timelineProxyRouter from './routes/timeline-proxy.routes.js';
 import emailsRouter from './routes/emails.js';
 import tasksRouter from './routes/tasks.js';
 import notificationsRouter from './routes/notifications.js';
@@ -266,7 +268,8 @@ export function createApp(): express.Express {
   });
 
   app.use('/api/v1/leads', leadsRouter);
-  app.use('/api/v1/leads/:leadId/notes', notesRouter);
+  app.use('/api/v1/leads/:leadId/notes', notesProxyRouter);
+  app.use('/api/v1/leads/:leadId/timeline', timelineProxyRouter);
   app.use('/api/v1/leads/:leadId/activity', activityRouter);
   app.use('/api/v1/privacy', privacyRouter);
   app.use('/api/v1/audit-logs', auditLogsRouter);
@@ -300,7 +303,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/optimization', optimizationAPI.getRouter());
 
   app.use('/api/leads', leadsRouter);
-  app.use('/api/leads/:leadId/notes', notesRouter);
+  app.use('/api/leads/:leadId/notes', notesProxyRouter);
+  app.use('/api/leads/:leadId/timeline', timelineProxyRouter);
   app.use('/api/leads/:leadId/activity', activityRouter);
   app.use('/api/privacy', privacyRouter);
   app.use('/api/audit-logs', auditLogsRouter);

@@ -39,6 +39,9 @@ import { ClaimRepository } from './services/claim-repository.js';
 import { createClaimsRoutes } from './routes/claims.routes.js';
 import { createTerritoryRoutes } from './routes/territory.routes.js';
 import { leadMetrics } from './monitoring.js';
+import notesRoutes from './routes/notes.routes.js';
+import activitiesRoutes from './routes/activities.routes.js';
+import timelineRoutes from './routes/timeline.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -130,6 +133,11 @@ const start = async (): Promise<void> => {
 
   // Setup territory routes
   app.use('/api/v1/territories', createTerritoryRoutes());
+
+  // Setup timeline & notes routes
+  app.use('/api/v1/notes', notesRoutes);
+  app.use('/api/v1/activities', activitiesRoutes);
+  app.use('/api/v1/timeline', timelineRoutes);
 
   // Setup attribution routes
   import attributionRoutes from './routes/attribution.routes.js';
