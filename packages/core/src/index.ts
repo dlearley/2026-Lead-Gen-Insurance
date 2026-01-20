@@ -16,6 +16,9 @@ export * from './infrastructure/index.js';
 // Security exports
 export * from './security/index.js';
 
+// Orchestration exports
+export * from './orchestration/index.js';
+
 // Performance and optimization exports
 export * from './performance/index.js';
 export * from './scaling/index.js';
