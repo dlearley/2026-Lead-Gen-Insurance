@@ -16,6 +16,9 @@ export * from './metrics';
 // Enhanced metrics
 export * from './enhanced-metrics';
 
+// Health checks
+export * from './health';
+
 // Winston + OpenTelemetry logging
 export * from './winston-otel';
 
@@ -24,3 +27,6 @@ export * from './tracing-decorators';
 
 // Manual instrumentation helpers
 export * from './instrumentation';
+
+// SLO management
+export * from './slos';
