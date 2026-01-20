@@ -1085,3 +1085,218 @@ response = requests.post(
 
 ---
 
+## 📚 Phase 13.8: Documentation, Runbooks & Operations (CURRENT)
+
+**Status**: Phase 13.8 Implementation Complete ✅
+
+### Objectives
+
+Consolidate and enhance all operational documentation for the Insurance Lead Gen Platform, providing comprehensive runbooks, operational procedures, troubleshooting guides, and reference materials necessary for maintaining platform reliability and ensuring smooth day-to-day operations.
+
+### Deliverables Completed
+
+#### Comprehensive Documentation ✅
+
+- [x] **Master Documentation Portal** (PHASE_13.8_DOCS_RUNBOOKS_OPERATIONS.md)
+  - Complete documentation overview and structure
+  - Cross-referenced links to all runbooks
+  - Navigation aids and quick reference guides
+  - Maintenance calendar and scheduling
+
+- [x] **Operational Checklists** (OPERATIONAL_CHECKLISTS.md)
+  - Daily health check procedures
+  - Weekly maintenance checklists
+  - Monthly operational tasks
+  - Pre/post deployment checklists
+  - Incident response checklists
+  - Security audit checklists
+  - Troubleshooting checklists
+
+- [x] **Operational Quick Reference** (OPERATIONAL_QUICK_REFERENCE.md)
+  - Emergency contact information
+  - Service endpoints and URLs
+  - Essential Kubernetes commands
+  - Common operations procedures
+  - Troubleshooting command references
+  - Configuration reference tables
+  - Alert thresholds and escalation paths
+
+#### Runbook Integration ✅
+
+- [x] **Primary Runbooks Updated/Referenced**
+  - ALERT_RUNBOOKS.md - Alert response procedures
+  - INCIDENT_RESPONSE_RUNBOOK.md - Incident management
+  - DISASTER_RECOVERY_RUNBOOK.md - Recovery procedures
+  - ON_CALL_RUNBOOK.md - On-call responsibilities
+  - OPERATIONAL_RUNBOOK.md - Day-to-day operations
+  - RUNBOOKS.md - Master runbook index
+
+- [x] **Deployment Runbooks**
+  - RUNBOOK_DEPLOY_DEV.md - Development deployments
+  - RUNBOOK_DEPLOY_STAGING.md - Staging deployments
+  - RUNBOOK_DEPLOY_PROD.md - Production deployments
+  - DEPLOYMENT_RUNBOOK.md - Deployment procedures
+  - DEPLOYMENT_PROCEDURES.md - Detailed deployment steps
+
+#### Documentation Standards ✅
+
+- [x] **Documentation Style Guide**
+  - Writing standards for operational documents
+  - Document structure requirements
+  - Version control procedures
+  - Review and update processes
+
+- [x] **Centralized Knowledge Base**
+  - Single source of truth for operations
+  - Cross-referenced documentation
+  - Search-friendly structure
+  - Easy navigation aids
+
+### Key Features
+
+1. **Comprehensive Checklists**
+   - Daily health checks
+   - Weekly maintenance
+   - Monthly operations
+   - Deployment procedures
+   - Incident response
+   - Security audits
+
+2. **Quick Reference Guides**
+   - Emergency contacts
+   - Service endpoints
+   - Essential commands
+   - Configuration reference
+   - Alert thresholds
+   - Escalation procedures
+
+3. **Runbook Integration**
+   - Centralized runbook index
+   - Cross-referenced procedures
+   - Step-by-step guides
+   - Verification steps
+   - Rollback procedures
+
+4. **Maintenance Calendar**
+   - Daily tasks
+   - Weekly schedules
+   - Monthly reviews
+   - Quarterly assessments
+   - Annual audits
+
+### Documentation Structure
+
+```
+docs/
+├── 📋 Core Documentation
+│   ├── README.md
+│   ├── ARCHITECTURE.md
+│   └── DEVELOPMENT.md
+│
+├── 🚀 Deployment & Operations
+│   ├── DEPLOYMENT_*.md (7 files)
+│   └── HELM_DEPLOYMENT.md
+│
+├── 🔧 Runbooks (12 runbooks)
+│   ├── ALERT_RUNBOOKS.md
+│   ├── INCIDENT_RESPONSE_RUNBOOK.md
+│   ├── DISASTER_RECOVERY_RUNBOOK.md
+│   ├── ON_CALL_RUNBOOK.md
+│   ├── OPERATIONAL_RUNBOOK.md
+│   └── RUNBOOKS.md
+│
+├── 📊 Monitoring & Observability
+│   ├── MONITORING.md
+│   └── DATABASE_MONITORING.md
+│
+├── 🔒 Security & Compliance (6 files)
+│   ├── SECURITY_HARDENING_GUIDE.md
+│   ├── HIPAA_COMPLIANCE.md
+│   └── GDPR_COMPLIANCE.md
+│
+├── 🗄️ Database Operations (5 files)
+│   ├── DATABASE_SETUP.md
+│   ├── DATABASE_MAINTENANCE.md
+│   └── DATABASE_BACKUP_RECOVERY.md
+│
+└── 📞 Support & Troubleshooting
+    ├── TROUBLESHOOTING_GUIDE.md
+    └── USER_GUIDE.md
+```
+
+### Documentation Files Created
+
+| File | Purpose |
+|------|---------|
+| PHASE_13.8_DOCS_RUNBOOKS_OPERATIONS.md | Master documentation portal |
+| OPERATIONAL_CHECKLISTS.md | Comprehensive operational checklists |
+| OPERATIONAL_QUICK_REFERENCE.md | Quick reference guide |
+
+### Documentation Features
+
+**Checklist Categories:**
+- Daily Operations (Morning/End-of-day)
+- Weekly Maintenance (Mon-Fri tasks)
+- Monthly Operations (Comprehensive reviews)
+- Deployment Checklists (Pre/Post deployment)
+- Incident Checklists (Declaration/Response/Postmortem)
+- Maintenance Checklists (DB/K8s/Certificate)
+- Security Checklists (Daily/Weekly/Monthly)
+- Troubleshooting Checklists (API/DB/Cache issues)
+
+**Quick Reference Sections:**
+- Emergency contacts and escalation
+- Service endpoints (Production/Staging/Monitoring)
+- Essential Kubernetes commands
+- Docker commands
+- Database commands (PostgreSQL)
+- Redis commands
+- Monitoring commands
+- Common operations
+- Troubleshooting commands
+- Configuration references
+- Log locations
+- Alert thresholds
+- Escalation procedures
+
+### Success Metrics
+
+- All operational procedures documented
+- 100% runbook coverage for known issues
+- Checklists for all recurring operations
+- Quick reference accessible within 30 seconds
+- Documentation reviewed quarterly
+- All on-call engineers trained on runbooks
+
+### Documentation Maintenance
+
+**Daily:**
+- Health check procedures
+- Error log review
+- Backup verification
+
+**Weekly:**
+- Log pattern analysis
+- Security advisory review
+- Performance trend analysis
+- Access log audit
+
+**Monthly:**
+- Certificate rotation checks
+- Comprehensive access review
+- Disaster recovery testing
+- Cost analysis
+- Documentation review
+
+**Quarterly:**
+- Full documentation audit
+- BCP testing
+- Compliance review
+- Architecture review
+
+### Timeline: Phase 13.8 Implementation Complete
+
+---
+
+*Last Updated: $(date)*
+*Document Owner: Platform Engineering Team*
