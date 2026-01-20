@@ -329,14 +329,5 @@ setInterval(() => {
   logger.debug('Data service heartbeat');
 }, 60000);
 
-// Re-export for package consumers
-export { prisma, disconnectPrisma } from './database/prisma.client.js';
-export {
-  ensureAuditLogInfrastructure,
-  insertAuditLog,
-  insertAuditLogs,
-  queryAuditLogs,
-  createPrismaAuditWriter,
-  type AuditLogQuery,
-  type AuditLogRow,
-} from './audit/audit-log.js';
+/// Re-export for package consumers
+export { prisma } from './prisma/client.js';
