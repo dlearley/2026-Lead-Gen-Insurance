@@ -11,6 +11,7 @@ import integrationConfigsRouter from './routes/integration-configs.routes.js';
 import integrationLogsRouter from './routes/integration-logs.routes.js';
 import { experimentsRouter } from './routes/experiments.routes.js';
 import { orchestrationRouter } from './routes/orchestration.routes.js';
+import { monitoringCostRouter } from './routes/monitoring-cost.routes.js';
 import { AlertService } from './services/alert-service.js';
 
 // Initialize observability
@@ -79,6 +80,7 @@ app.use('/api/v1/integration-configs', integrationConfigsRouter);
 app.use('/api/v1/integration-logs', integrationLogsRouter);
 app.use('/api/v1/experiments', experimentsRouter);
 app.use('/api/v1/orchestration', orchestrationRouter);
+app.use('/api/v1/monitoring-cost', monitoringCostRouter);
 
 app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
   structuredLogger.error('Unhandled error', { error: err, path: req.path });
