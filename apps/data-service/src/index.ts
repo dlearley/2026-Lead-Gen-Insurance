@@ -157,6 +157,9 @@ const start = async (): Promise<void> => {
   import attributionRoutes from './routes/attribution.routes.js';
   app.use('/api/v1/attribution', attributionRoutes);
 
+  // Setup advanced performance optimization routes
+  app.use('/api/v1/performance', createAdvancedPerformanceRoutes(prisma, cacheManager, redis));
+
   // Health check endpoint
   app.get('/health', async (req, res) => {
     let dbStatus = 'ok';

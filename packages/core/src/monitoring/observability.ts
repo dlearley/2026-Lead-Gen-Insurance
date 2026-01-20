@@ -112,5 +112,13 @@ export function initializeObservability(config: ObservabilityConfig): Observabil
   return manager;
 }
 
+/**
+ * Get tracer for the service
+ */
+export function getTracer(serviceName: string): any {
+  const { trace } = require('@opentelemetry/api');
+  return trace.getTracer(serviceName);
+}
+
 export * from './tracing';
 export * from './metrics';
