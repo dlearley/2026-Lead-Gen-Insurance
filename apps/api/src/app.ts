@@ -39,6 +39,7 @@ import auditLogsRouter from './routes/audit-logs.js';
 import customerSuccessRouter from './routes/customer-success.js';
 import onboardingRouter from './routes/onboarding.js';
 import gatewayRouter from './routes/gateway.js';
+import { talkTrackRouter } from './routes/talk-track.js';
 import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
@@ -296,6 +297,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/business-data', businessDataIngestionRouter);
   app.use('/api/v1/claims', claimsRouter);
   app.use('/api/v1/territories', territoryRouter);
+  app.use('/api/v1/talk-tracks', talkTrackRouter);
+  app.use('/api/talk-tracks', talkTrackRouter);
   app.use('/api/v1/customer-success', customerSuccessRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes
