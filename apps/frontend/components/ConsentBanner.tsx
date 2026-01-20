@@ -1,7 +1,7 @@
 // Consent Banner Component
 // Phase 25.1B - Data Privacy & GDPR Automation
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { gdprApiService } from '../../services/gdpr-api.service';
 import type { ConsentBanner, ConsentAction } from '../../types';
 

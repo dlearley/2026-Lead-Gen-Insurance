@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/utils/cn";
 import {
   LayoutDashboard,
@@ -18,6 +19,10 @@ import {
   BookOpen,
   LifeBuoy,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/auth.store";
+import { normalizeOnboardingRole } from "@/lib/onboarding/tours";
+import { getAccessibleNavModules } from "@/lib/navigation/modules";
+import type { AppModuleKey } from "@/lib/navigation/modules";
 
 interface NavItem {
   label: string;
@@ -27,75 +32,38 @@ interface NavItem {
   mobileOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: <LayoutDashboard className="h-5 w-5" />,
-  },
-  {
-    label: "Leads",
-    href: "/leads",
-    icon: <Target className="h-5 w-5" />,
-    badge: "New",
-  },
-  {
-    label: "Nearby Leads",
-    href: "/leads/nearby",
-    icon: <MapPin className="h-5 w-5" />,
-    mobileOnly: true,
-  },
-  {
-    label: "Analytics",
-    href: "/analytics",
-    icon: <BarChart3 className="h-5 w-5" />,
-  },
-  {
-    label: "Reports",
-    href: "/reports",
-    icon: <FolderOpen className="h-5 w-5" />,
-  },
-  {
-    label: "Users",
-    href: "/users",
-    icon: <Users className="h-5 w-5" />,
-  },
-  {
-    label: "Organizations",
-    href: "/organizations",
-    icon: <Building2 className="h-5 w-5" />,
-  },
-  {
-    label: "Documents",
-    href: "/documents",
-    icon: <FileText className="h-5 w-5" />,
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: <Settings className="h-5 w-5" />,
-  },
-  {
-    label: "Onboarding",
-    href: "/onboarding",
-    icon: <ClipboardList className="h-5 w-5" />,
-  },
-  {
-    label: "Training",
-    href: "/training",
-    icon: <GraduationCap className="h-5 w-5" />,
-  },
-  {
-    label: "Guides",
-    href: "/guides",
-    icon: <BookOpen className="h-5 w-5" />,
-  },
-  {
-    label: "Help Center",
-    href: "/help",
-    icon: <LifeBuoy className="h-5 w-5" />,
-  },
-];
+function iconForModule(key: AppModuleKey) {
+  switch (key) {
+    case "dashboard":
+      return <LayoutDashboard className="h-5 w-5" />;
+    case "leads":
+      return <Target className="h-5 w-5" />;
+    case "nearbyLeads":
+      return <MapPin className="h-5 w-5" />;
+    case "analytics":
+      return <BarChart3 className="h-5 w-5" />;
+    case "reports":
+      return <FolderOpen className="h-5 w-5" />;
+    case "users":
+      return <Users className="h-5 w-5" />;
+    case "organizations":
+      return <Building2 className="h-5 w-5" />;
+    case "documents":
+      return <FileText className="h-5 w-5" />;
+    case "settings":
+      return <Settings className="h-5 w-5" />;
+    case "onboarding":
+      return <ClipboardList className="h-5 w-5" />;
+    case "training":
+      return <GraduationCap className="h-5 w-5" />;
+    case "guides":
+      return <BookOpen className="h-5 w-5" />;
+    case "help":
+      return <LifeBuoy className="h-5 w-5" />;
+    default:
+      return null;
+  }
+}
 
 interface SidebarProps {
   isMobileMenuOpen: boolean;
@@ -104,6 +72,28 @@ interface SidebarProps {
 
 export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+
+  const role = useMemo(() => normalizeOnboardingRole(user?.role), [user?.role]);
+
+  const navItems = useMemo<NavItem[]>(() => {
+    return getAccessibleNavModules(role).map((m) => ({
+      label: m.label,
+      href: m.href,
+      icon: iconForModule(m.key),
+      badge: m.nav.badge,
+      mobileOnly: m.nav.mobileOnly,
+    }));
+  }, [role]);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const NavItem = ({ item }: { item: NavItem }) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -122,9 +112,7 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
         )}
       >
         <div className="flex items-center space-x-3">
-          <div className={cn(isActive ? "text-primary-600" : "text-secondary-500")}>
-            {item.icon}
-          </div>
+          <div className={cn(isActive ? "text-primary-600" : "text-secondary-500")}>{item.icon}</div>
           <span>{item.label}</span>
         </div>
         {item.badge && (
@@ -135,8 +123,6 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
       </Link>
     );
   };
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
 
   return (
     <>
@@ -151,7 +137,7 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
           <div className="flex-1 px-3 py-6 overflow-y-auto">
             <nav className="space-y-1">
               {navItems
-                .filter(item => !item.mobileOnly || isMobile)
+                .filter((item) => !item.mobileOnly || isMobile)
                 .map((item) => (
                   <NavItem key={item.href} item={item} />
                 ))}
@@ -160,12 +146,8 @@ export function Sidebar({ isMobileMenuOpen, onCloseMobile }: SidebarProps) {
 
           <div className="p-4 border-t border-secondary-200">
             <div className="bg-secondary-50 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-secondary-900 mb-2">
-                Need Help?
-              </h4>
-              <p className="text-xs text-secondary-600 mb-3">
-                Check our documentation or contact support.
-              </p>
+              <h4 className="text-sm font-semibold text-secondary-900 mb-2">Need Help?</h4>
+              <p className="text-xs text-secondary-600 mb-3">Check our documentation or contact support.</p>
               <Link
                 href="/help"
                 onClick={onCloseMobile}

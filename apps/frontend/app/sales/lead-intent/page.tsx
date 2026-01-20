@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Zap, TrendingUp, Users, Target, CheckCircle2 } from "lucide-react";
 import { IntentScoreCard } from "../../../components/intent/intent-score-card";
 import type { IntentScore } from "@insurance-lead-gen/types";
