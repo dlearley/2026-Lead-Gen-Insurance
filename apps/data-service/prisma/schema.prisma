@@ -78,6 +78,15 @@ model Lead {
   similarityScore Float?
   enrichedData    Json?
 
+  // Business data enrichment
+  company             String?
+  industry            String?
+  employeeCount       Int?
+  annualRevenue       Float?
+  businessDataEnrichedAt DateTime?
+  businessDataSource  String?
+  businessDataQuality Float?
+
   // Status and metadata
   status         LeadStatus    @default(RECEIVED)
   metadata       Json?
@@ -1529,6 +1538,111 @@ model SpecialtyMatching {
   @@index([brokerId])
   @@index([weightedScore])
   @@map("specialty_matching")
+}
+
+// ========================================
+// BUSINESS DATA INGESTION
+// ========================================
+
+model BusinessDataSource {
+  id                String                @id @default(uuid())
+  name              String                @unique
+  type              BusinessDataSourceType
+  description       String?
+  apiEndpoint       String?
+  apiKey           String?
+  rateLimitPerMinute Int?
+  rateLimitPerDay   Int?
+  status            BusinessDataSourceStatus @default(active)
+  isEnabled         Boolean              @default(true)
+  priority          Int                   @default(1)
+  qualityThreshold  Float                 @default(80.0)
+  enabledFields     String[]
+  config           Json?
+  lastSuccessfulAt  DateTime?
+  lastErrorAt       DateTime?
+  lastErrorMessage  String?
+  totalCalls        Int                   @default(0)
+  successfulCalls   Int                   @default(0)
+  failedCalls       Int                   @default(0)
+  averageResponseTime Float               @default(0)
+  dataQualityScore  Float                 @default(0)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@map("business_data_sources")
+}
+
+enum BusinessDataSourceType {
+  zoominfo
+  apollo
+  clearbit
+  dun_bradstreet
+  linkedin_sales_navigator
+  custom
+}
+
+enum BusinessDataSourceStatus {
+  active
+  inactive
+  error
+  rate_limited
+}
+
+model BusinessDataProcessingJob {
+  id              String                        @id @default(uuid())
+  sourceId        String
+  status          BusinessDataProcessingStatus  @default(pending)
+  startedAt       DateTime                     @default(now())
+  completedAt     DateTime?
+  recordsProcessed Int                          @default(0)
+  recordsEnriched Int                          @default(0)
+  recordsFailed   Int                          @default(0)
+  qualityScore    Float                        @default(0)
+  processingTime  Int?
+  errors          String[]                     @default([])
+  warnings        String[]                     @default([])
+  config         Json?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@map("business_data_processing_jobs")
+}
+
+enum BusinessDataProcessingStatus {
+  pending
+  processing
+  completed
+  failed
+  partial_success
+}
+
+model BusinessDataAnalytics {
+  id                    String   @id @default(uuid())
+  periodStart           DateTime
+  periodEnd             DateTime
+  totalLeadsProcessed   Int      @default(0)
+  leadsWithBusinessData Int      @default(0)
+  enrichmentRate        Float    @default(0)
+  averageQualityScore   Float    @default(0)
+  sourceBreakdown       Json
+  industryBreakdown     Json
+  revenueBreakdown      Json
+  growthTrends          Json
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("business_data_analytics")
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
 }
 
 enum ExperimentStatus {
