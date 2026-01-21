@@ -462,17 +462,7 @@ export interface HealthCheckResult {
 // PAGINATED RESPONSE TYPE
 // ========================================
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrevious: boolean;
-  };
-}
+// PaginatedResponse is imported from api-ecosystem.ts
 
 // ========================================
 // ERROR TYPES

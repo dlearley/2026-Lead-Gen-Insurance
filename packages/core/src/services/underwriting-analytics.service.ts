@@ -7,7 +7,7 @@ import {
   AcceptanceMetrics,
   AccuracyMetrics,
   Bottleneck,
-} from '@insurance/types';
+} from '@insurance-lead-gen/types';
 import logger from '../logger.js';
 
 /**

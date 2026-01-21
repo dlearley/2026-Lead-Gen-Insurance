@@ -1,25 +1,15 @@
 import { z } from 'zod';
-import {
-  CourseCategory,
-  CourseLevel,
-  ContentType,
-  ProgressStatus,
-  EnrollmentStatus,
-  EducationLevel,
-  LearningStyle,
-  InsuranceType
-} from '@insurance/types';
 
 // Course Schemas
 export const createCourseSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  category: z.nativeEnum(CourseCategory),
-  level: z.nativeEnum(CourseLevel),
+  category: z.enum(['ONBOARDING', 'COMPLIANCE', 'PRODUCTS', 'SALES_TECHNIQUES', 'CUSTOMER_SERVICE', 'REGULATORY', 'TECHNOLOGY', 'LEADERSHIP', 'SPECIALIZATIONS', 'CONTINUING_EDUCATION']),
+  level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']),
   duration: z.number().min(1, 'Duration must be at least 1 minute'),
   estimatedHours: z.number().positive().optional(),
   thumbnailUrl: z.string().url().optional(),
-  contentType: z.nativeEnum(ContentType),
+  contentType: z.enum(['VIDEO', 'DOCUMENT', 'INTERACTIVE', 'WEBINAR', 'SIMULATION', 'QUIZ']),
   isMandatory: z.boolean().default(false),
   objectives: z.array(z.string()).default([]),
   prerequisites: z.array(z.string()).default([]),
@@ -29,12 +19,12 @@ export const createCourseSchema = z.object({
 export const updateCourseSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  category: z.nativeEnum(CourseCategory).optional(),
-  level: z.nativeEnum(CourseLevel).optional(),
+  category: z.enum(['ONBOARDING', 'COMPLIANCE', 'PRODUCTS', 'SALES_TECHNIQUES', 'CUSTOMER_SERVICE', 'REGULATORY', 'TECHNOLOGY', 'LEADERSHIP', 'SPECIALIZATIONS', 'CONTINUING_EDUCATION']).optional(),
+  level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
   duration: z.number().min(1).optional(),
   estimatedHours: z.number().positive().optional(),
   thumbnailUrl: z.string().url().optional(),
-  contentType: z.nativeEnum(ContentType).optional(),
+  contentType: z.enum(['VIDEO', 'DOCUMENT', 'INTERACTIVE', 'WEBINAR', 'SIMULATION', 'QUIZ']).optional(),
   isMandatory: z.boolean().optional(),
   isActive: z.boolean().optional(),
   objectives: z.array(z.string()).optional(),
@@ -46,27 +36,27 @@ export const updateCourseSchema = z.object({
 export const createLearningPathSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  category: z.nativeEnum(CourseCategory),
-  level: z.nativeEnum(CourseLevel),
+  category: z.enum(['ONBOARDING', 'COMPLIANCE', 'PRODUCTS', 'SALES_TECHNIQUES', 'CUSTOMER_SERVICE', 'REGULATORY', 'TECHNOLOGY', 'LEADERSHIP', 'SPECIALIZATIONS', 'CONTINUING_EDUCATION']),
+  level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']),
   estimatedHours: z.number().positive().optional(),
   isMandatory: z.boolean().default(false),
   prerequisites: z.array(z.string()).default([]),
   targetRoles: z.array(z.string()).default([]),
-  specialization: z.array(z.nativeEnum(InsuranceType)),
+  specialization: z.array(z.enum(['auto', 'home', 'life', 'health', 'commercial'])),
   tags: z.array(z.string()).default([])
 });
 
 export const updateLearningPathSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  category: z.nativeEnum(CourseCategory).optional(),
-  level: z.nativeEnum(CourseLevel).optional(),
+  category: z.enum(['ONBOARDING', 'COMPLIANCE', 'PRODUCTS', 'SALES_TECHNIQUES', 'CUSTOMER_SERVICE', 'REGULATORY', 'TECHNOLOGY', 'LEADERSHIP', 'SPECIALIZATIONS', 'CONTINUING_EDUCATION']).optional(),
+  level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
   estimatedHours: z.number().positive().optional(),
   isMandatory: z.boolean().optional(),
   isActive: z.boolean().optional(),
   prerequisites: z.array(z.string()).optional(),
   targetRoles: z.array(z.string()).optional(),
-  specialization: z.array(z.nativeEnum(InsuranceType)).optional(),
+  specialization: z.array(z.enum(['auto', 'home', 'life', 'health', 'commercial'])).optional(),
   tags: z.array(z.string()).optional()
 });
 
@@ -107,7 +97,7 @@ export const enrollLearningPathSchema = z.object({
 export const updateProgressSchema = z.object({
   progress: z.number().min(0).max(100).optional(),
   timeSpent: z.number().min(0).optional(),
-  status: z.nativeEnum(ProgressStatus).optional()
+  status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'FAILED']).optional()
 });
 
 // Quiz Submission Schema
@@ -119,19 +109,19 @@ export const submitQuizSchema = z.object({
 
 // Agent Education Schema
 export const updateAgentEducationSchema = z.object({
-  educationLevel: z.nativeEnum(EducationLevel).optional(),
+  educationLevel: z.enum(['NONE', 'HIGH_SCHOOL', 'ASSOCIATE', 'BACHELOR', 'MASTER', 'DOCTORATE']).optional(),
   expertiseAreas: z.array(z.string()).optional(),
   skillAssessments: z.record(z.unknown()).optional(),
   learningGoals: z.array(z.string()).optional(),
-  preferredLearningStyle: z.nativeEnum(LearningStyle).optional(),
+  preferredLearningStyle: z.enum(['VIDEO', 'TEXT', 'INTERACTIVE', 'HANDS_ON', 'GROUP']).optional(),
   educationMetadata: z.record(z.unknown()).optional()
 });
 
 // Query Parameter Schemas
 export const courseFilterSchema = z.object({
-  category: z.nativeEnum(CourseCategory).optional(),
-  level: z.nativeEnum(CourseLevel).optional(),
-  contentType: z.nativeEnum(ContentType).optional(),
+  category: z.enum(['ONBOARDING', 'COMPLIANCE', 'PRODUCTS', 'SALES_TECHNIQUES', 'CUSTOMER_SERVICE', 'REGULATORY', 'TECHNOLOGY', 'LEADERSHIP', 'SPECIALIZATIONS', 'CONTINUING_EDUCATION']).optional(),
+  level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
+  contentType: z.enum(['VIDEO', 'DOCUMENT', 'INTERACTIVE', 'WEBINAR', 'SIMULATION', 'QUIZ']).optional(),
   isMandatory: z.string().transform(val => val === 'true').optional(),
   isActive: z.string().transform(val => val !== 'false').optional(),
   tags: z.string().transform(tags => tags.split(',')).optional(),
@@ -141,12 +131,12 @@ export const courseFilterSchema = z.object({
 });
 
 export const learningPathFilterSchema = z.object({
-  category: z.nativeEnum(CourseCategory).optional(),
-  level: z.nativeEnum(CourseLevel).optional(),
+  category: z.enum(['ONBOARDING', 'COMPLIANCE', 'PRODUCTS', 'SALES_TECHNIQUES', 'CUSTOMER_SERVICE', 'REGULATORY', 'TECHNOLOGY', 'LEADERSHIP', 'SPECIALIZATIONS', 'CONTINUING_EDUCATION']).optional(),
+  level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
   isMandatory: z.string().transform(val => val === 'true').optional(),
   isActive: z.string().transform(val => val !== 'false').optional(),
   tags: z.string().transform(tags => tags.split(',')).optional(),
-  specialization: z.nativeEnum(InsuranceType).optional(),
+  specialization: z.enum(['auto', 'home', 'life', 'health', 'commercial']).optional(),
   search: z.string().optional(),
   page: z.string().transform(val => parseInt(val, 10)).optional(),
   limit: z.string().transform(val => parseInt(val, 10)).optional()
@@ -155,7 +145,7 @@ export const learningPathFilterSchema = z.object({
 export const enrollmentFilterSchema = z.object({
   agentId: z.string().uuid().optional(),
   courseId: z.string().uuid().optional(),
-  status: z.nativeEnum(EnrollmentStatus).optional(),
+  status: z.enum(['ENROLLED', 'IN_PROGRESS', 'COMPLETED', 'DROPPED', 'FAILED']).optional(),
   dateFrom: z.string().transform(val => new Date(val)).optional(),
   dateTo: z.string().transform(val => new Date(val)).optional(),
   page: z.string().transform(val => parseInt(val, 10)).optional(),

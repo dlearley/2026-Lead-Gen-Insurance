@@ -9,7 +9,7 @@ export type MediaType = 'audio' | 'video';
 export type CaseStatus = 'new' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
 export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
 export type CaseRelationshipType = 'parent' | 'child' | 'related' | 'duplicate';
-// @ts-expect-error TS2300: Duplicate type identifier is actually a field reference = 'view' | 'comment' | 'edit' | 'owner';
+export type DocumentPermissionType = 'view' | 'comment' | 'edit' | 'owner';
 export type NotificationType = 'message' | 'call' | 'case' | 'document';
 export type MessageNotificationPreference = 'all' | 'mentions' | 'none';
 
@@ -229,7 +229,7 @@ export interface DocumentPermission {
   id: string;
   documentId: string;
   userId: string;
-  permission: DocumentPermission;
+  permission: DocumentPermissionType;
   grantedAt: Date;
   grantedBy: string;
   expiresAt?: Date;
@@ -382,7 +382,7 @@ export interface UploadDocumentInput {
 export interface ShareDocumentInput {
   documentId: string;
   userId: string;
-  permission: DocumentPermission;
+  permission: DocumentPermissionType;
   grantedBy: string;
   expiresAt?: Date;
 }

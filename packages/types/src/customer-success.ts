@@ -18,7 +18,7 @@ export type ChurnRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type HealthLevel = 'POOR' | 'FAIR' | 'GOOD' | 'EXCELLENT';
 export type HealthTrend = 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNKNOWN';
 
-export type OnboardingStatus =
+export type CustomerOnboardingStatus =
   | 'NOT_STARTED'
   | 'IN_PROGRESS'
   | 'COMPLETED'
@@ -141,7 +141,7 @@ export interface CustomerSuccessProfile {
   currentMetrics?: Record<string, unknown>;
   onboardingStartDate?: Date;
   onboardingEndDate?: Date;
-  onboardingStatus: OnboardingStatus;
+  onboardingStatus: CustomerOnboardingStatus;
   goLiveDate?: Date;
   timeToValue?: number;
   integrationsEnabled: string[];
@@ -454,7 +454,7 @@ export interface CustomerFilterParams {
   healthScoreMax?: number;
   churnRiskLevel?: ChurnRiskLevel | ChurnRiskLevel[];
   csmId?: string;
-  onboardingStatus?: OnboardingStatus;
+  onboardingStatus?: CustomerOnboardingStatus;
   search?: string;
   customerSinceFrom?: Date;
   customerSinceTo?: Date;

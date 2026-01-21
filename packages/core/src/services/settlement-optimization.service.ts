@@ -8,11 +8,15 @@ import type {
   NegotiationStrategy,
   LitigationCostEstimate,
   SubrogationPotential,
-  Justification,
+  ClaimJustification,
   ComparableCases,
-  ClaimData,
+  FraudClaimData,
 } from '@insurance-lead-gen/types';
 import { logger } from '../logger.js';
+
+// Type aliases for clarity
+type Justification = ClaimJustification;
+type ClaimData = FraudClaimData;
 
 /**
  * Settlement Optimization Service
@@ -38,7 +42,7 @@ export class SettlementOptimizationService {
         claimId,
         recommendedAmount: optimalSettlement.optimalAmount,
         confidenceLevel: optimalSettlement.confidenceInterval ? 0.8 : 0.7,
-        negotiationStrategy: strategy.strategy,
+        negotiationStrategy: strategy,
         litigationCostEstimate: litigationCost.totalEstimatedCost,
         subrogationPotential: subrogation.estimatedRecoveryAmount,
         justification: this.generateJustification(optimalSettlement, litigationCost, subrogation),
@@ -55,7 +59,7 @@ export class SettlementOptimizationService {
       return recommendation;
     } catch (error) {
       logger.error('Error recommending settlement', { claimId, error });
-      throw new Error(`Failed to recommend settlement: ${error.message}`);
+      throw new Error(`Failed to recommend settlement: ${(error as Error).message}`);
     }
   }
 
@@ -160,7 +164,7 @@ export class SettlementOptimizationService {
       };
     } catch (error) {
       logger.error('Error calculating optimal settlement', { error });
-      throw new Error(`Failed to calculate optimal settlement: ${error.message}`);
+      throw new Error(`Failed to calculate optimal settlement: ${(error as Error).message}`);
     }
   }
 
@@ -254,7 +258,7 @@ export class SettlementOptimizationService {
       };
     } catch (error) {
       logger.error('Error getting negotiation strategy', { claimId, error });
-      throw new Error(`Failed to get negotiation strategy: ${error.message}`);
+      throw new Error(`Failed to get negotiation strategy: ${(error as Error).message}`);
     }
   }
 
@@ -305,7 +309,7 @@ export class SettlementOptimizationService {
       };
     } catch (error) {
       logger.error('Error estimating litigation costs', { claimId, error });
-      throw new Error(`Failed to estimate litigation costs: ${error.message}`);
+      throw new Error(`Failed to estimate litigation costs: ${(error as Error).message}`);
     }
   }
 
@@ -389,7 +393,7 @@ export class SettlementOptimizationService {
       };
     } catch (error) {
       logger.error('Error evaluating subrogation', { claimId, error });
-      throw new Error(`Failed to evaluate subrogation: ${error.message}`);
+      throw new Error(`Failed to evaluate subrogation: ${(error as Error).message}`);
     }
   }
 
@@ -399,7 +403,8 @@ export class SettlementOptimizationService {
   static async getSettlementJustification(claimId: string, claimData: ClaimData): Promise<Justification> {
     try {
       const optimalSettlement = await this.calculateOptimalSettlement(claimData);
-      const comparableCases = await this.getComparableCases(claimId, 10);
+      const comparableCasesResult = await this.getComparableCases(claimId, 10);
+      const comparableCases = comparableCasesResult.comparableCases;
 
       // Calculate benchmarks
       const averageSettlement = comparableCases.length > 0
@@ -425,7 +430,7 @@ export class SettlementOptimizationService {
         'Cooperative claimant',
       ];
 
-      const conclusion = `Based on analysis of ${comparableCases.length} comparable cases, industry benchmarks, and the specific circumstances of this claim, a settlement of $${optimalSettlement.optimalAmount.toLocaleString()} (${(settlementRatio * 100).toFixed(0)}% of claimed amount) is recommended.`;
+      const conclusion = `Based on analysis of ${comparableCasesResult.totalFound} comparable cases, industry benchmarks, and the specific circumstances of this claim, a settlement of $${optimalSettlement.optimalAmount.toLocaleString()} (${(settlementRatio * 100).toFixed(0)}% of claimed amount) is recommended.`;
 
       return {
         claimId,
@@ -456,7 +461,7 @@ export class SettlementOptimizationService {
       };
     } catch (error) {
       logger.error('Error getting settlement justification', { claimId, error });
-      throw new Error(`Failed to get settlement justification: ${error.message}`);
+      throw new Error(`Failed to get settlement justification: ${(error as Error).message}`);
     }
   }
 
@@ -474,7 +479,7 @@ export class SettlementOptimizationService {
         comparableCases: [],
         averageSettlement: 0,
         medianSettlement: 0,
-        settlementRatio: [0, 0],
+        settlementRange: [0, 0],
         recommendations: [
           'Monitor similar claims',
           'Update benchmarks regularly',
@@ -482,7 +487,7 @@ export class SettlementOptimizationService {
       };
     } catch (error) {
       logger.error('Error getting comparable cases', { claimId, error });
-      throw new Error(`Failed to get comparable cases: ${error.message}`);
+      throw new Error(`Failed to get comparable cases: ${(error as Error).message}`);
     }
   }
 
@@ -554,7 +559,7 @@ export class SettlementOptimizationService {
     if (values.length === 0) return 0;
     const sorted = [...values].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    return sorted.length % 2 !== 0 ? (sorted[mid] ?? 0) : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
   }
 
   /**

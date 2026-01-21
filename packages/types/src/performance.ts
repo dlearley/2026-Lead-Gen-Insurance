@@ -187,18 +187,7 @@ export interface PaginationOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-    cursor?: string;
-  };
-}
+// PaginatedResponse is imported from api-ecosystem.ts
 
 export interface CursorPaginationOptions {
   first?: number;

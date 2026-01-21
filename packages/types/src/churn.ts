@@ -350,7 +350,7 @@ export interface AutomationRule {
   description?: string;
   trigger: TriggerCondition;
   actions: AutomationAction[];
-  conditions: RuleCondition[];
+  conditions: ChurnRuleCondition[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -371,7 +371,7 @@ export interface AutomationAction {
   config: Record<string, unknown>;
 }
 
-export interface RuleCondition {
+export interface ChurnRuleCondition {
   field: string;
   operator: 'EQ' | 'NEQ' | 'GT' | 'LT' | 'GTE' | 'LTE' | 'IN' | 'NOT_IN' | 'CONTAINS';
   value: unknown;

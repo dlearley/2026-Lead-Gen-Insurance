@@ -265,7 +265,7 @@ export interface QualificationRule {
   name: string;
   description: string;
   category: string;
-  condition: RuleCondition;
+  condition: ScoringRuleCondition;
   action: RuleAction;
   priority: number;
   isActive: boolean;
@@ -273,12 +273,12 @@ export interface QualificationRule {
   updatedAt: Date;
 }
 
-export interface RuleCondition {
+export interface ScoringRuleCondition {
   field: string;
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'contains' | 'exists';
   value: unknown;
   logicalOperator?: 'and' | 'or';
-  conditions?: RuleCondition[];
+  conditions?: ScoringRuleCondition[];
 }
 
 export interface RuleAction {

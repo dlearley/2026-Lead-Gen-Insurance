@@ -313,7 +313,7 @@ export interface RoutingRule {
   id: string;
   ruleName: string;
   ruleType: RuleType;
-  condition: RuleCondition;
+  condition: RoutingRuleCondition;
   action: string;
   priority: number; // 1-100, higher = more important
   isActive: boolean;
@@ -321,12 +321,12 @@ export interface RoutingRule {
   updatedAt: Date;
 }
 
-export interface RuleCondition {
+export interface RoutingRuleCondition {
   field: string;
   operator: RuleOperator;
   value: unknown;
   logicalOperator?: 'and' | 'or';
-  conditions?: RuleCondition[];
+  conditions?: RoutingRuleCondition[];
 }
 
 export interface RoutingAction {

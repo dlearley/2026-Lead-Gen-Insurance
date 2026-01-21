@@ -148,7 +148,6 @@ export interface PathEnrollment {
   agentId: string;
   status: EnrollmentStatus;
   progress: number; // 0-100
-  completedAt?: Date;
   enrolledAt: Date;
   startedAt?: Date;
   completedAt?: Date;
@@ -226,8 +225,8 @@ export interface Agent {
 
 export type AgentStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION';
 
-// Import InsuranceType from the main index
-export type InsuranceType = 'auto' | 'home' | 'life' | 'health' | 'commercial';
+// Import InsuranceType from scoring.ts
+import type { InsuranceType } from './scoring.js';
 
 // DTOs for API requests
 export interface CreateCourseDto {

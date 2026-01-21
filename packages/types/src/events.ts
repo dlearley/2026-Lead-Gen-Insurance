@@ -45,7 +45,7 @@ export interface LeadCreatePayload {
 }
 
 export type LeadReceivedEvent = EventEnvelope<
-  typeof EVENT_SUBJECTS.lead.received,
+  typeof EVENT_SUBJECTS.LeadReceived,
   {
     leadId: string;
     lead: LeadCreatePayload;
@@ -53,14 +53,21 @@ export type LeadReceivedEvent = EventEnvelope<
 >;
 
 export type LeadProcessedEvent = EventEnvelope<
-  typeof EVENT_SUBJECTS.lead.processed,
+  typeof EVENT_SUBJECTS.LeadProcessed,
   {
     leadId: string;
   }
 >;
 
+export type UnderwritingResult = {
+  decision: 'approved' | 'declined' | 'pending';
+  score?: number;
+  factors?: string[];
+  conditions?: string[];
+};
+
 export type UnderwritingRequestedEvent = EventEnvelope<
-  LeadReceived,
+  'underwriting.requested',
   {
     leadId: string;
     policyId?: string;
@@ -69,7 +76,7 @@ export type UnderwritingRequestedEvent = EventEnvelope<
 >;
 
 export type UnderwritingCompletedEvent = EventEnvelope<
-  LeadProcessed,
+  'underwriting.completed',
   {
     leadId: string;
     policyId?: string;

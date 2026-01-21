@@ -6,7 +6,7 @@ export type UnderwritingDecision = 'approved' | 'denied' | 'manual_review' | 'co
 
 export type GapSeverity = 'Critical' | 'High' | 'Medium' | 'Low';
 
-export type RecommendationType =
+export type UnderwritingRecommendationType =
   | 'new_policy'
   | 'coverage_upgrade'
   | 'cross_sell'
@@ -32,7 +32,7 @@ export interface UnderwritingRule {
   ruleName: string;
   insuranceLine?: string;
   ruleType: RuleType;
-  conditionLogic: RuleCondition[];
+  conditionLogic: UnderwritingRuleCondition[];
   riskScoreAdjustment: number;
   decisionAction: DecisionAction;
   priority: number;
@@ -41,7 +41,7 @@ export interface UnderwritingRule {
   updatedAt: Date;
 }
 
-export interface RuleCondition {
+export interface UnderwritingRuleCondition {
   field: string;
   operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'in' | 'not_in';
   value: unknown;
@@ -51,7 +51,7 @@ export interface CreateUnderwritingRuleDto {
   ruleName: string;
   insuranceLine?: string;
   ruleType: RuleType;
-  conditionLogic: RuleCondition[];
+  conditionLogic: UnderwritingRuleCondition[];
   riskScoreAdjustment: number;
   decisionAction: DecisionAction;
   priority?: number;
@@ -62,7 +62,7 @@ export interface UpdateUnderwritingRuleDto {
   ruleName?: string;
   insuranceLine?: string;
   ruleType?: RuleType;
-  conditionLogic?: RuleCondition[];
+  conditionLogic?: UnderwritingRuleCondition[];
   riskScoreAdjustment?: number;
   decisionAction?: DecisionAction;
   priority?: number;
@@ -203,7 +203,7 @@ export interface PolicyRecommendation {
   id: string;
   customerId: string;
   insuranceLine: string;
-  recommendationType: RecommendationType;
+  recommendationType: UnderwritingRecommendationType;
   recommendedCoverage: Record<string, unknown>;
   estimatedPremium: number;
   recommendationScore: number;
@@ -408,7 +408,7 @@ export interface AcceptanceMetrics {
   acceptanceRate: number;
   conversionRate: number;
   averageRevenue: number;
-  byRecommendationType: Record<RecommendationType, AcceptanceByType>;
+  byUnderwritingRecommendationType: Record<UnderwritingRecommendationType, AcceptanceByType>;
 }
 
 export interface AcceptanceByType {
@@ -569,7 +569,7 @@ export interface CoverageGapFilterParams {
 export interface PolicyRecommendationFilterParams {
   customerId?: string;
   insuranceLine?: string;
-  recommendationType?: RecommendationType;
+  recommendationType?: UnderwritingRecommendationType;
   urgencyLevel?: UrgencyLevel;
   dateFrom?: Date;
   dateTo?: Date;
@@ -587,17 +587,7 @@ export interface UnderwritingExceptionFilterParams {
   limit?: number;
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrevious: boolean;
-  };
-}
+// PaginatedResponse is imported from api-ecosystem.ts
 
 export type UnderwritingRequested = {
   underwritingId: string;

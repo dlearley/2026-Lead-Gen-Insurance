@@ -2,7 +2,7 @@
 // CUSTOMER RETENTION TYPES
 // ========================================
 
-export type PolicyStatus = 'active' | 'pending_renewal' | 'expired' | 'cancelled' | 'lapsed';
+export type RetentionPolicyStatus = 'active' | 'pending_renewal' | 'expired' | 'cancelled' | 'lapsed';
 export type PolicyType = 'auto' | 'home' | 'life' | 'health' | 'commercial';
 export type RenewalStatus = 'upcoming' | 'overdue' | 'renewed' | 'churned';
 export type ChurnRisk = 'low' | 'medium' | 'high' | 'critical';
@@ -70,7 +70,7 @@ export interface RetentionPolicy {
   agentId: string;
   policyNumber: string;
   policyType: PolicyType;
-  status: PolicyStatus;
+  status: RetentionPolicyStatus;
   premium: {
     amount: number;
     frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
@@ -425,7 +425,7 @@ export interface UpdateRetentionCustomerDto {
 }
 
 export interface UpdateRetentionPolicyDto {
-  status?: PolicyStatus;
+  status?: RetentionPolicyStatus;
   premium?: {
     amount: number;
     frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
@@ -447,7 +447,7 @@ export interface RetentionQueryParams {
   endDate?: string;
   churnRisk?: ChurnRisk;
   policyType?: PolicyType;
-  status?: PolicyStatus;
+  status?: RetentionPolicyStatus;
   healthScoreMin?: number;
   healthScoreMax?: number;
   agentId?: string;

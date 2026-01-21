@@ -217,7 +217,7 @@ export interface TransformationRule {
 
 export interface CachingConfig {
   enabled: boolean;
-  strategies: CacheStrategy[];
+  strategies: GatewayCacheStrategy[];
   redis: {
     host: string;
     port: number;
@@ -232,7 +232,7 @@ export interface CachingConfig {
   };
 }
 
-export interface CacheStrategy {
+export interface GatewayCacheStrategy {
   route: string;
   method: string;
   ttl: number;
@@ -250,13 +250,13 @@ export interface CacheCondition {
 
 export interface MonitoringConfig {
   enabled: boolean;
-  metrics: MetricsConfig;
+  metrics: GatewayMetricsConfig;
   logging: LoggingConfig;
-  tracing: TracingConfig;
+  tracing: GatewayTracingConfig;
   alerting: AlertingConfig;
 }
 
-export interface MetricsConfig {
+export interface GatewayMetricsConfig {
   enabled: boolean;
   interval: number;
   retentionPeriod: number;
@@ -294,7 +294,7 @@ export interface LogDestination {
   enabled: boolean;
 }
 
-export interface TracingConfig {
+export interface GatewayTracingConfig {
   enabled: boolean;
   serviceName: string;
   jaeger: {
@@ -314,11 +314,11 @@ export interface TracingConfig {
 
 export interface AlertingConfig {
   enabled: boolean;
-  rules: AlertRule[];
+  rules: GatewayAlertRule[];
   channels: AlertChannel[];
 }
 
-export interface AlertRule {
+export interface GatewayAlertRule {
   name: string;
   condition: string;
   threshold: number;
@@ -529,12 +529,12 @@ export interface ThrottleCondition {
 
 export interface RequestCache {
   enabled: boolean;
-  strategies: RequestCacheStrategy[];
+  strategies: RequestGatewayCacheStrategy[];
   storage: CacheStorage;
   invalidation: CacheInvalidation;
 }
 
-export interface RequestCacheStrategy {
+export interface RequestGatewayCacheStrategy {
   route: string;
   method: string;
   ttl: number;
@@ -609,11 +609,11 @@ export interface ResponseMetadata {
 export interface ValidationResult {
   field: string;
   valid: boolean;
-  errors: ValidationError[];
+  errors: GatewayValidationError[];
   warnings: ValidationWarning[];
 }
 
-export interface ValidationError {
+export interface GatewayValidationError {
   code: string;
   message: string;
   path: string;
@@ -742,10 +742,10 @@ export interface AuditRequirement {
 // PERFORMANCE & MONITORING TYPES
 // ========================================
 
-export interface PerformanceMetrics {
+export interface GatewayPerformanceMetrics {
   requests: RequestMetrics;
   responses: ResponseMetrics;
-  latency: LatencyMetrics;
+  latency: GatewayLatencyMetrics;
   throughput: ThroughputMetrics;
   errors: ErrorMetrics;
   custom: CustomMetrics;
@@ -770,14 +770,14 @@ export interface ResponseMetrics {
   errors: number;
 }
 
-export interface LatencyMetrics {
+export interface GatewayLatencyMetrics {
   average: number;
   median: number;
   p50: number;
   p90: number;
   p95: number;
   p99: number;
-  byRoute: Record<string, LatencyMetrics>;
+  byRoute: Record<string, GatewayLatencyMetrics>;
 }
 
 export interface ThroughputMetrics {
@@ -853,7 +853,7 @@ export interface RetentionMetric {
 
 export interface TechnicalMetrics {
   database: DatabaseMetrics;
-  cache: CacheMetrics;
+  cache: GatewayCacheMetrics;
   external: ExternalServiceMetrics;
 }
 
@@ -861,17 +861,17 @@ export interface DatabaseMetrics {
   queries: number;
   averageLatency: number;
   slowQueries: number;
-  connectionPool: ConnectionPoolMetrics;
+  connectionPool: GatewayConnectionPoolMetrics;
 }
 
-export interface ConnectionPoolMetrics {
+export interface GatewayConnectionPoolMetrics {
   active: number;
   idle: number;
   waiting: number;
   poolSize: number;
 }
 
-export interface CacheMetrics {
+export interface GatewayCacheMetrics {
   hits: number;
   misses: number;
   hitRate: number;

@@ -4,7 +4,7 @@ import {
   RiskComponents,
   RiskAssessment,
   RiskPrediction,
-} from '@insurance/types';
+} from '@insurance-lead-gen/types';
 import logger from '../logger.js';
 
 /**

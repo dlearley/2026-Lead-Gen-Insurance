@@ -1041,19 +1041,19 @@ export default function () {
   
   switch (endpoint.method.toUpperCase()) {
     case 'GET':
-      res = http.get(\`\">${endpoint.path}\"` + this.buildQueryParams(endpoint.queryParams) + \`\", params);
+      res = http.get(\`\${endpoint.path}\` + buildQueryParams(endpoint.queryParams), params);
       break;
     case 'POST':
-      res = http.post(\`\">${endpoint.path}\"\", JSON.stringify(endpoint.body || {}), params);
+      res = http.post(\`\${endpoint.path}\`, JSON.stringify(endpoint.body || {}), params);
       break;
     case 'PUT':
-      res = http.put(\`\">${endpoint.path}\"\", JSON.stringify(endpoint.body || {}), params);
+      res = http.put(\`\${endpoint.path}\`, JSON.stringify(endpoint.body || {}), params);
       break;
     case 'DELETE':
-      res = http.del(\`\">${endpoint.path}\"\", null, params);
+      res = http.del(\`\${endpoint.path}\`, null, params);
       break;
     default:
-      res = http.get(\`\">${endpoint.path}\"\", params);
+      res = http.get(\`\${endpoint.path}\`, params);
   }
   
   // Track metrics
@@ -1075,10 +1075,13 @@ export default function () {
 // Helper function to build query parameters
 function buildQueryParams(params) {
   if (!params) return '';
-  
+
   const queryString = Object.entries(params)
-    .map(([key, value]) => \`\">${key}=\">${value}\"\`)
+    .map(([key, value]) => \`\${key}=\${value}\`)
     .join('&');
-  
+
   return queryString ? '?' + queryString : '';
+}
+`;
+  }
 }

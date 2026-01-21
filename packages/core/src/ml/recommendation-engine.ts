@@ -574,8 +574,7 @@ export class RecommendationEngine {
         action: 'Send re-engagement campaign',
         channel: 'email',
         content: 'New products, features, or compelling content',
-        timing: 'within 48 hours',  };  // ... (truncated for brevity)
-    // Continuing the ActionItem generation functions...
+        timing: 'within 48 hours',
         expectedOutcome: 'Reactivate dormant lead'
       },
       {

@@ -6,7 +6,7 @@ import {
   FraudStatus,
   Claim,
   ClaimFilterParams
-} from '@insurance/types/claims';
+} from '@insurance-lead-gen/types';
 import { BaseError } from '../errors.js';
 import { logger } from '../logger.js';
 import { MetricsCollector } from '../monitoring/metrics.js';

@@ -204,7 +204,7 @@ export interface ApiUsageFilterParams {
 }
 
 // Rate Limit Types
-export interface RateLimitConfig {
+export interface TierRateLimitConfig {
   tier: RateLimitTier;
   requestsPerMinute: number;
   requestsPerHour: number;
@@ -212,7 +212,7 @@ export interface RateLimitConfig {
   burstLimit: number;
 }
 
-export const RATE_LIMIT_TIERS: Record<RateLimitTier, RateLimitConfig> = {
+export const RATE_LIMIT_TIERS: Record<RateLimitTier, TierRateLimitConfig> = {
   basic: {
     tier: 'basic',
     requestsPerMinute: 60,

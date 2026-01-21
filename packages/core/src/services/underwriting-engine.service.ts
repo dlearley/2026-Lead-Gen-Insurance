@@ -5,11 +5,10 @@ import {
   RiskComponents,
   Exception,
   RecommendedCoverage,
-  RuleCondition,
   DecisionAction,
   UnderwritingCase,
   MakeUnderwritingDecisionDto,
-} from '@insurance/types';
+} from '@insurance-lead-gen/types';
 import logger from '../logger.js';
 
 /**
@@ -121,7 +120,7 @@ export class UnderwritingEngineService {
     }
 
     // Additional risk factors
-    riskFactors.forEach(factor => {
+    riskFactors.forEach((factor: { type: string; impact: number }) => {
       if (factor.type === 'property') components.property += factor.impact;
       if (factor.type === 'location') components.location += factor.impact;
       if (factor.type === 'occupation') components.occupational += factor.impact;
@@ -302,9 +301,9 @@ export class UnderwritingEngineService {
   private generateExplainableFactors(components: RiskComponents, weights: Record<string, number>) {
     return Object.entries(components).map(([factor, value]) => ({
       factor: factor.charAt(0).toUpperCase() + factor.slice(1),
-      impact: Math.round((value / 100) * 100), // Percentage impact
-      direction: value > 50 ? 'negative' as const : 'positive' as const,
-      description: this.getFactorDescription(factor, value),
+      impact: Math.round(((value as number) / 100) * 100), // Percentage impact
+      direction: (value as number) > 50 ? 'negative' as const : 'positive' as const,
+      description: this.getFactorDescription(factor, value as number),
     }));
   }
 
@@ -345,6 +344,12 @@ export class UnderwritingEngineService {
 }
 
 // ==================== TYPES ====================
+
+interface RuleCondition {
+  field: string;
+  operator: string;
+  value: unknown;
+}
 
 interface UnderwritingRule {
   id: string;

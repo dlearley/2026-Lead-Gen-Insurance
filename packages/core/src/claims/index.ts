@@ -112,4 +112,4 @@ export type {
   RiskLevel,
   StatusSource,
   PolicyStatus
-} from '@insurance/types/claims';
+} from '@insurance-lead-gen/types';

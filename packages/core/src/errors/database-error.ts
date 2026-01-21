@@ -125,10 +125,10 @@ function getDatabaseErrorSuggestion(errorCode: string): string {
 function sanitizeQuery(query: string): string {
   // Remove sensitive data from query strings
   return query
-    .replace(/'[^']*'/g, \'?'\)
-    .replace(/\$\d+/g, \'?'\)
-    .replace(/:[a-zA-Z_][a-zA-Z0-9_]*/g, \'?'\)
-    .replace(/\s+/g, \' \')
+    .replace(/'[^']*'/g, '?')
+    .replace(/\$\d+/g, '?')
+    .replace(/:[a-zA-Z_][a-zA-Z0-9_]*/g, '?')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 

@@ -4,7 +4,7 @@
 
 // Note Types
 export type NoteVisibility = 'PRIVATE' | 'TEAM' | 'PUBLIC';
-export type NoteType = 'general' | 'call' | 'email' | 'meeting' | 'follow_up' | 'system';
+export type TimelineNoteType = 'general' | 'call' | 'email' | 'meeting' | 'follow_up' | 'system';
 
 export interface Note {
   id: string;
@@ -12,7 +12,7 @@ export interface Note {
   authorId: string;
   content: string;
   visibility: NoteVisibility;
-  type: NoteType;
+  type: TimelineNoteType;
   mentions?: string[];
   attachments?: NoteAttachment[];
   createdAt: Date;
@@ -30,7 +30,7 @@ export interface NoteAttachment {
 }
 
 // Activity Log Types
-export type ActivityType =
+export type TimelineActivityType =
   | 'LEAD_CREATED'
   | 'LEAD_UPDATED'
   | 'STATUS_CHANGED'
@@ -57,7 +57,7 @@ export interface ActivityLog {
   id: string;
   leadId: string;
   userId?: string;
-  activityType: ActivityType;
+  activityType: TimelineActivityType;
   action: string;
   description?: string;
   metadata?: Record<string, unknown>;
@@ -94,8 +94,8 @@ export interface TimelineFilter {
   userId?: string;
   dateFrom?: Date;
   dateTo?: Date;
-  activityType?: ActivityType;
-  noteType?: NoteType;
+  activityType?: TimelineActivityType;
+  noteType?: TimelineNoteType;
   search?: string;
 }
 
@@ -118,11 +118,11 @@ export interface TimelineResponse {
 }
 
 // Note DTOs
-export interface CreateNoteDto {
+export interface CreateTimelineNoteDto {
   leadId: string;
   content: string;
   visibility?: NoteVisibility;
-  type?: NoteType;
+  type?: TimelineNoteType;
   mentions?: string[];
   attachments?: Array<{
     fileName: string;
@@ -132,10 +132,10 @@ export interface CreateNoteDto {
   }>;
 }
 
-export interface UpdateNoteDto {
+export interface UpdateTimelineNoteDto {
   content?: string;
   visibility?: NoteVisibility;
-  type?: NoteType;
+  type?: TimelineNoteType;
   mentions?: string[];
 }
 
@@ -143,7 +143,7 @@ export interface NoteFilterDto {
   leadId?: string;
   authorId?: string;
   visibility?: NoteVisibility;
-  type?: NoteType;
+  type?: TimelineNoteType;
   dateFrom?: Date;
   dateTo?: Date;
   search?: string;
@@ -155,7 +155,7 @@ export interface NoteFilterDto {
 export interface CreateActivityDto {
   leadId: string;
   userId?: string;
-  activityType: ActivityType;
+  activityType: TimelineActivityType;
   action: string;
   description?: string;
   metadata?: Record<string, unknown>;
@@ -164,7 +164,7 @@ export interface CreateActivityDto {
 export interface ActivityFilterDto {
   leadId?: string;
   userId?: string;
-  activityType?: ActivityType;
+  activityType?: TimelineActivityType;
   dateFrom?: Date;
   dateTo?: Date;
   search?: string;

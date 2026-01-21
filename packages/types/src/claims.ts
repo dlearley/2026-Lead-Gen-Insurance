@@ -129,17 +129,18 @@ export interface UpdateClaimDto {
 }
 
 // Policy & Insured Types for Claims
-export type PolicyStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED';
+export type ClaimPolicyStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUSPENDED';
+import type { InsuranceType } from './scoring.js';
 
 export interface Policy {
   id: string;
   policyNumber: string;
-  policyType: InsuranceType; // @ts-ignore: TS2552 error: confusing but type exists
+  policyType: InsuranceType;
   carrierId: string;
   insuredId: string;
   effectiveDate: Date;
   expirationDate: Date;
-  status: PolicyStatus;
+  status: ClaimPolicyStatus;
   premium?: number;
   coverageLimit?: number;
   deductible?: number;
@@ -450,7 +451,7 @@ export interface CreatePaymentScheduleDto {
 export type CommunicationType = 'CALL' | 'EMAIL' | 'SMS' | 'LETTER' | 'IN_PERSON';
 export type CommunicationDirection = 'INBOUND' | 'OUTBOUND';
 export type CommunicatedWithType = 'INSURED' | 'ADJUSTER' | 'VENDOR' | 'ATTORNEY' | 'THIRD_PARTY';
-export type NoteType = 'INTERNAL' | 'EXTERNAL' | 'INVESTIGATION' | 'DECISION';
+export type ClaimNoteType = 'INTERNAL' | 'EXTERNAL' | 'INVESTIGATION' | 'DECISION';
 export type NotePriority = 'LOW' | 'NORMAL' | 'HIGH';
 export type TaskType = 'INVESTIGATION' | 'CONTACT' | 'DOCUMENT' | 'DECISION' | 'OTHER';
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
@@ -494,7 +495,7 @@ export interface CreateCommunicationDto {
 export interface ClaimNote {
   id: string;
   claimId: string;
-  noteType: NoteType;
+  noteType: ClaimNoteType;
   noteTitle: string;
   noteContent: string;
   isConfidential: boolean;
@@ -505,16 +506,16 @@ export interface ClaimNote {
   updatedAt: Date;
 }
 
-export interface CreateNoteDto {
+export interface CreateClaimNoteDto {
   claimId: string;
-  noteType: NoteType;
+  noteType: ClaimNoteType;
   noteTitle: string;
   noteContent: string;
   isConfidential?: boolean;
   priority?: NotePriority;
 }
 
-export interface UpdateNoteDto {
+export interface UpdateClaimNoteDto {
   noteTitle?: string;
   noteContent?: string;
   isConfidential?: boolean;
@@ -590,7 +591,7 @@ export interface ReviewFraudIndicatorDto {
 
 // Subrogation & Recovery Types
 export type SubrogationStatus = 'IDENTIFIED' | 'IN_PROGRESS' | 'SETTLED' | 'CLOSED';
-export type ActivityType = 'LETTER_SENT' | 'RESPONSE_RECEIVED' | 'DEMAND' | 'NEGOTIATION' | 'SETTLEMENT' | 'LAWSUIT';
+export type SubrogationActivityType = 'LETTER_SENT' | 'RESPONSE_RECEIVED' | 'DEMAND' | 'NEGOTIATION' | 'SETTLEMENT' | 'LAWSUIT';
 
 export interface ClaimSubrogation {
   id: string;
@@ -654,7 +655,7 @@ export interface UpdateSubrogationDto {
 export interface SubrogationActivity {
   id: string;
   subrogationId: string;
-  activityType: ActivityType;
+  activityType: SubrogationActivityType;
   activityDate: Date;
   description: string;
   createdBy?: string;
@@ -663,7 +664,7 @@ export interface SubrogationActivity {
 
 export interface CreateSubrogationActivityDto {
   subrogationId: string;
-  activityType: ActivityType;
+  activityType: SubrogationActivityType;
   description: string;
 }
 

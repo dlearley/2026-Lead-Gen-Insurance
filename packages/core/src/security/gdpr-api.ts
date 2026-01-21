@@ -11,7 +11,7 @@ import type {
   ComplianceAudit,
   ConsentCategory,
   GDPRArticle
-} from '@insurance/types';
+} from '@insurance-lead-gen/types';
 
 export interface CreateDSARRequest {
   userId: string;

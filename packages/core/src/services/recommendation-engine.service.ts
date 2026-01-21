@@ -4,7 +4,7 @@ import {
   UrgencyLevel,
   RecommendationContext,
   RecommendationScore,
-} from '@insurance/types';
+} from '@insurance-lead-gen/types';
 import logger from '../logger.js';
 
 /**

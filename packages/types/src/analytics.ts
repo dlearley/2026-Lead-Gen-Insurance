@@ -2,7 +2,7 @@
 // ANALYTICS TYPES
 // ========================================
 
-export type InsuranceType = 'auto' | 'home' | 'life' | 'health' | 'commercial';
+import type { InsuranceType } from './scoring.js';
 export type LeadStatus = 'received' | 'processing' | 'qualified' | 'routed' | 'converted' | 'rejected';
 
 // Lead Funnel Metrics

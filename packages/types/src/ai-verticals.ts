@@ -171,7 +171,7 @@ export interface AutoVerticalData extends VerticalData {
   vehicleDetails: VehicleDetails;
   driverProfile: DriverProfile;
   usagePatterns: UsagePatterns;
-  riskAssessment: AutoRiskAssessment;
+  riskAssessment: AutoAIRiskAssessment;
   recommendedProducts: AutoProductRecommendation[];
   pricingFactors: AutoPricingFactor[];
 }
@@ -208,13 +208,13 @@ export interface UsagePatterns {
   multiVehicle: boolean;
 }
 
-export interface AutoRiskAssessment {
+export interface AutoAIRiskAssessment {
   overallRisk: 'low' | 'medium' | 'high';
   riskScore: number; // 0-100
   accidentProbability: number; // 0-1
   claimProbability: number; // 0-1
   claimSeverityEstimate: number; // USD
-  factors: RiskFactor[];
+  factors: AIRiskFactor[];
 }
 
 export interface AutoProductRecommendation {
@@ -475,7 +475,7 @@ export interface DocumentProcessingResult {
   extractedFields: Record<string, unknown>;
   confidenceScores: Record<string, number>;
   extractedText: string;
-  entities: EntityExtraction[];
+  entities: AIEntityExtraction[];
   classification: DocumentClassification;
   validationResult: DocumentValidation;
   ocrQuality: {
@@ -488,7 +488,7 @@ export interface DocumentProcessingResult {
   reviewerNotes: string[];
 }
 
-export interface EntityExtraction {
+export interface AIEntityExtraction {
   entityType: 'person' | 'date' | 'amount' | 'address' | 'vehicle' | 'policy_number' | 'location' | 'medical_term' | 'other';
   value: string;
   confidence: number; // 0-1
@@ -512,11 +512,11 @@ export interface DocumentValidation {
   isValid: boolean;
   completenessScore: number; // 0-100
   missingFields: string[];
-  inconsistencies: ValidationError[];
+  inconsistencies: AIValidationError[];
   suggestedCorrections: Record<string, unknown>;
 }
 
-export interface ValidationError {
+export interface AIValidationError {
   field: string;
   error: string;
   severity: 'low' | 'medium' | 'high';
@@ -585,14 +585,14 @@ export interface VoiceProcessingResult {
   transcript: string;
   confidence: number; // 0-1
   speakerDiarization?: SpeakerDiarization[];
-  sentimentAnalysis: SentimentAnalysis;
+  sentimentAnalysis: AISentimentAnalysis;
   intentRecognition: IntentRecognition;
   callQuality: {
     score: number; // 0-1
     issues: string[];
   };
   keywords: string[];
-  entities: EntityExtraction[];
+  entities: AIEntityExtraction[];
   actionItems: string[];
   duration: number; // seconds
   silencePercentage: number; // percentage
@@ -605,10 +605,10 @@ export interface SpeakerDiarization {
     endTime: number; // seconds
     text: string;
   }[];
-  sentiment: SentimentAnalysis;
+  sentiment: AISentimentAnalysis;
 }
 
-export interface SentimentAnalysis {
+export interface AISentimentAnalysis {
   overall: 'positive' | 'negative' | 'neutral' | 'mixed';
   score: number; // -1 (negative) to 1 (positive)
   aspects: Array<{
@@ -639,7 +639,7 @@ export interface ChatbotConversation {
   startedAt: Date;
   endedAt?: Date;
   messages: ChatMessage[];
-  summary: ConversationSummary;
+  summary: AIConversationSummary;
   nextActions: RecommendedAction[];
   handoffRequired: boolean;
   handoffReason?: string;
@@ -651,12 +651,12 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   intent: string;
-  entities: EntityExtraction[];
+  entities: AIEntityExtraction[];
   confidence: number; // 0-1
   responseTime?: number; // milliseconds
 }
 
-export interface ConversationSummary {
+export interface AIConversationSummary {
   primaryTopic: string;
   topics: string[];
   questionsAnswered: number;
@@ -998,7 +998,7 @@ export interface GetModelAccuracyResponse {
 }
 
 // RISK ASSESSMENT INTERFACE
-export interface RiskFactor {
+export interface AIRiskFactor {
   id: string;
   category: string;
   description: string;
@@ -1010,14 +1010,14 @@ export interface RiskFactor {
   regulatoryImplications: string[];
 }
 
-export interface RiskAssessment {
+export interface AIRiskAssessment {
   assessmentId: string;
   entityId: string;
   entityType: 'lead' | 'client' | 'policy' | 'claim';
   insuranceType: InsuranceType;
   overallRiskScore: number; // 0-100
   riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  riskFactors: RiskFactor[];
+  riskFactors: AIRiskFactor[];
   recommendations: RiskMitigationRecommendation[];
   assessedAt: Date;
   nextReviewDate: Date;
