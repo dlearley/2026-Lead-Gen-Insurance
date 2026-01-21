@@ -20,9 +20,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 10 },   // Ramp up
-        { duration: '5m', target: 10 },   // Stay at baseline
-        { duration: '2m', target: 0 },    // Ramp down
+        { duration: '2m', target: 10 }, // Ramp up
+        { duration: '5m', target: 10 }, // Stay at baseline
+        { duration: '2m', target: 0 }, // Ramp down
       ],
       gracefulRampDown: '30s',
     },
@@ -31,9 +31,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 20 },   // Ramp up to peak
-        { duration: '5m', target: 20 },   // Stay at peak
-        { duration: '2m', target: 0 },    // Ramp down
+        { duration: '2m', target: 20 }, // Ramp up to peak
+        { duration: '5m', target: 20 }, // Stay at peak
+        { duration: '2m', target: 0 }, // Ramp down
       ],
       gracefulRampDown: '30s',
       dependsOn: 'baseline',
@@ -59,7 +59,7 @@ export const options = {
         { duration: '1m', target: 10 },
         { duration: '30s', target: 100 }, // Sudden spike
         { duration: '1m', target: 100 },
-        { duration: '30s', target: 10 },  // Drop back
+        { duration: '30s', target: 10 }, // Drop back
         { duration: '2m', target: 10 },
       ],
     },
@@ -81,7 +81,7 @@ export const options = {
 
 // Base URL from environment
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
-const API_TOKEN = __Env.API_TOKEN || 'test-token';
+const API_TOKEN = __ENV.API_TOKEN || 'test-token';
 
 // Default request headers
 const headers = {
@@ -105,12 +105,12 @@ export default function (data) {
 // Test health endpoint
 function testHealthEndpoint() {
   const res = http.get(`${BASE_URL}/health`, { headers });
-  
+
   check(res, {
     'health check returns 200': (r) => r.status === 200,
     'health check is fast': (r) => r.timings.duration < 100,
   }) || errorRate.add(1);
-  
+
   responseTime.add(res.timings.duration);
 }
 
@@ -131,23 +131,24 @@ function testLeadCRUD() {
     { headers }
   );
   leadCreateTime.add(Date.now() - startTime);
-  
-  const createCheck = check(createRes, {
-    'lead create returns 201': (r) => r.status === 201,
-    'lead create response has ID': (r) => r.json('id') !== undefined,
-  }) || errorRate.add(1);
-  
+
+  const createCheck =
+    check(createRes, {
+      'lead create returns 201': (r) => r.status === 201,
+      'lead create response has ID': (r) => r.json('id') !== undefined,
+    }) || errorRate.add(1);
+
   if (!createCheck) return;
-  
+
   const leadId = createRes.json('id');
-  
+
   // READ
   const readRes = http.get(`${BASE_URL}/api/v1/leads/${leadId}`, { headers });
   check(readRes, {
     'lead read returns 200': (r) => r.status === 200,
     'lead read returns correct ID': (r) => r.json('id') === leadId,
   }) || errorRate.add(1);
-  
+
   // UPDATE
   const updateRes = http.put(
     `${BASE_URL}/api/v1/leads/${leadId}`,
@@ -158,25 +159,25 @@ function testLeadCRUD() {
     'lead update returns 200': (r) => r.status === 200,
     'lead update applied': (r) => r.json('qualityScore') === 85,
   }) || errorRate.add(1);
-  
+
   // DELETE
   const deleteRes = http.delete(`${BASE_URL}/api/v1/leads/${leadId}`, { headers });
   check(deleteRes, {
     'lead delete returns 204': (r) => r.status === 204,
   }) || errorRate.add(1);
-  
+
   sleep(1);
 }
 
 // Test agent endpoints
 function testAgentEndpoints() {
   const res = http.get(`${BASE_URL}/api/v1/agents`, { headers });
-  
+
   check(res, {
     'agents list returns 200': (r) => r.status === 200,
     'agents list is array': (r) => Array.isArray(r.json('data')),
   }) || errorRate.add(1);
-  
+
   sleep(0.5);
 }
 
@@ -191,14 +192,14 @@ function testSearchAndFilter() {
       limit: '20',
     },
   };
-  
+
   const res = http.get(`${BASE_URL}/api/v1/leads`, params);
-  
+
   check(res, {
     'filtered search returns 200': (r) => r.status === 200,
     'filtered search returns pagination': (r) => r.json('pagination') !== undefined,
   }) || errorRate.add(1);
-  
+
   sleep(0.5);
 }
 
@@ -210,7 +211,7 @@ export function teardown(data) {
 // Summary function for custom reporting
 export function handleSummary(data) {
   return {
-    stdout: `
+    'stdout': `
       Performance Test Summary
       =======================
       Total Requests: ${data.metrics.http_reqs.values.count}
