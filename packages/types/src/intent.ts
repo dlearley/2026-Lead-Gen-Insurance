@@ -1,4 +1,4 @@
-import { Lead } from './index.js';
+import type { Lead } from './churn.js';
 
 export type IntentLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 

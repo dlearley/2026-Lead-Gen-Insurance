@@ -6,7 +6,7 @@ export type UnderwritingDecision = 'approved' | 'denied' | 'manual_review' | 'co
 
 export type GapSeverity = 'Critical' | 'High' | 'Medium' | 'Low';
 
-export type RecommendationType =
+export type UnderwritingRecommendationType =
   | 'new_policy'
   | 'coverage_upgrade'
   | 'cross_sell'
@@ -203,7 +203,7 @@ export interface PolicyRecommendation {
   id: string;
   customerId: string;
   insuranceLine: string;
-  recommendationType: RecommendationType;
+  recommendationType: UnderwritingRecommendationType;
   recommendedCoverage: Record<string, unknown>;
   estimatedPremium: number;
   recommendationScore: number;
@@ -408,7 +408,7 @@ export interface AcceptanceMetrics {
   acceptanceRate: number;
   conversionRate: number;
   averageRevenue: number;
-  byRecommendationType: Record<RecommendationType, AcceptanceByType>;
+  byRecommendationType: Record<UnderwritingRecommendationType, AcceptanceByType>;
 }
 
 export interface AcceptanceByType {
@@ -569,7 +569,7 @@ export interface CoverageGapFilterParams {
 export interface PolicyRecommendationFilterParams {
   customerId?: string;
   insuranceLine?: string;
-  recommendationType?: RecommendationType;
+  recommendationType?: UnderwritingRecommendationType;
   urgencyLevel?: UrgencyLevel;
   dateFrom?: Date;
   dateTo?: Date;

@@ -50,12 +50,12 @@ export interface ConversationAnalysis {
   churnRisk: number; // 0-100
 }
 
-export type RecommendationType = 'response' | 'action' | 'knowledge' | 'coaching';
+export type CopilotRecommendationType = 'response' | 'action' | 'knowledge' | 'coaching';
 export type RecommendationPriority = 'high' | 'medium' | 'low';
 
 export interface BaseRecommendation {
   id: string;
-  type: RecommendationType;
+  type: CopilotRecommendationType;
   confidence: number;
   priority: RecommendationPriority;
   timestamp: number;
