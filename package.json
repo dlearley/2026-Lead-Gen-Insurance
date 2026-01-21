@@ -24,6 +24,7 @@
     "test:e2e": "turbo test:e2e",
     "test:e2e:install": "playwright install --with-deps",
     "test:performance": "k6 run testing/performance/comprehensive-load-test.js",
+    "test:performance:verify": "k6 run tests/performance/k6-setup-verification.js",
     "test:performance:baseline": "k6 run -e SCENARIO=baseline testing/performance/comprehensive-load-test.js",
     "test:performance:peak": "k6 run -e SCENARIO=peak_load testing/performance/comprehensive-load-test.js",
     "test:performance:stress": "k6 run -e SCENARIO=stress testing/performance/comprehensive-load-test.js",
@@ -79,8 +80,11 @@
     "typescript": "^5.3.3"
   },
   "lint-staged": {
-    "*.{js,ts}": [
+    "*.ts": [
       "eslint --fix",
+      "prettier --write"
+    ],
+    "*.js": [
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": [
