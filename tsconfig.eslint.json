@@ -12,6 +12,6 @@
       "@insurance-lead-gen/config/*": ["packages/config/src/*"]
     }
   },
-  "include": ["apps/**/*.ts", "packages/**/*.ts"],
+  "include": ["apps/**/*.ts", "packages/**/*.ts", "testing/**/*.ts"],
   "exclude": ["node_modules", "dist", "build", "coverage"]
 }
