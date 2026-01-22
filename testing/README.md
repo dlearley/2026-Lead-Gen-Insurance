@@ -24,7 +24,7 @@ testing/
 
 #### Unit Tests (`/testing/unit/`)
 - Individual component testing
-- Service layer testing
+- Service layer testing (Lead, Claim, Education)
 - Utility function testing
 - Repository pattern testing
 - Business logic validation

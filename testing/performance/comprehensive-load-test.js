@@ -131,10 +131,11 @@ export function setup() {
 // Main test function
 export default function (data) {
   const scenarios = [
-    { weight: 40, fn: testLeadGeneration },
-    { weight: 30, fn: testLeadRetrieval },
+    { weight: 35, fn: testLeadGeneration },
+    { weight: 25, fn: testLeadRetrieval },
     { weight: 15, fn: testAgentMatching },
     { weight: 10, fn: testAnalyticsEndpoints },
+    { weight: 10, fn: testEducationSystem },
     { weight: 5, fn: testBulkOperations },
   ];
 
@@ -389,6 +390,49 @@ function testBulkOperations(data) {
 
     check(updateRes, {
       'bulk update successful': (r) => r.status === 200,
+    }) || errorRate.add(1);
+
+    sleep(randomIntBetween(2, 4));
+  });
+}
+
+/**
+ * Test education system functionality
+ */
+function testEducationSystem(data) {
+  const headers = getHeaders();
+
+  group('Education System', function () {
+    // List courses
+    const listRes = http.get(`${data.baseUrl}/api/v1/broker-education/courses`, { headers });
+    check(listRes, {
+      'education courses listed': (r) => r.status === 200,
+    }) || errorRate.add(1);
+
+    const courses = listRes.json();
+    if (!Array.isArray(courses) || courses.length === 0) {
+      sleep(1);
+      return;
+    }
+
+    const courseId = courses[randomIntBetween(0, courses.length - 1)].id;
+    sleep(randomIntBetween(1, 2));
+
+    // Get course details
+    const detailRes = http.get(`${data.baseUrl}/api/v1/broker-education/courses/${courseId}`, { headers });
+    check(detailRes, {
+      'education course details returned': (r) => r.status === 200,
+    }) || errorRate.add(1);
+
+    // Enroll (using a random agent ID)
+    const agentId = `agent-${randomIntBetween(1, 1000)}`;
+    const enrollRes = http.post(
+      `${data.baseUrl}/api/v1/broker-education/enrollments`,
+      JSON.stringify({ courseId, agentId }),
+      { headers }
+    );
+    check(enrollRes, {
+      'education enrollment successful': (r) => r.status === 201 || r.status === 200,
     }) || errorRate.add(1);
 
     sleep(randomIntBetween(2, 4));
