@@ -3,7 +3,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -101,6 +100,10 @@ model Lead {
   assignments   LeadAssignment[]
   events        LeadEvent[]
   policies      Policy[]
+
+  customer      Customer?
+  predictions   LeadPrediction[]
+  auditLogs    PredictionAuditLog[]
 
   @@index([status])
   @@index([email])
@@ -490,6 +493,288 @@ model Agent {
   @@map("agents")
 }
 
+// ========================================
+// EDUCATION & TRAINING (Phase 29)
+// ========================================
+
+model Course {
+  id            String         @id @default(uuid())
+  title         String
+  description   String?        @db.Text
+  category      CourseCategory @default(ONBOARDING)
+  level         CourseLevel    @default(BEGINNER)
+  duration      Int            // Duration in minutes
+  estimatedHours Int?
+  thumbnailUrl  String?
+  contentType   ContentType    @default(VIDEO)
+  isMandatory   Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  objectives    Json           // Array of strings
+  prerequisites Json           // Array of strings
+  tags          Json           // Array of strings
+  createdBy     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  modules       CourseModule[]
+  enrollments   CourseEnrollment[]
+  certifications CourseCertification[]
+  pathCourses   PathCourse[]
+
+  @@index([category])
+  @@index([level])
+  @@index([isActive])
+  @@map("courses")
+}
+
+model CourseModule {
+  id            String         @id @default(uuid())
+  courseId      String
+  title         String
+  description   String?        @db.Text
+  orderIndex    Int
+  content       Json           // Flexible content structure
+  duration      Int?
+  isRequired    Boolean        @default(true)
+  hasQuiz       Boolean        @default(false)
+  passingScore  Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  quizzes       ModuleQuiz[]
+  progresses    ModuleProgress[]
+
+  @@index([courseId])
+  @@map("course_modules")
+}
+
+model ModuleQuiz {
+  id                String   @id @default(uuid())
+  moduleId          String
+  title             String
+  description       String?  @db.Text
+  questions         Json     // Quiz questions structure
+  timeLimit         Int?
+  maxAttempts       Int
+  passingScore      Int
+  shuffleQuestions  Boolean  @default(false)
+  shuffleAnswers    Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  module            CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  attempts          QuizAttempt[]
+
+  @@index([moduleId])
+  @@map("module_quizzes")
+}
+
+model LearningPath {
+  id            String         @id @default(uuid())
+  title         String
+  description   String?        @db.Text
+  category      CourseCategory @default(ONBOARDING)
+  level         CourseLevel    @default(BEGINNER)
+  estimatedHours Int?
+  isMandatory   Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  prerequisites Json           // Array of strings
+  targetRoles   Json           // Array of strings
+  specialization Json          // Array of InsuranceType
+  tags          Json           // Array of strings
+  createdBy     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  courses       PathCourse[]
+  enrollments   PathEnrollment[]
+
+  @@index([category])
+  @@index([level])
+  @@index([isActive])
+  @@map("learning_paths")
+}
+
+model PathCourse {
+  id             String   @id @default(uuid())
+  learningPathId String
+  courseId       String
+  orderIndex     Int
+  isRequired     Boolean  @default(true)
+  passingScore   Int?
+  createdAt      DateTime @default(now())
+
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([learningPathId, courseId])
+  @@index([learningPathId])
+  @@index([courseId])
+  @@map("path_courses")
+}
+
+model CourseEnrollment {
+  id            String            @id @default(uuid())
+  courseId      String
+  agentId       String
+  status        EnrollmentStatus   @default(ENROLLED)
+  progress      Int               @default(0) // 0-100
+  completedAt   DateTime?
+  finalScore    Int?
+  passingScore  Int?
+  enrolledAt    DateTime          @default(now())
+  startedAt     DateTime?
+
+  course        Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  agent         Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  moduleProgresses ModuleProgress[]
+
+  @@unique([courseId, agentId])
+  @@index([courseId])
+  @@index([agentId])
+  @@index([status])
+  @@map("course_enrollments")
+}
+
+model ModuleProgress {
+  id             String         @id @default(uuid())
+  status         ProgressStatus @default(NOT_STARTED)
+  progress       Int            @default(0) // 0-100
+  timeSpent      Int            @default(0) // Time in minutes
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  enrollmentId   String?
+  moduleId       String?
+
+  enrollment     CourseEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module         CourseModule?     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  quizAttempts   QuizAttempt[]
+
+  @@index([enrollmentId])
+  @@index([moduleId])
+  @@map("module_progress")
+}
+
+model QuizAttempt {
+  id            String         @id @default(uuid())
+  moduleId      String
+  progressId    String?
+  score         Int
+  timeSpent     Int
+  attemptedAt   DateTime       @default(now())
+
+  module        ModuleQuiz     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress      ModuleProgress? @relation(fields: [progressId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId])
+  @@index([progressId])
+  @@map("quiz_attempts")
+}
+
+model PathEnrollment {
+  id             String          @id @default(uuid())
+  learningPathId String
+  agentId        String
+  status         EnrollmentStatus @default(ENROLLED)
+  progress       Int             @default(0) // 0-100
+  completedAt    DateTime?
+  enrolledAt     DateTime        @default(now())
+  startedAt      DateTime?
+
+  learningPath   LearningPath    @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  agent          Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([learningPathId, agentId])
+  @@index([learningPathId])
+  @@index([agentId])
+  @@index([status])
+  @@map("path_enrollments")
+}
+
+model CourseCertification {
+  id                String   @id @default(uuid())
+  courseId          String
+  agentId           String
+  certificateNumber String   @unique
+  issueDate         DateTime @default(now())
+  expiryDate        DateTime
+  score             Int
+  status            String   @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  course            Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  agent             Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([agentId])
+  @@index([certificateNumber])
+  @@map("course_certifications")
+}
+
+enum CourseCategory {
+  ONBOARDING
+  COMPLIANCE
+  PRODUCTS
+  SALES_TECHNIQUES
+  CUSTOMER_SERVICE
+  REGULATORY
+  TECHNOLOGY
+  LEADERSHIP
+  SPECIALIZATIONS
+  CONTINUING_EDUCATION
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum ContentType {
+  VIDEO
+  DOCUMENT
+  INTERACTIVE
+  WEBINAR
+  SIMULATION
+  QUIZ
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+  DROPPED
+  FAILED
+}
+
+enum EducationLevel {
+  NONE
+  HIGH_SCHOOL
+  ASSOCIATE
+  BACHELOR
+  MASTER
+  DOCTORATE
+}
+
+enum LearningStyle {
+  VIDEO
+  TEXT
+  INTERACTIVE
+  HANDS_ON
+  GROUP
+}
+
 enum AgentStatus {
   ACTIVE
   INACTIVE
@@ -636,6 +921,7 @@ model Policy {
   id                  String        @id @default(uuid())
   customerId          String
   agentId             String?
+  leadId              String
   policyNumber        String        @unique
   insuranceType       InsuranceType
   status              PolicyStatus  @default(ACTIVE)
@@ -661,7 +947,11 @@ model Policy {
   updatedAt           DateTime      @updatedAt
 
   customer            Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lead                Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
+  @@index([customerId])
+  @@index([agentId])
+  @@index([leadId])
   @@map("policies")
 }
 
@@ -914,6 +1204,7 @@ model PartnerUser {
   partner           Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   trainingProgress  PartnerTrainingProgress[]
   certifications    PartnerCertification[]
+  supportTickets    PartnerSupportTicket[]
 
   @@index([partnerId])
   @@index([email])
@@ -1636,16 +1927,6 @@ model BusinessDataAnalytics {
   @@map("business_data_analytics")
 }
 
-model SystemConfig {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("system_config")
-}
-
 enum ExperimentStatus {
   DRAFT
   ACTIVE
@@ -1723,4 +2004,221 @@ enum AssignmentRole {
   PRIMARY
   SECONDARY
   BACKUP
+}
+
+// ========================================
+// WORKFLOW & ORCHESTRATION (Phase 14.1)
+// ========================================
+
+model Workflow {
+  id          String          @id @default(uuid())
+  name        String
+  description String?         @db.Text
+  version     Int             @default(1)
+  status      WorkflowStatus  @default(DRAFT)
+  category    String
+  triggers    Json
+  steps       Json
+  errorHandlers Json?
+  timeout     Int?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  executions  WorkflowExecution[]
+
+  @@index([status])
+  @@index([category])
+  @@map("workflows")
+}
+
+model WorkflowExecution {
+  id              String            @id @default(uuid())
+  workflowId      String
+  workflowVersion Int
+  status          ExecutionStatus   @default(PENDING)
+  input           Json
+  output          Json?
+  currentStepId   String?
+  startedAt       DateTime          @default(now())
+  completedAt     DateTime?
+  error           String?           @db.Text
+  metadata        Json?
+
+  workflow        Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepsExecuted   StepExecution[]
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("workflow_executions")
+}
+
+model StepExecution {
+  id            String          @id @default(uuid())
+  executionId   String
+  stepId        String
+  stepName      String
+  status        ExecutionStatus @default(PENDING)
+  input         Json?
+  output        Json?
+  startedAt     DateTime        @default(now())
+  completedAt   DateTime?
+  duration      Int?
+  attempt       Int             @default(1)
+  error         String?         @db.Text
+  logs          Json?
+
+  execution     WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+  @@index([status])
+  @@map("step_executions")
+}
+
+model Webhook {
+  id          String          @id @default(uuid())
+  name        String
+  url         String
+  method      HttpMethod      @default(POST)
+  headers     Json?
+  secret      String?
+  isActive    Boolean         @default(true)
+  retryPolicy Json?
+  timeout     Int?
+  events      Json
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  eventsList  WebhookEvent[]
+
+  @@index([isActive])
+  @@map("webhooks")
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  webhookId   String
+  eventType   String
+  payload     Json
+  statusCode  Int?
+  response    String?  @db.Text
+  success     Boolean  @default(false)
+  attempt     Int      @default(1)
+  sentAt      DateTime @default(now())
+  completedAt DateTime?
+  error       String?  @db.Text
+
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([eventType])
+  @@index([sentAt])
+  @@map("webhook_events")
+}
+
+model TransformationRule {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?  @db.Text
+  inputSchema  Json
+  outputSchema Json
+  transformations Json
+  isActive     Boolean  @default(true)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("transformation_rules")
+}
+
+model OrchestrationMetrics {
+  id                      String            @id @default(uuid())
+  workflowId              String            @unique
+  totalExecutions         Int               @default(0)
+  successfulExecutions    Int               @default(0)
+  failedExecutions        Int               @default(0)
+  averageExecutionTime    Float?
+  averageStepExecutionTime Float?
+  successRate             Float?
+  lastExecutionAt         DateTime?
+  lastExecutionStatus     ExecutionStatus?
+  updatedAt               DateTime          @updatedAt
+
+  @@index([workflowId])
+  @@map("orchestration_metrics")
+}
+
+model CircuitBreaker {
+  id               String             @id @default(uuid())
+  serviceId        String             @unique
+  state            CircuitBreakerState @default(CLOSED)
+  failureCount     Int                @default(0)
+  lastFailureTime  DateTime?
+  lastSuccessTime  DateTime?
+  threshold        Int                @default(5)
+  timeout          Int                @default(60000)
+  halfOpenMaxCalls Int                @default(3)
+  halfOpenCalls    Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([serviceId])
+  @@index([state])
+  @@map("circuit_breakers")
+}
+
+model WorkflowTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String   @db.Text
+  category    String
+  version     String
+  definition  Json
+  parameters  Json
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isPublic])
+  @@map("workflow_templates")
+}
+
+// ========================================
+// WORKFLOW & ORCHESTRATION ENUMS
+// ========================================
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+enum CircuitBreakerState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
 }
