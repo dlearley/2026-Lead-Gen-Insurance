@@ -26,21 +26,17 @@ export * from './talk-track.js';
 export * from './support.js';
 export * from './ai-verticals.js';
 export * from './performance.js';
+export * from './knowledge-ops.js';
 
 // NLP types - selective export to avoid conflicts
-export type {
-  DocumentEmbedding,
-  SimilarDocument,
-  DocumentChunk,
-  EntityOccurrence
-} from './nlp.js';
+export type { DocumentEmbedding, SimilarDocument, DocumentChunk, EntityOccurrence } from './nlp.js';
 
 // Document management types - selective export
 export type {
   DocumentMetadata,
   DocumentStatus as DocMgmtDocumentStatus,
   SearchFilters,
-  SearchResults
+  SearchResults,
 } from './document-management.js';
 
 // Claims outcome types - selective export
@@ -51,11 +47,8 @@ export type {
   LitigationCostEstimate,
   SubrogationPotential,
   Justification as ClaimJustification,
-  ComparableCases
+  ComparableCases,
 } from './claims-outcome.js';
 
 // Fraud detection types - selective export
-export type {
-  ClaimData as FraudClaimData,
-  FraudScore
-} from './fraud-detection.js';
+export type { ClaimData as FraudClaimData, FraudScore } from './fraud-detection.js';
