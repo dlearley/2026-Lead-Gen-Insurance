@@ -114,3 +114,10 @@ temp/
 
 # Alembic
 alembic/versions/__pycache__/
+
+# k6 Performance Testing
+load-test-results.json
+performance-report.json
+results.json
+k6-results*.json
+*.k6.json

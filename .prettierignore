@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Tool caches
+.turbo/
+
+# Lockfiles
+pnpm-lock.yaml
+
+# Generated performance test outputs
+results.json
+load-test-results.json
+performance-report.json
+k6-results*.json
+*.k6.json
