@@ -46,6 +46,7 @@ import timelineRoutes from './routes/timeline.routes.js';
 import { TalkTrackGeneratorService } from './services/talk-track-generator.service.js';
 import { createTalkTrackRoutes } from './routes/talk-track.routes.js';
 import supportRoutes from './routes/support.routes.js';
+import knowledgeOpsRoutes from './routes/knowledge-ops.routes.js';
 
 const config = getConfig();
 const PORT = config.ports.dataService;
@@ -129,6 +130,9 @@ const start = async (): Promise<void> => {
   // Setup broker education routes
   app.use('/api/v1/broker-education', createBrokerEducationRoutes());
 
+  // Setup knowledge transfer & operations enablement routes
+  app.use('/api/v1/knowledge-ops', knowledgeOpsRoutes);
+
   // Setup business data ingestion routes
   app.use('/api/v1/business-data', businessDataIngestionRoutes);
 
@@ -178,7 +182,7 @@ const start = async (): Promise<void> => {
     }
 
     const status = dbStatus === 'ok' && redisStatus === 'ok' ? 'ok' : 'degraded';
-    
+
     res.status(status === 'ok' ? 200 : 503).json({
       status,
       timestamp: new Date().toISOString(),
@@ -275,11 +279,15 @@ const start = async (): Promise<void> => {
     for await (const msg of agentsMatchSub) {
       try {
         const filters = eventBus.decode<any>(msg.data);
-        const agents = await agentRepository.findMany({
-          isActive: true,
-          state: filters.state,
-          specialization: filters.insuranceType,
-        }, 0, filters.limit || 50);
+        const agents = await agentRepository.findMany(
+          {
+            isActive: true,
+            state: filters.state,
+            specialization: filters.insuranceType,
+          },
+          0,
+          filters.limit || 50
+        );
 
         if (msg.reply) {
           eventBus.publish(msg.reply, { agents });

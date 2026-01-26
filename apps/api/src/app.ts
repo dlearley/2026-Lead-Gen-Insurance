@@ -4,7 +4,13 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { logger, MetricsCollector, createSecurityRateLimiter, rateLimitPresets, createInputSanitizer } from '@insurance-lead-gen/core';
+import {
+  logger,
+  MetricsCollector,
+  createSecurityRateLimiter,
+  rateLimitPresets,
+  createInputSanitizer,
+} from '@insurance-lead-gen/core';
 import { register } from 'prom-client';
 import { apiAnalyticsMiddleware } from './middleware/analytics.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
@@ -45,12 +51,13 @@ import onboardingRouter from './routes/onboarding.js';
 import gatewayRouter from './routes/gateway.js';
 import { talkTrackRouter } from './routes/talk-track.js';
 import supportRouter from './routes/support.js';
+import knowledgeOpsRouter from './routes/knowledge-ops.js';
 import { OptimizationAPI } from '@insurance-lead-gen/core';
 import { UPLOADS_DIR } from './utils/files.js';
 import mediaSessionsRouter from './routes/media-sessions.js';
 import mediaRecordingsRouter from './routes/media-recordings.js';
 import rtcSignalingRouter from './routes/rtc-signaling.js';
-import { 
+import {
   apiGatewayMiddleware,
   securityHeadersMiddleware,
   corsMiddleware,
@@ -58,7 +65,7 @@ import {
   requestValidationMiddleware,
   requestTransformationMiddleware,
   responseTransformationMiddleware,
-  circuitBreakerMiddleware
+  circuitBreakerMiddleware,
 } from './middleware/api-gateway.middleware.js';
 import { APIGatewayService } from '@insurance-lead-gen/core';
 import { createAuditMiddleware } from './middleware/audit.middleware.js';
@@ -92,29 +99,32 @@ export function createApp(): express.Express {
         xssProtection: { enabled: true, mode: 'block' },
         contentTypeOptions: { enabled: true },
         frameOptions: { enabled: true, policy: 'SAMEORIGIN' },
-        referrerPolicy: { enabled: true, policy: 'strict-origin-when-cross-origin' }
+        referrerPolicy: { enabled: true, policy: 'strict-origin-when-cross-origin' },
       },
       cors: {
-        origin: process.env.NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') || false : true,
+        origin:
+          process.env.NODE_ENV === 'production'
+            ? process.env.ALLOWED_ORIGINS?.split(',') || false
+            : true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-API-Key'],
         exposedHeaders: ['X-Request-ID', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
         credentials: true,
         maxAge: 86400,
         preflightContinue: false,
-        optionsSuccessStatus: 204
-      }
+        optionsSuccessStatus: 204,
+      },
     },
     rateLimits: {
       global: { requests: 1000, windowMs: 60000, strategy: 'sliding' },
-      burstLimit: 50
+      burstLimit: 50,
     },
     validation: {
       enabled: true,
       strict: false,
       schemas: [],
-      sanitizeInput: true
-    }
+      sanitizeInput: true,
+    },
   };
 
   // Initialize API Gateway Service (placeholder - would be connected to actual service)
@@ -130,11 +140,23 @@ export function createApp(): express.Express {
       enabled: true,
       rateLimits: gatewayConfig.rateLimits,
       security: gatewayConfig.security,
-      routing: { services: [], loadBalancer: {} as any, circuitBreaker: {} as any, requestTransformation: {} as any, responseTransformation: {} as any },
+      routing: {
+        services: [],
+        loadBalancer: {} as any,
+        circuitBreaker: {} as any,
+        requestTransformation: {} as any,
+        responseTransformation: {} as any,
+      },
       caching: { enabled: false, strategies: [], redis: {} as any, memory: {} as any },
-      monitoring: { enabled: true, metrics: {} as any, logging: {} as any, tracing: {} as any, alerting: {} as any },
+      monitoring: {
+        enabled: true,
+        metrics: {} as any,
+        logging: {} as any,
+        tracing: {} as any,
+        alerting: {} as any,
+      },
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     },
     // Audit service would go here
     null as any,
@@ -168,11 +190,13 @@ export function createApp(): express.Express {
   // Global Rate Limiting
   const globalRateLimiter = createSecurityRateLimiter({
     ...rateLimitPresets.api,
-    redis: process.env.REDIS_HOST ? {
-      host: process.env.REDIS_HOST,
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
-    } : undefined,
+    redis: process.env.REDIS_HOST
+      ? {
+          host: process.env.REDIS_HOST,
+          port: parseInt(process.env.REDIS_PORT || '6379'),
+          password: process.env.REDIS_PASSWORD,
+        }
+      : undefined,
   });
   app.use('/api', globalRateLimiter);
 
@@ -290,6 +314,7 @@ export function createApp(): express.Express {
   app.use('/api/talk-tracks', talkTrackRouter);
   app.use('/api/v1/customer-success', customerSuccessRouter);
   app.use('/api/v1/support', supportRouter);
+  app.use('/api/v1/knowledge-ops', knowledgeOpsRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes
   const optimizationAPI = new OptimizationAPI();
@@ -325,6 +350,7 @@ export function createApp(): express.Express {
   app.use('/api/territories', territoryRouter);
   app.use('/api/onboarding', onboardingRouter);
   app.use('/api/support', supportRouter);
+  app.use('/api/knowledge-ops', knowledgeOpsRouter);
 
   // Phase 19.5: Post-Launch Optimization & Operations API routes (legacy)
   app.use('/api/optimization', optimizationAPI.getRouter());
@@ -338,17 +364,18 @@ export function createApp(): express.Express {
   });
 
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    logger.error('Unhandled error', { 
+    logger.error('Unhandled error', {
       error: err instanceof Error ? err.message : err,
       stack: err instanceof Error ? err.stack : undefined,
       path: req.path,
-      method: req.method
+      method: req.method,
     });
-    
+
     const statusCode = err.status || err.statusCode || 500;
-    const message = process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : err.message || 'Internal server error';
+    const message =
+      process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : err.message || 'Internal server error';
 
     res.status(statusCode).json({ error: message });
   });
