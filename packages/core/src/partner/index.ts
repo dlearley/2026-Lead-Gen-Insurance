@@ -12,3 +12,4 @@ export * from './webhook.service';
 export * from './event.service';
 export * from './marketplace.service';
 export * from './billing.service';
+export * from './vendor-partner-coordination.service';

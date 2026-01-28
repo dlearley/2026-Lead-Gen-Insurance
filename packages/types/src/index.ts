@@ -26,6 +26,7 @@ export * from './talk-track.js';
 export * from './support.js';
 export * from './ai-verticals.js';
 export * from './performance.js';
+export * from './vendor-partner-coordination.js';
 
 // NLP types - selective export to avoid conflicts
 export type {

@@ -19,6 +19,9 @@ export * from './security/index.js';
 // Orchestration exports
 export * from './orchestration/index.js';
 
+// Partner ecosystem exports
+export * from './partner/index.js';
+
 // Performance and optimization exports
 export * from './performance/index.js';
 export * from './scaling/index.js';
