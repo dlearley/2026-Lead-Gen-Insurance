@@ -1,0 +1,40 @@
+{
+  "test_id": "full-recovery-20260128-021703",
+  "test_name": "full-recovery",
+  "timestamp": "2026-01-28T02:17:21+00:00",
+  "status": "passed",
+  "recovery_time_seconds": 18,
+  "rto_target_seconds": 3600,
+  "rto_compliance": true,
+  "backup_used": "backup-manifest-2026-01-28.json",
+  "backup_timestamp": "2026-01-28T02:13:00Z",
+  "components_tested": [
+    "infrastructure_availability",
+    "backup_manifest",
+    "full_stack_recovery",
+    "service_health",
+    "data_consistency",
+    "api_functionality"
+  ],
+  "services_tested": [
+    "postgresql",
+    "neo4j", 
+    "redis",
+    "qdrant",
+    "nats",
+    "api_gateway",
+    "data_service",
+    "orchestrator",
+    "backend",
+    "frontend"
+  ],
+  "results": {
+    "infrastructure_availability": "passed",
+    "backup_manifest": "passed",
+    "full_stack_recovery": "passed",
+    "service_health": "passed",
+    "data_consistency": "passed",
+    "api_functionality": "passed"
+  },
+  "summary": "Full infrastructure recovery test completed successfully within RTO targets"
+}
