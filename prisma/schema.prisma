@@ -964,3 +964,250 @@ enum PeriodType {
   QUARTERLY
   ANNUAL
 }
+// ============================================================================
+// Vendor & Partner Integration Coordination Models
+// ============================================================================
+
+model VendorPartnerRelationship {
+  id                String                          @id @default(uuid())
+  vendorId          String
+  partnerId         String
+  relationshipType  VendorPartnerRelationshipType
+  status            RelationshipStatus              @default(PENDING)
+  startDate         DateTime                        @default(now())
+  endDate           DateTime?
+  agreementDetails   Json?
+  configuration     Json?
+  metadata          Json?
+
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  relationships     VendorPartnerRelationshipRelation[]
+
+  @@index([vendorId])
+  @@index([partnerId])
+  @@index([relationshipType])
+  @@index([status])
+  @@index([startDate])
+}
+
+model VendorPartnerRelationshipRelation {
+  id              String                          @id @default(uuid())
+  relationshipId  String
+  name            String
+  value           String
+  createdAt       DateTime                        @default(now())
+
+  relationship    VendorPartnerRelationship       @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@index([relationshipId])
+}
+
+model IntegrationWorkflow {
+  id                  String                @id @default(uuid())
+  name                String
+  description         String?
+  workflowType        WorkflowType
+  vendorId            String?
+  partnerId           String?
+  integrationId       String?
+  status              WorkflowStepStatus     @default(NOT_STARTED)
+  currentStep         Int?
+  dependencies        String[]              // IDs of workflows that must complete first
+  estimatedDuration    Int?                 // in minutes
+  actualDuration      Int?                 // in minutes
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  steps               WorkflowStep[]
+
+  @@index([workflowType])
+  @@index([vendorId])
+  @@index([partnerId])
+  @@index([integrationId])
+  @@index([status])
+}
+
+model WorkflowStep {
+  id                  String                @id @default(uuid())
+  workflowId          String
+  stepNumber          Int
+  name                String
+  description         String?
+  status              WorkflowStepStatus     @default(NOT_STARTED)
+  estimatedDuration    Int?                 // in minutes
+  actualDuration      Int?                 // in minutes
+  startedAt           DateTime?
+  completedAt         DateTime?
+  errorMessage        String?
+  retryCount          Int                  @default(0)
+  maxRetries          Int?
+  dependencies        Int[]                // Step numbers that must complete first
+  configuration       Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  workflow            IntegrationWorkflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, stepNumber])
+  @@index([workflowId])
+  @@index([status])
+}
+
+model IntegrationDependency {
+  id                        String                    @id @default(uuid())
+  integrationId             String
+  dependsOnIntegrationId    String
+  dependencyType          IntegrationDependencyType
+  condition                String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  @@index([integrationId])
+  @@index([dependsOnIntegrationId])
+  @@index([dependencyType])
+}
+
+model SharedResource {
+  id                  String              @id @default(uuid())
+  resourceId          String              // The actual resource identifier
+  resourceType        SharedResourceType
+  ownerId             String
+  ownerType           OwnerType
+  name                String
+  description         String?
+  configuration       Json?
+  accessControl       Json?
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  accessGrants        ResourceAccessGrant[]
+
+  @@index([resourceId])
+  @@index([resourceType])
+  @@index([ownerId, ownerType])
+  @@index([isActive])
+}
+
+model ResourceAccessGrant {
+  id                  String              @id @default(uuid())
+  resourceId          String
+  grantedToId         String
+  grantedToType       OwnerType
+  accessLevel         AccessLevel
+  grantedBy           String
+  grantedAt           DateTime            @default(now())
+  expiresAt           DateTime?
+  isActive            Boolean             @default(true)
+  conditions          Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  resource            SharedResource      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+  @@index([grantedToId, grantedToType])
+  @@index([grantedBy])
+  @@index([isActive])
+}
+
+model CrossIntegrationEvent {
+  id                    String                  @id @default(uuid())
+  eventName              String
+  sourceIntegrationId    String
+  targetIntegrationIds   String[]
+  payload               Json
+  eventCategory         String
+  priority              EventPriority           @default(medium)
+  status                CrossIntegrationEventStatus @default(pending)
+  processedAt           DateTime?
+  errorMessage          String?
+  metadata              Json?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([eventName])
+  @@index([sourceIntegrationId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+// Enums for Vendor & Partner Coordination
+
+enum VendorPartnerRelationshipType {
+  INTEGRATION
+  RESELLER
+  REFERRAL
+  COLLABORATION
+  API_CONSUMPTION
+}
+
+enum RelationshipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum WorkflowType {
+  INTEGRATION_SETUP
+  API_ACCESS_GRANT
+  RESOURCE_SHARING
+  DATA_SYNC
+  TESTING_VALIDATION
+  PRODUCTION_DEPLOYMENT
+}
+
+enum WorkflowStepStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum IntegrationDependencyType {
+  REQUIRES
+  CONFLICTS
+  ENHANCES
+  DEPENDS_ON_DATA
+}
+
+enum SharedResourceType {
+  API_ENDPOINT
+  WEBHOOK
+  DATABASE_TABLE
+  CACHE_KEY
+  QUEUE_TOPIC
+  STORAGE_BUCKET
+}
+
+enum OwnerType {
+  vendor
+  partner
+}
+
+enum AccessLevel {
+  read
+  write
+  admin
+}
+
+enum EventPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum CrossIntegrationEventStatus {
+  pending
+  processing
+  completed
+  failed
+}
