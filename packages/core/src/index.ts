@@ -19,8 +19,10 @@ export * from './security/index.js';
 // Orchestration exports
 export * from './orchestration/index.js';
 
+// API Gateway exports
+export * from './api-gateway.js';
+
 // Performance and optimization exports
-export * from './performance/index.js';
 export * from './scaling/index.js';
 export * from './cost/index.js';
 export * from './operations/index.js';

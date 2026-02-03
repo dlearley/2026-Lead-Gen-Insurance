@@ -5,7 +5,7 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { logger, MetricsCollector, createSecurityRateLimiter, rateLimitPresets, createInputSanitizer } from '@insurance-lead-gen/core';
-import { register } from 'prom-client';
+import { register, collectDefaultMetrics } from 'prom-client';
 import { apiAnalyticsMiddleware } from './middleware/analytics.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { createAuditMiddleware } from './middleware/audit.middleware.js';
@@ -54,18 +54,17 @@ import {
   apiGatewayMiddleware,
   securityHeadersMiddleware,
   corsMiddleware,
-  requestIdMiddleware,
+  requestIdMiddleware as gatewayRequestIdMiddleware,
   requestValidationMiddleware,
   requestTransformationMiddleware,
   responseTransformationMiddleware,
-  circuitBreakerMiddleware
+  circuitBreakerMiddleware,
+  rateLimitHeadersMiddleware,
+  createGatewayMiddlewareConfig
 } from './middleware/api-gateway.middleware.js';
-import { APIGatewayService } from '@insurance-lead-gen/core';
-import { createAuditMiddleware } from './middleware/audit.middleware.js';
-import { createSecurityRateLimiter, rateLimitPresets } from './middleware/security-rate-limiter.js';
+import { APIGatewayService, createAPIGatewayService } from '@insurance-lead-gen/core';
+import { createSecurityRateLimiter as createSecurityRateLimiterFromMiddleware, rateLimitPresets as rateLimitPresetsFromMiddleware } from './middleware/security-rate-limiter.js';
 import { createInputSanitizer } from './middleware/security.js';
-import { register, collectDefaultMetrics } from 'prom-client';
-import { apiAnalyticsMiddleware } from './middleware/analytics.js';
 
 // Initialize default metrics
 collectDefaultMetrics();
@@ -84,65 +83,25 @@ export function createApp(): express.Express {
   // Initialize health service (will be properly initialized when used)
   let healthService: HealthService | null = null;
 
-  // API Gateway Configuration
-  const gatewayConfig = {
-    security: {
-      headers: {
-        hsts: { enabled: true, maxAge: 31536000, includeSubDomains: true, preload: true },
-        xssProtection: { enabled: true, mode: 'block' },
-        contentTypeOptions: { enabled: true },
-        frameOptions: { enabled: true, policy: 'SAMEORIGIN' },
-        referrerPolicy: { enabled: true, policy: 'strict-origin-when-cross-origin' }
-      },
-      cors: {
-        origin: process.env.NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') || false : true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-API-Key'],
-        exposedHeaders: ['X-Request-ID', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
-        credentials: true,
-        maxAge: 86400,
-        preflightContinue: false,
-        optionsSuccessStatus: 204
-      }
-    },
-    rateLimits: {
-      global: { requests: 1000, windowMs: 60000, strategy: 'sliding' },
-      burstLimit: 50
-    },
-    validation: {
-      enabled: true,
-      strict: false,
-      schemas: [],
-      sanitizeInput: true
-    }
-  };
+  // API Gateway Configuration using the factory function
+  const gatewayConfig = createGatewayMiddlewareConfig();
 
-  // Initialize API Gateway Service (placeholder - would be connected to actual service)
-  const gatewayService = new APIGatewayService(
-    // Redis connection would go here
-    null as any,
-    // Config would go here
-    {
-      id: 'api-gateway',
-      name: 'Insurance Lead Gen API Gateway',
-      version: '1.0.0',
-      environment: process.env.NODE_ENV as any,
-      enabled: true,
-      rateLimits: gatewayConfig.rateLimits,
-      security: gatewayConfig.security,
-      routing: { services: [], loadBalancer: {} as any, circuitBreaker: {} as any, requestTransformation: {} as any, responseTransformation: {} as any },
-      caching: { enabled: false, strategies: [], redis: {} as any, memory: {} as any },
-      monitoring: { enabled: true, metrics: {} as any, logging: {} as any, tracing: {} as any, alerting: {} as any },
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    // Audit service would go here
-    null as any,
+  // Initialize API Gateway Service
+  const gatewayService = createAPIGatewayService(
+    // Redis connection - will be initialized if REDIS_HOST is set
+    process.env.REDIS_HOST ? {
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+      password: process.env.REDIS_PASSWORD
+    } : null,
+    gatewayConfig,
+    null, // Audit service - would be properly initialized
     metrics
   );
 
   // Make gateway service available to routes
   app.set('APIGatewayService', gatewayService);
+  app.set('GatewayConfig', gatewayConfig);
 
   // Basic middleware
   app.use(helmet(gatewayConfig.security.headers));
@@ -154,20 +113,21 @@ export function createApp(): express.Express {
   app.use(apiAnalyticsMiddleware);
 
   // API Gateway middleware stack
-  app.use(requestIdMiddleware);
+  app.use(gatewayRequestIdMiddleware);
   app.use(apiGatewayMiddleware(gatewayService));
-  app.use(requestValidationMiddleware(gatewayConfig.validation));
+  app.use(requestValidationMiddleware(gatewayConfig.security.inputValidation));
   app.use(requestTransformationMiddleware());
   app.use(responseTransformationMiddleware(gatewayService));
+  app.use(rateLimitHeadersMiddleware(gatewayService));
   app.use(
     createAuditMiddleware({
       excludePaths: ['/health', '/metrics', '/uploads'],
     })
   );
 
-  // Global Rate Limiting
-  const globalRateLimiter = createSecurityRateLimiter({
-    ...rateLimitPresets.api,
+  // Global Rate Limiting using the security rate limiter
+  const globalRateLimiter = createSecurityRateLimiterFromMiddleware({
+    ...rateLimitPresetsFromMiddleware.api,
     redis: process.env.REDIS_HOST ? {
       host: process.env.REDIS_HOST,
       port: parseInt(process.env.REDIS_PORT || '6379'),
@@ -180,7 +140,6 @@ export function createApp(): express.Express {
   app.use(createInputSanitizer());
 
   // Metrics middleware
-  app.use(metricsCollector.middleware());
   app.use(metrics.middleware());
 
   app.use('/uploads', express.static(path.resolve(UPLOADS_DIR)));

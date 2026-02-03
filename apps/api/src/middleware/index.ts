@@ -16,5 +16,7 @@ export {
   corsMiddleware,
   requestIdMiddleware,
   requestLoggingMiddleware,
-  circuitBreakerMiddleware
+  circuitBreakerMiddleware,
+  rateLimitHeadersMiddleware,
+  createGatewayMiddlewareConfig
 } from './api-gateway.middleware.js';

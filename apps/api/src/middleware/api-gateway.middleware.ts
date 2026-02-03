@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { APIGatewayService } from '@insurance-lead-gen/core';
+import { APIGatewayService, APIGatewayServiceConfig } from '@insurance-lead-gen/core';
 import { RequestContext, AuthenticationRequest, RequestValidation } from '@insurance-lead-gen/types';
 import { logger } from '@insurance-lead-gen/core';
 
@@ -570,6 +570,173 @@ function createCircuitBreaker(config: any): any {
       }
     }
   };
+}
+
+/**
+ * Rate Limit Headers Middleware
+ * Injects standard rate limit headers into all responses
+ */
+export const rateLimitHeadersMiddleware = (gatewayService?: APIGatewayService) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Store original setHeader
+    const originalSetHeader = res.setHeader.bind(res);
+    
+    // Override setHeader to inject rate limit info from context
+    res.setHeader = (name: string, value: string | number) => {
+      // Let the original headers be set
+      return originalSetHeader(name, value);
+    };
+    
+    // Inject rate limit headers if available in context
+    const context = (req as any).apiContext;
+    if (context?.attributes) {
+      const { rateLimitLimit, rateLimitRemaining, rateLimitReset } = context.attributes;
+      
+      if (rateLimitLimit !== undefined) {
+        originalSetHeader('X-RateLimit-Limit', rateLimitLimit.toString());
+      }
+      if (rateLimitRemaining !== undefined) {
+        originalSetHeader('X-RateLimit-Remaining', rateLimitRemaining.toString());
+      }
+      if (rateLimitReset) {
+        originalSetHeader('X-RateLimit-Reset', rateLimitReset);
+      }
+    }
+    
+    next();
+  };
+};
+
+/**
+ * Create API Gateway middleware configuration
+ */
+export function createGatewayMiddlewareConfig(overrides?: Partial<APIGatewayServiceConfig>): APIGatewayServiceConfig {
+  return {
+    id: 'api-gateway',
+    name: 'Insurance Lead Gen API Gateway',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV as any || 'development',
+    enabled: true,
+    rateLimits: {
+      global: {
+        requests: 1000,
+        windowMs: 60000,
+        strategy: 'sliding'
+      },
+      perRoute: {},
+      perUser: {},
+      burstLimit: 50
+    },
+    security: {
+      jwt: {
+        secret: process.env.JWT_SECRET || 'secret',
+        algorithm: 'HS256',
+        expiresIn: '1h',
+        refreshTokenExpiresIn: '7d',
+        issuer: 'insurance-lead-gen',
+        audience: 'api',
+        enableBlacklisting: true,
+        leeway: 60
+      },
+      apiKeys: {
+        enabled: true,
+        headerName: 'X-API-Key',
+        prefix: 'ak_',
+        hashAlgorithm: 'sha256',
+        rotationInterval: 90 * 24 * 60 * 60 * 1000,
+        allowedScopes: ['read', 'write', 'admin']
+      },
+      oauth: {
+        providers: [],
+        redirectUris: [],
+        stateExpiry: 600000,
+        enableStateValidation: true,
+        enableNonceValidation: false
+      },
+      cors: {
+        origin: process.env.NODE_ENV === 'production'
+          ? process.env.ALLOWED_ORIGINS?.split(',') || false
+          : true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-API-Key'],
+        exposedHeaders: ['X-Request-ID', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+        credentials: true,
+        maxAge: 86400,
+        preflightContinue: false,
+        optionsSuccessStatus: 204
+      },
+      csrf: {
+        enabled: false,
+        headerName: 'X-CSRF-Token',
+        cookieName: 'csrf_token',
+        cookieOptions: {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          path: '/'
+        },
+        tokenLength: 32,
+        excludedRoutes: ['/health', '/metrics', '/api/v1/auth/login']
+      },
+      headers: {
+        hsts: { enabled: true, maxAge: 31536000, includeSubDomains: true, preload: true },
+        xssProtection: { enabled: true, mode: 'block' },
+        contentTypeOptions: { enabled: true },
+        frameOptions: { enabled: true, policy: 'SAMEORIGIN' },
+        referrerPolicy: { enabled: true, policy: 'strict-origin-when-cross-origin' }
+      },
+      inputValidation: {
+        enabled: true,
+        sanitizeInput: true,
+        removeNullBytes: true,
+        maxPayloadSize: 10485760,
+        allowedContentTypes: [
+          'application/json',
+          'application/x-www-form-urlencoded',
+          'multipart/form-data'
+        ],
+        blockedPatterns: [
+          '/\\$\\{.*\\}/',
+          '/\\$\\(.*\\)/',
+          '/script/i',
+          '/union\\s+select/i',
+          '/--.*$/m'
+        ],
+        customValidators: []
+      },
+      auditLogging: true,
+      encryptionAtRest: true
+    },
+    routing: {
+      services: [],
+      loadBalancer: {
+        algorithm: 'round_robin',
+        stickySession: false
+      },
+      circuitBreaker: {
+        enabled: true,
+        failureThreshold: 5,
+        recoveryTimeout: 30000
+      }
+    },
+    monitoring: {
+      enabled: true,
+      metrics: {
+        enabled: true,
+        interval: 15000
+      },
+      logging: {
+        enabled: true,
+        level: 'info'
+      },
+      alerting: {
+        enabled: true,
+        rules: [],
+        channels: []
+      }
+    },
+    ...overrides
+  } as APIGatewayServiceConfig;
 }
 
 // Extend Express Request interface
