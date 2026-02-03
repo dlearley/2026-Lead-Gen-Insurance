@@ -18,3 +18,7 @@ export {
   requestLoggingMiddleware,
   circuitBreakerMiddleware
 } from './api-gateway.middleware.js';
+
+// Security Middleware
+export { createSecurityRateLimiter, rateLimitPresets } from './security-rate-limiter.js';
+export { createInputSanitizer } from './security.js';

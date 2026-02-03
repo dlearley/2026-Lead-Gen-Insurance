@@ -102,3 +102,65 @@ export {
   authService,
   type AuthConfig,
 } from './auth.js';
+
+// JWT Service
+export {
+  JWTService,
+  getJWTService,
+  type JWTConfig,
+  type JWTPayload,
+  type TokenPair,
+} from './jwt.js';
+
+// MFA Service
+export {
+  MFAService,
+  getMFAService,
+  WebAuthnService,
+  getWebAuthnService,
+  type MFAConfig,
+  type MFASecret,
+  type MFAVerification,
+  type WebAuthnCredential,
+  type WebAuthnChallenge,
+} from './mfa.js';
+
+// OAuth/SSO Service
+export {
+  OAuthSSOService,
+  oauthSSOService,
+  type OAuthProviderConfig,
+  type OAuthTokenResponse,
+  type OAuthUserInfo,
+  type SSOConfig,
+} from './oauth-sso.js';
+
+// Session Management
+export {
+  SessionService,
+  sessionService,
+  type SessionConfig,
+  type Session,
+  type SessionTokenPair,
+  type DeviceInfo,
+} from './session-management.js';
+
+// Device Fingerprinting
+export {
+  DeviceFingerprinting,
+  deviceFingerprinting,
+  type DeviceFingerprint,
+  type FingerprintComponents,
+  type DeviceFingerprintConfig,
+} from './device-fingerprinting.js';
+
+// Security Policy
+export {
+  SecurityPolicyService,
+  securityPolicyService,
+  type PasswordPolicy,
+  type AccountLockoutPolicy,
+  type SecurityPolicy,
+  type SecurityEvent,
+  type PasswordStrengthResult,
+} from './security-policy.js';
